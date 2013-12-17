@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vs2008-amqp", "vs2008-amqp.csproj", "{5CDFDA77-CFC2-4A6E-B731-6C06B59BFFE3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vs2008-amqp-test", "vs2008-amqp-test.csproj", "{2F31ED5C-44A2-464A-BD55-2B5B010654E8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5CDFDA77-CFC2-4A6E-B731-6C06B59BFFE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5CDFDA77-CFC2-4A6E-B731-6C06B59BFFE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5CDFDA77-CFC2-4A6E-B731-6C06B59BFFE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5CDFDA77-CFC2-4A6E-B731-6C06B59BFFE3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2F31ED5C-44A2-464A-BD55-2B5B010654E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2F31ED5C-44A2-464A-BD55-2B5B010654E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2F31ED5C-44A2-464A-BD55-2B5B010654E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2F31ED5C-44A2-464A-BD55-2B5B010654E8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
