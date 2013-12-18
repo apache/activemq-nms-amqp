@@ -1,6 +1,3 @@
-using System;
-using Org.Apache.Qpid.Messaging;
-using System.Threading;
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,7 +14,11 @@ using System.Threading;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+using System;
+using System.Threading;
 using Apache.NMS.Util;
+using Org.Apache.Qpid.Messaging;
 
 namespace Apache.NMS.Amqp
 {
@@ -26,6 +27,11 @@ namespace Apache.NMS.Amqp
     /// </summary>
     public class MessageConsumer : IMessageConsumer
     {
+        /// <summary>
+        /// Private object used for synchronization, instead of public "this"
+        /// </summary>
+        private readonly object myLock = new object();
+
         protected TimeSpan zeroTimeout = new TimeSpan(0);
 
         private readonly Session session;
@@ -38,6 +44,8 @@ namespace Apache.NMS.Amqp
         private AutoResetEvent pause = new AutoResetEvent(false);
         private Atomic<bool> asyncDelivery = new Atomic<bool>(false);
 
+        private readonly Atomic<bool> started = new Atomic<bool>(false); 
+        private Org.Apache.Qpid.Messaging.Receiver qpidReceiver = null;
 
         private ConsumerTransformerDelegate consumerTransformer;
         public ConsumerTransformerDelegate ConsumerTransformer
@@ -52,6 +60,28 @@ namespace Apache.NMS.Amqp
             this.id = consumerId;
             this.destination = dest;
             this.acknowledgementMode = acknowledgementMode;
+        }
+
+        public void Start()
+        {
+            // Don't try creating session if connection not yet up
+            if (!session.IsStarted)
+            {
+                throw new SessionClosedException();
+            }
+
+            if (started.CompareAndSet(false, true))
+            {
+                try
+                {
+                    // Create qpid sender
+                    qpidReceiver = session.CreateQpidReceiver("");
+                }
+                catch (Org.Apache.Qpid.Messaging.QpidException e)
+                {
+                    throw new NMSException("Failed to create Qpid Receiver : " + e.Message);
+                }
+            }
         }
 
         public event MessageListener Listener

@@ -50,7 +50,7 @@ namespace Apache.NMS.Amqp
         private int sessionCounter = 0; 
         private readonly IList sessions = ArrayList.Synchronized(new ArrayList());
 
-        Org.Apache.Qpid.Messaging.Connection qpidConnection = null; // Don't create until Start()
+        private Org.Apache.Qpid.Messaging.Connection qpidConnection = null; // Don't create until Start()
 
         /// <summary>
         /// Creates new connection
@@ -81,7 +81,7 @@ namespace Apache.NMS.Amqp
                 {
                     foreach (Session session in sessions)
                     {
-                        //session.Start();
+                        session.Start();
                     }
                 }
             }
@@ -336,7 +336,44 @@ namespace Apache.NMS.Amqp
 
         public void Close()
         {
-            Dispose();
+            if (!this.closed.Value)
+            {
+                this.Stop();
+            }
+
+            lock (connectedLock)
+            {
+                if (this.closed.Value)
+                {
+                    return;
+                }
+
+                try
+                {
+                    Tracer.InfoFormat("Connection[]: Closing Connection Now.");
+                    this.closing.Value = true;
+
+                    lock (sessions.SyncRoot)
+                    {
+                        foreach (Session session in sessions)
+                        {
+                            session.Shutdown();
+                        }
+                    }
+                    sessions.Clear();
+
+                }
+                catch (Exception ex)
+                {
+                    Tracer.ErrorFormat("Connection[]: Error during connection close: {0}", ex);
+                }
+                finally
+                {
+                    this.closed.Value = true;
+                    this.connected.Value = false;
+                    this.closing.Value = false;
+                }
+            }
         }
 
         public void PurgeTempDestinations()
@@ -358,6 +395,16 @@ namespace Apache.NMS.Amqp
         public int GetNextSessionId()
         {
             return Interlocked.Increment(ref sessionCounter);
+        }
+
+        public Org.Apache.Qpid.Messaging.Session CreateQpidSession()
+        {
+            // TODO: Session name; transactional session
+            if (!connected.Value)
+            {
+                throw new ConnectionClosedException();
+            }
+            return qpidConnection.CreateSession();
         }
     }
 }

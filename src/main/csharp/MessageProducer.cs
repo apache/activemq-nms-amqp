@@ -14,7 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 using System;
+using System.Threading;
+using Apache.NMS.Util;
 using Org.Apache.Qpid.Messaging;
 
 namespace Apache.NMS.Amqp
@@ -24,8 +27,13 @@ namespace Apache.NMS.Amqp
     /// </summary>
     public class MessageProducer : IMessageProducer
     {
+        /// <summary>
+        /// Private object used for synchronization, instead of public "this"
+        /// </summary>
+        private readonly object myLock = new object();
 
         private readonly Session session;
+        private readonly int id; 
         private Destination destination;
 
         //private long messageCounter;
@@ -34,9 +42,11 @@ namespace Apache.NMS.Amqp
         private MsgPriority priority;
         private bool disableMessageID;
         private bool disableMessageTimestamp;
-        private readonly int id;
 
         //private IMessageConverter messageConverter;
+
+        private readonly Atomic<bool> started = new Atomic<bool>(false);
+        private Org.Apache.Qpid.Messaging.Sender qpidSender = null;
 
         private ProducerTransformerDelegate producerTransformer;
         public ProducerTransformerDelegate ProducerTransformer
@@ -50,6 +60,28 @@ namespace Apache.NMS.Amqp
             this.session = session;
             this.id = producerId;
             this.destination = destination;
+        }
+
+        public void Start()
+        {
+            // Don't try creating session if connection not yet up
+            if (!session.IsStarted)
+            {
+                throw new SessionClosedException();
+            }
+
+            if (started.CompareAndSet(false, true))
+            {
+                try
+                {
+                    // Create qpid sender
+                    qpidSender = session.CreateQpidSender("");
+                }
+                catch (Org.Apache.Qpid.Messaging.QpidException e)
+                {
+                    throw new NMSException("Failed to create Qpid Sender : " + e.Message);
+                }
+            }
         }
 
         public void Send(IMessage message)

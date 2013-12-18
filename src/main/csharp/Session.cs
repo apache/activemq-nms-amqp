@@ -17,6 +17,7 @@
 using System;
 using System.Collections;
 using System.Threading;
+using Apache.NMS.Util;
 using Org.Apache.Qpid.Messaging;
 
 namespace Apache.NMS.Amqp
@@ -43,12 +44,16 @@ namespace Apache.NMS.Amqp
         private int producerCounter;
         private long nextDeliveryId;
         private long lastDeliveredSequenceId;
+        private readonly object sessionLock = new object();
+        private readonly Atomic<bool> started = new Atomic<bool>(false);
         protected bool disposed = false;
         protected bool closed = false;
         protected bool closing = false;
         private TimeSpan disposeStopTimeout = TimeSpan.FromMilliseconds(30000);
         private TimeSpan closeStopTimeout = TimeSpan.FromMilliseconds(Timeout.Infinite);
         private TimeSpan requestTimeout;
+
+        private Org.Apache.Qpid.Messaging.Session qpidSession = null; // Don't create until Start()
 
         public Session(Connection connection, int sessionId, AcknowledgementMode acknowledgementMode)
         {
@@ -61,6 +66,58 @@ namespace Apache.NMS.Amqp
                 // TODO: transactions
                 throw new NotSupportedException("Transactions are not supported by Qpid/Amqp");
             }
+            if (connection.IsStarted)
+            {
+                this.Start();
+            }
+            connection.AddSession(this);
+        }
+
+        /// <summary>
+        /// Create new unmanaged session and start senders and receivers
+        /// Associated connection must be open.
+        /// </summary>
+        public void Start()
+        {
+            // Don't try creating session if connection not yet up
+            if (!connection.IsStarted)
+            {
+                throw new ConnectionClosedException();
+            }
+
+            if (started.CompareAndSet(false, true))
+            {
+                try
+                {
+                    // Create qpid session
+                    qpidSession = connection.CreateQpidSession();
+
+                    // Start producers and consumers
+                    lock (producers.SyncRoot)
+                    {
+                        foreach (MessageProducer producer in producers.Values)
+                        {
+                            producer.Start();
+                        }
+                    }
+                    lock (consumers.SyncRoot)
+                    {
+                        foreach (MessageConsumer consumer in consumers.Values)
+                        {
+                            consumer.Start();
+                        }
+                    }
+                }
+                catch (Org.Apache.Qpid.Messaging.QpidException e)
+                {
+                    throw new SessionClosedException( "Failed to create session : " + e.Message );
+                }
+            }
+        }
+
+        public bool IsStarted
+        {
+            get { return started.Value; }
         }
 
         public void Dispose()
@@ -136,7 +193,7 @@ namespace Apache.NMS.Amqp
                     {
                         foreach (MessageConsumer consumer in consumers.Values)
                         {
-                            consumer.Shutdown();
+                            consumer.Close();
                         }
                     }
                     consumers.Clear();
@@ -145,7 +202,7 @@ namespace Apache.NMS.Amqp
                     {
                         foreach (MessageProducer producer in producers.Values)
                         {
-                            producer.Shutdown();
+                            producer.Close();
                         }
                     }
                     producers.Clear();
@@ -463,7 +520,26 @@ namespace Apache.NMS.Amqp
         {
             get { return id; }
         }
-        
+
+
+        public Org.Apache.Qpid.Messaging.Receiver CreateQpidReceiver(string address)
+        {
+            if (!IsStarted)
+            {
+                throw new SessionClosedException();
+            }
+            return qpidSession.CreateReceiver(address);
+        }
+
+        public Org.Apache.Qpid.Messaging.Sender CreateQpidSender(string address)
+        {
+            if (!IsStarted)
+            {
+                throw new SessionClosedException();
+            }
+            return qpidSession.CreateSender(address);
+        }
+
         #region Transaction State Events
 
         public event SessionTxEventDelegate TransactionStartedListener;
