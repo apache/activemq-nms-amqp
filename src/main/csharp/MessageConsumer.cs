@@ -62,6 +62,7 @@ namespace Apache.NMS.Amqp
             this.acknowledgementMode = acknowledgementMode;
         }
 
+        #region IStartable Methods
         public void Start()
         {
             // Don't try creating session if connection not yet up
@@ -75,7 +76,11 @@ namespace Apache.NMS.Amqp
                 try
                 {
                     // Create qpid sender
-                    qpidReceiver = session.CreateQpidReceiver("");
+                    Console.WriteLine("Start Consumer Id = " + ConsumerId.ToString());
+                    if (qpidReceiver == null)
+                    {
+                        qpidReceiver = session.CreateQpidReceiver(destination.ToString());
+                    }
                 }
                 catch (Org.Apache.Qpid.Messaging.QpidException e)
                 {
@@ -83,6 +88,30 @@ namespace Apache.NMS.Amqp
                 }
             }
         }
+
+        public bool IsStarted
+        {
+            get { return started.Value; }
+        }
+        #endregion
+
+        #region IStoppable Methods
+        public void Stop()
+        {
+            if (started.CompareAndSet(true, false))
+            {
+                try
+                {
+                    qpidReceiver.Dispose();
+                    qpidReceiver = null;
+                }
+                catch (Org.Apache.Qpid.Messaging.QpidException e)
+                {
+                    throw new NMSException("Failed to close session with Id " + ConsumerId.ToString() + " : " + e.Message);
+                }
+            }
+        }
+        #endregion
 
         public event MessageListener Listener
         {

@@ -69,18 +69,22 @@ namespace Apache.NMS.Amqp
             Dispose(false);
         }
 
+        #region IStartable Members
         /// <summary>
         /// Starts message delivery for this connection.
         /// </summary>
         public void Start()
         {
+            // Create and open qpidConnection
             CheckConnected();
+
             if (started.CompareAndSet(false, true))
             {
                 lock (sessions.SyncRoot)
                 {
                     foreach (Session session in sessions)
                     {
+                        // Create and start qpidSessions
                         session.Start();
                     }
                 }
@@ -95,25 +99,38 @@ namespace Apache.NMS.Amqp
         {
             get { return started.Value; }
         }
+        #endregion
 
+        #region IStoppable Members
         /// <summary>
         /// Temporarily stop asynchronous delivery of inbound messages for this connection.
         /// The sending of outbound messages is unaffected.
         /// </summary>
         public void Stop()
         {
+            // Close qpidConnection
+            CheckDisconnected();
+
+            // Administratively close NMS objects
             if (started.CompareAndSet(true, false))
             {
-                lock (sessions.SyncRoot)
+                foreach (Session session in sessions)
                 {
-                    foreach (Session session in sessions)
-                    {
-                        //session.Stop();
-                    }
+                    // Create and start qpidSessions
+                    session.Stop();
                 }
             }
         }
+        #endregion
 
+        #region IDisposable Methods
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+        #endregion
+
+        #region AMQP Connection Class Methods
         /// <summary>
         /// Creates a new session to work on this connection
         /// </summary>
@@ -145,12 +162,6 @@ namespace Apache.NMS.Amqp
             {
                 sessions.Remove(session);
             }
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         protected void Dispose(bool disposing)
@@ -298,11 +309,17 @@ namespace Apache.NMS.Amqp
                         try
                         {
                             // TODO: embellish the brokerUri with other connection options
-                            // Allocate a new Qpid connection
-                            qpidConnection = new Org.Apache.Qpid.Messaging.Connection(brokerUri.ToString());
+                            // Allocate a Qpid connection
+                            if (qpidConnection == null)
+                            {
+                                qpidConnection = new Org.Apache.Qpid.Messaging.Connection(brokerUri.ToString());
+                            }
                             
                             // Open the connection
-                            qpidConnection.Open();
+                            if (!qpidConnection.IsOpen)
+                            {
+                                qpidConnection.Open();
+                            }
 
                             connected.Value = true;
                         }
@@ -331,6 +348,54 @@ namespace Apache.NMS.Amqp
             if (!connected.Value)
             {
                 throw new ConnectionClosedException();
+            }
+        }
+
+
+        /// <summary>
+        /// Check and ensure that the connection object is disconnected
+        /// Open connections are closed and this closes related sessions, senders, and receivers.
+        /// Closed connections may be restarted with subsequent calls to Start().
+        /// </summary>
+        internal void CheckDisconnected()
+        {
+            if (closed.Value || closing.Value)
+            {
+                throw new ConnectionClosedException();
+            }
+            if (!connected.Value)
+            {
+                return;
+            }
+            while (connected.Value && !closed.Value && !closing.Value)
+            {
+                if (Monitor.TryEnter(connectedLock))
+                {
+                    try
+                    {
+                        // Close the connection
+                        if (qpidConnection.IsOpen)
+                        {
+                            qpidConnection.Close();
+                        }
+
+                        connected.Value = false;
+                        break;
+                    }
+                    catch (Org.Apache.Qpid.Messaging.QpidException e)
+                    {
+                        throw new NMSException("AMQP Connection close failed : " + e.Message);
+                    }
+                    finally
+                    {
+                        Monitor.Exit(connectedLock);
+                    }
+                }
+            }
+
+            if (connected.Value)
+            {
+                throw new NMSException("Failed to close AMQP Connection");
             }
         }
 
@@ -392,6 +457,7 @@ namespace Apache.NMS.Amqp
             }
         }
 
+
         public int GetNextSessionId()
         {
             return Interlocked.Increment(ref sessionCounter);
@@ -406,5 +472,6 @@ namespace Apache.NMS.Amqp
             }
             return qpidConnection.CreateSession();
         }
+        #endregion
     }
 }

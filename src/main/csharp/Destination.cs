@@ -49,12 +49,12 @@ namespace Apache.NMS.Amqp
 			set
 			{
 				this.path = value;
-				if(!this.path.Contains("\\"))
-				{
-					// Queues must have paths in them.  If no path specified, then
-					// default to local machine.
-					this.path = ".\\" + this.path;
-				}
+                //if(!this.path.Contains("\\"))
+                //{
+                //    // Queues must have paths in them.  If no path specified, then
+                //    // default to local machine.
+                //    this.path = ".\\" + this.path;
+                //}
 			}
 		}
 
