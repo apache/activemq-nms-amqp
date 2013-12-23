@@ -90,8 +90,10 @@
     <Compile Include="src\main\csharp\ObjectMessage.cs" />
     <Compile Include="src\main\csharp\Queue.cs" />
     <Compile Include="src\main\csharp\Session.cs" />
+    <Compile Include="src\main\csharp\SessionClosedException.cs" />
     <Compile Include="src\main\csharp\StreamMessage.cs" />
     <Compile Include="src\main\csharp\TextMessage.cs" />
+    <Compile Include="src\main\csharp\Topic.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="keyfile\NMSKey.snk" />

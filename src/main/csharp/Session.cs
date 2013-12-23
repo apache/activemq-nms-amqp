@@ -379,7 +379,7 @@ namespace Apache.NMS.Amqp
 
         public ITopic GetTopic(string name)
         {
-            throw new NotSupportedException("TODO: Topic");
+            return new Topic(name);
         }
 
         public ITemporaryQueue CreateTemporaryQueue()
