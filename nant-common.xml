@@ -41,11 +41,12 @@
     <property name="build.skip"              value="false" />
     <property name="build.skip.release"      value="false" unless="${property::exists('build.skip.release')}" />
     <property name="download.skip"           value="false" unless="${property::exists('download.skip')}"/>
+    <property name="install.skip"            value="false" unless="${property::exists('install.skip')}"/>
     <property name="compile.skip"            value="false" unless="${property::exists('compile.skip')}" />
     <property name="current.build.config"    value="${if(project.release.type == 'release', 'release', 'debug')}" overwrite="false" />
     <property name="current.build.framework" value="${framework::get-target-framework()}" overwrite="false" />
     <property name="current.build.defines"   value="${build.defines}" />
-    <property name="build.framework.strings" value="net-2.0,net-3.5,net-4.0,mono-2.0,netcf-2.0,netcf-3.5" unless="${property::exists('build.framework.strings')}"/>
+    <property name="build.framework.strings" value="net-2.0,net-3.5,net-4.0,mono-2.0,mono-4.0,netcf-2.0,netcf-3.5" unless="${property::exists('build.framework.strings')}"/>
     <property name="current.build.framework.assembly.dir" value="${framework::get-assembly-directory(framework::get-target-framework())}" dynamic="true" />
 
     <property name="build.config.strings"    value="${if(property::exists('configuration'), configuration, if(build.skip.release == 'true', 'debug', 'debug,release'))}" dynamic="true" />
@@ -205,6 +206,9 @@
         <property name="current.build.framework.sign" value="true" />
         <property name="link.sdkdoc.version" value="SDK_v2_0" />
         <property name="link.sdkdoc.web" value="true" />
+        <if test="${framework::exists(current.build.framework)}">
+            <property name="nant.settings.currentframework" value="${current.build.framework}" />
+        </if>
         <!-- Use the .NET 3.5 compiler for improved language features.  Still targets same runtime. -->
         <if test="${framework::exists('net-3.5')}">
             <property name="nant.settings.currentframework" value="net-3.5" />
@@ -263,6 +267,18 @@
         <property name="current.build.framework" value="mono-2.0" />
         <property name="current.build.framework.name" value="Mono 2.0" />
         <property name="current.build.defines" value="${build.defines}MONO,MONO_2_0" dynamic="true" />
+        <property name="current.build.framework.sign" value="true" />
+        <property name="link.sdkdoc.version" value="SDK_v1_1" />
+        <property name="link.sdkdoc.web" value="true" />
+        <if test="${framework::exists(current.build.framework)}">
+            <property name="nant.settings.currentframework" value="${current.build.framework}" />
+        </if>
+    </target>
+
+    <target name="set-mono-4.0-framework-configuration">
+        <property name="current.build.framework" value="mono-4.0" />
+        <property name="current.build.framework.name" value="Mono 4.0" />
+        <property name="current.build.defines" value="${build.defines}MONO,MONO_4_0" dynamic="true" />
         <property name="current.build.framework.sign" value="true" />
         <property name="link.sdkdoc.version" value="SDK_v1_1" />
         <property name="link.sdkdoc.web" value="true" />
@@ -387,7 +403,7 @@
     <target name="install" depends="init, compile-target, conditional-install"
             description="Install the artifacts into the nant repo" />
 
-    <target name="conditional-install" unless="${build.skip}"
+    <target name="conditional-install" unless="${build.skip or install.skip}"
             description="Install the artifacts into the nant repo">
         <property name="path" value="${project.group}/${project.name}/${project.version.full}/${current.build.framework}/${current.build.config}" />
         <foreach item="File" property="install.filename">
@@ -471,7 +487,7 @@
                 <exec program="nunit-console" failonerror="true" workingdir="build/${current.build.framework}/${current.build.config}">
                     <arg value="${NUnit.Projectfile}" />
                     <arg value="-labels" />
-                    <arg value="-exclude=LongRunning" />
+                    <arg value="-exclude=Manual,LongRunning" />
                     <arg value="-xml=Nunit.TestOutput.xml" />
                 </exec>
             </if>
