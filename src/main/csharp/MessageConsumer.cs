@@ -76,7 +76,7 @@ namespace Apache.NMS.Amqp
                 try
                 {
                     // Create qpid sender
-                    Console.WriteLine("Start Consumer Id = " + ConsumerId.ToString());
+                    Tracer.DebugFormat("Start Consumer Id = " + ConsumerId.ToString());
                     if (qpidReceiver == null)
                     {
                         qpidReceiver = session.CreateQpidReceiver(destination.ToString());
@@ -141,8 +141,11 @@ namespace Apache.NMS.Amqp
         {
             IMessage nmsMessage = null;
 
-            // TODO: Receive a message
-
+            Message qpidMessage = new Message();
+            if (qpidReceiver.Fetch(ref qpidMessage))
+            {
+                nmsMessage = session.MessageConverter.ToNmsMessage(qpidMessage);
+            }
             return nmsMessage;
         }
 

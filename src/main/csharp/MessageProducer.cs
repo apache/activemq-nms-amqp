@@ -76,7 +76,7 @@ namespace Apache.NMS.Amqp
                 try
                 {
                     // Create qpid sender
-                    Console.WriteLine("Start Producer Id = " + ProducerId.ToString()); 
+                    Tracer.DebugFormat("Start Producer Id = " + ProducerId.ToString()); 
                     if (qpidSender == null)
                     {
                         qpidSender = session.CreateQpidSender(destination.ToString());
@@ -102,7 +102,7 @@ namespace Apache.NMS.Amqp
             {
                 try
                 {
-                    Console.WriteLine("Stop  Producer Id = " + ProducerId);
+                    Tracer.DebugFormat("Stop  Producer Id = " + ProducerId);
                     qpidSender.Dispose();
                     qpidSender = null;
                 }
@@ -158,7 +158,7 @@ namespace Apache.NMS.Amqp
                 // Convert the Message into a Amqp message
                 Message msg = session.MessageConverter.ToAmqpMessage(message);
 
-                // TODO: send the message!
+                qpidSender.Send(msg);
             }
             catch (Exception e)
             {
