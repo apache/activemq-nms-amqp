@@ -56,7 +56,7 @@ namespace Apache.NMS.Amqp
         public static string GetDefaultBrokerUrl()
         {
             string answer = Environment.GetEnvironmentVariable(ENV_BROKER_URL);
-            if(answer == null)
+            if (answer == null)
             {
                 answer = DEFAULT_BROKER_URL;
             }
@@ -144,6 +144,15 @@ namespace Apache.NMS.Amqp
             connection.ClientId = this.clientID;
             connection.ConnectionProperties = this.properties;
 
+            if (!String.IsNullOrEmpty(userName))
+            {
+                connection.SetConnectionProperty(Connection.USERNAME_OPTION, userName);
+            }
+            if (!String.IsNullOrEmpty(password))
+            {
+                connection.SetConnectionProperty(Connection.PASSWORD_OPTION, password);
+            }
+
             IConnection ReturnValue = null;
             ReturnValue = connection;
 
@@ -168,7 +177,7 @@ namespace Apache.NMS.Amqp
             get { return this.redeliveryPolicy; }
             set
             {
-                if(value != null)
+                if (value != null)
                 {
                     this.redeliveryPolicy = value;
                 }

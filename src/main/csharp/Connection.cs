@@ -36,6 +36,8 @@ namespace Apache.NMS.Amqp
         private const string PROTOCOL_1_0 = "amqp1.0";
         private const char SEP_ARGS = ',';
         private const char SEP_NAME_VALUE = ':';
+        public const string USERNAME_OPTION = "username";
+        public const string PASSWORD_OPTION = "password";
 
         private static readonly TimeSpan InfiniteTimeSpan = TimeSpan.FromMilliseconds(Timeout.Infinite);
 
@@ -57,7 +59,7 @@ namespace Apache.NMS.Amqp
         private string clientId;
         private StringDictionary connectionProperties;
 
-        private int sessionCounter = 0; 
+        private int sessionCounter = 0;
         private readonly IList sessions = ArrayList.Synchronized(new ArrayList());
 
         private Org.Apache.Qpid.Messaging.Connection qpidConnection = null; // Don't create until Start()
@@ -246,8 +248,8 @@ namespace Apache.NMS.Amqp
         public IRedeliveryPolicy RedeliveryPolicy
         {
             get { return this.redeliveryPolicy; }
-            set 
-            { 
+            set
+            {
                 ThrowIfConnected("RedeliveryPolicy");
                 this.redeliveryPolicy = value;
             }
@@ -257,10 +259,10 @@ namespace Apache.NMS.Amqp
         public ConsumerTransformerDelegate ConsumerTransformer
         {
             get { return this.consumerTransformer; }
-            set 
+            set
             {
                 ThrowIfConnected("ConsumerTransformer");
-                this.consumerTransformer = value; 
+                this.consumerTransformer = value;
             }
         }
 
@@ -268,7 +270,7 @@ namespace Apache.NMS.Amqp
         public ProducerTransformerDelegate ProducerTransformer
         {
             get { return this.producerTransformer; }
-            set 
+            set
             {
                 ThrowIfConnected("ProducerTransformer");
                 this.producerTransformer = value;
@@ -333,12 +335,12 @@ namespace Apache.NMS.Amqp
                             // Allocate a Qpid connection
                             if (qpidConnection == null)
                             {
-                                qpidConnection = 
+                                qpidConnection =
                                     new Org.Apache.Qpid.Messaging.Connection(
-                                        brokerUri.ToString(), 
+                                        brokerUri.ToString(),
                                         ConstructConnectionOptionsString());
                             }
-                            
+
                             // Open the connection
                             if (!qpidConnection.IsOpen)
                             {
@@ -349,7 +351,7 @@ namespace Apache.NMS.Amqp
                         }
                         catch (Org.Apache.Qpid.Messaging.QpidException e)
                         {
-                            throw new ConnectionClosedException( e.Message );
+                            throw new ConnectionClosedException(e.Message);
                         }
                     }
                     finally
@@ -482,7 +484,7 @@ namespace Apache.NMS.Amqp
         public StringDictionary ConnectionProperties
         {
             get { return connectionProperties; }
-            set 
+            set
             {
                 ThrowIfConnected("ConnectionProperties");
                 connectionProperties = value;
@@ -551,7 +553,7 @@ namespace Apache.NMS.Amqp
 
         public void HandleException(Exception e)
         {
-            if(ExceptionListener != null && !this.closed.Value)
+            if (ExceptionListener != null && !this.closed.Value)
             {
                 ExceptionListener(e);
             }
