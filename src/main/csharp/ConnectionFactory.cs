@@ -15,21 +15,43 @@
  * limitations under the License.
  */
 using System;
+using System.Collections.Specialized;
 using Apache.NMS.Policies;
 using Org.Apache.Qpid.Messaging;
 
 namespace Apache.NMS.Amqp
 {
     /// <summary>
-    /// A Factory that can estbalish NMS connections to Qpid/Amqp
+    /// A Factory that can establish NMS connections to AMQP using QPID.
+    /// 
+    /// @param brokerUri String or Uri specifying base connection address
+    /// @param clientID String specifying client ID
+    /// @param connectionProperties 0..N Strings specifying Qpid connection connectionProperties in the form "name:value".
+    /// 
+    /// Example:
+    /// Uri connecturi = new Uri("amqp:localhost:5673")
+    /// IConnectionFactory factory = new NMSConnectionFactory();
+    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi);
+    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA");
+    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA", "protocol:amqp1.0");
+    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA", "protocol:amqp1.0", "reconnect:true", "reconnect_timeout:60", "username:bob", "password:secret");
+    /// 
+    /// See http://qpid.apache.org/components/programming/book/connection-options.html 
+    /// for more information on Qpid connection options.
     /// </summary>
     public class ConnectionFactory : IConnectionFactory
     {
         public const string DEFAULT_BROKER_URL = "tcp://localhost:5672";
         public const string ENV_BROKER_URL = "AMQP_BROKER_URL";
+        private const char SEP_NAME_VALUE = ':';
+
         private Uri brokerUri;
         private string clientID;
+
+        private StringDictionary properties = new StringDictionary();
         private IRedeliveryPolicy redeliveryPolicy = new RedeliveryPolicy();
+
+        #region Constructor Methods
 
         public static string GetDefaultBrokerUrl()
         {
@@ -42,37 +64,70 @@ namespace Apache.NMS.Amqp
         }
 
         public ConnectionFactory()
-            : this(GetDefaultBrokerUrl())
+            : this(new Uri(GetDefaultBrokerUrl()), string.Empty, null)
         {
         }
 
         public ConnectionFactory(string brokerUri)
-            : this(brokerUri, null)
+            : this(new Uri(brokerUri), string.Empty, null)
         {
         }
 
         public ConnectionFactory(string brokerUri, string clientID)
-            : this(new Uri(brokerUri), clientID)
+            : this(new Uri(brokerUri), clientID, null)
         {
         }
 
         public ConnectionFactory(Uri brokerUri)
-            : this(brokerUri, null)
+            : this(brokerUri, string.Empty, null)
         {
         }
 
         public ConnectionFactory(Uri brokerUri, string clientID)
+            : this(brokerUri, clientID, null)
         {
-            this.brokerUri = brokerUri;
-            this.clientID = clientID;
         }
+
+        public ConnectionFactory(Uri brokerUri, string clientID, params Object[] propsArray)
+        {
+            try
+            {
+                this.brokerUri = brokerUri;
+                this.clientID = clientID;
+
+                if (propsArray != null)
+                {
+                    foreach (object prop in propsArray)
+                    {
+                        string nvp = prop.ToString();
+                        int sepPos = nvp.IndexOf(SEP_NAME_VALUE);
+                        if (sepPos > 0)
+                        {
+                            properties.Add(nvp.Substring(0, sepPos), nvp.Substring(sepPos + 1));
+                        }
+                        else
+                        {
+                            throw new NMSException("Connection property is not in the form \"name:value\" :" + nvp);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Apache.NMS.Tracer.DebugFormat("Exception instantiating AMQP.ConnectionFactory: {0}", ex.Message);
+                throw;
+            }
+        }
+        #endregion
+
+        #region IConnectionFactory Members
 
         /// <summary>
         /// Creates a new connection to Qpid/Amqp.
         /// </summary>
         public IConnection CreateConnection()
         {
-            return CreateConnection(string.Empty, string.Empty, false);
+            return CreateConnection(string.Empty, string.Empty);
         }
 
         /// <summary>
@@ -80,21 +135,14 @@ namespace Apache.NMS.Amqp
         /// </summary>
         public IConnection CreateConnection(string userName, string password)
         {
-            return CreateConnection(userName, password, false);
-        }
-
-        /// <summary>
-        /// Creates a new connection to Qpid/Amqp.
-        /// </summary>
-        public IConnection CreateConnection(string userName, string password, bool useLogging)
-        {
-            Connection connection = new Connection(this.BrokerUri);
+            Connection connection = new Connection();
 
             connection.RedeliveryPolicy = this.redeliveryPolicy.Clone() as IRedeliveryPolicy;
-            //connection.ConsumerTransformer = this.consumerTransformer;
-            //connection.ProducerTransformer = this.producerTransformer;
+            //connection.ConsumerTransformer = this.consumerTransformer; // TODO:
+            //connection.ProducerTransformer = this.producerTransformer; // TODO:
             connection.BrokerUri = this.BrokerUri;
             connection.ClientId = this.clientID;
+            connection.ConnectionProperties = this.properties;
 
             IConnection ReturnValue = null;
             ReturnValue = connection;
@@ -141,5 +189,69 @@ namespace Apache.NMS.Amqp
             set { this.producerTransformer = value; }
         }
 
+        #endregion
+
+        #region ConnectionProperties Methods
+
+        /// <summary>
+        /// Connection connectionProperties acceessor
+        /// </summary>
+        /// <remarks>This factory does not check for legal property names. Users
+        /// my specify anything they want. Propery name processing happens when
+        /// connections are created and started.</remarks>
+        public StringDictionary ConnectionProperties
+        {
+            get { return properties; }
+            set { properties = value; }
+        }
+
+        /// <summary>
+        /// Test existence of named property
+        /// </summary>
+        /// <param name="name">The name of the connection property to test.</param>
+        /// <returns>Boolean indicating if property exists in setting dictionary.</returns>
+        public bool ConnectionPropertyExists(string name)
+        {
+            return properties.ContainsKey(name);
+        }
+
+        /// <summary>
+        /// Get value of named property
+        /// </summary>
+        /// <param name="name">The name of the connection property to get.</param>
+        /// <returns>string value of property.</returns>
+        /// <remarks>Throws if requested property does not exist.</remarks>
+        public string GetConnectionProperty(string name)
+        {
+            if (properties.ContainsKey(name))
+            {
+                return properties[name];
+            }
+            else
+            {
+                throw new NMSException("Amqp connection property '" + name + "' does not exist");
+            }
+        }
+
+        /// <summary>
+        /// Set value of named property
+        /// </summary>
+        /// <param name="name">The name of the connection property to set.</param>
+        /// <param name="value">The value of the connection property.</param>
+        /// <returns>void</returns>
+        /// <remarks>Existing property values are overwritten. New property values
+        /// are added.</remarks>
+        public void SetConnectionProperty(string name, string value)
+        {
+            if (properties.ContainsKey(name))
+            {
+                properties[name] = value;
+            }
+            else
+            {
+                properties.Add(name, value);
+            }
+        }
+        #endregion
     }
 }
