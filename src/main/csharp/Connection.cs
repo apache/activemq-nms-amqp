@@ -32,8 +32,8 @@ namespace Apache.NMS.Amqp
     {
         // Connections options indexes and constants
         private const string PROTOCOL_OPTION = "protocol";
-        private const string PROTOCOL_0_10 = "amqp0.10";
         private const string PROTOCOL_1_0 = "amqp1.0";
+        private const string PROTOCOL_0_10 = "amqp0-10";
         private const char SEP_ARGS = ',';
         private const char SEP_NAME_VALUE = ':';
         public const string USERNAME_OPTION = "username";
@@ -338,7 +338,7 @@ namespace Apache.NMS.Amqp
                                 qpidConnection =
                                     new Org.Apache.Qpid.Messaging.Connection(
                                         brokerUri.ToString(),
-                                        ConstructConnectionOptionsString());
+                                        ConstructConnectionOptionsString(connectionProperties));
                             }
 
                             // Open the connection
@@ -584,35 +584,12 @@ namespace Apache.NMS.Amqp
         /// Convert specified connection properties string map into the
         /// connection properties string to send to Qpid Messaging. 
         /// </summary>
-        /// <returns>void</returns>
-        /// <remarks>Mostly this is pass-through but special processing is applied
-        /// to the protocol version to get a default amqp1.0.</remarks>
-        internal string ConstructConnectionOptionsString()
+        /// <returns>qpid connection properties string</returns>
+        /// <remarks>Mostly this is pass-through. Default to amqp1.0
+        /// in the absence of any protocol option.</remarks>
+        internal string ConstructConnectionOptionsString(StringDictionary cp)
         {
             string result = "";
-            // construct new dictionary with desired settings
-            StringDictionary cp = connectionProperties;
-
-            // protocol version munging
-            if (cp.ContainsKey(PROTOCOL_OPTION))
-            {
-                // protocol option specified
-                if (cp[PROTOCOL_OPTION].Equals(PROTOCOL_0_10))
-                {
-                    // amqp 0.10 selected by setting _no_ option
-                    cp.Remove(PROTOCOL_OPTION);
-                }
-                else
-                {
-                    // amqp version set but not to version 0.10 - pass it through
-                }
-            }
-            else
-            {
-                // no protocol option - select 1.0
-                cp.Add(PROTOCOL_OPTION, PROTOCOL_1_0);
-            }
-
             // Construct qpid connection string
             bool first = true;
             result = "{";
@@ -623,9 +600,21 @@ namespace Apache.NMS.Amqp
                     result += SEP_ARGS;
                 }
                 result += de.Key + SEP_NAME_VALUE.ToString() + de.Value;
+                first = false;
             }
-            result += "}";
 
+            // protocol version munging
+            if (!cp.ContainsKey(PROTOCOL_OPTION))
+            {
+                // no protocol option - select 1.0
+                if (!first)
+                {
+                    result += SEP_ARGS;
+                }
+                result += PROTOCOL_OPTION + SEP_NAME_VALUE.ToString() + PROTOCOL_1_0;
+            }
+
+            result += "}";
             return result;
         }
 
