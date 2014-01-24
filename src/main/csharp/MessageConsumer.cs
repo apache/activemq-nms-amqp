@@ -79,7 +79,7 @@ namespace Apache.NMS.Amqp
                     Tracer.DebugFormat("Start Consumer Id = " + ConsumerId.ToString());
                     if (qpidReceiver == null)
                     {
-                        qpidReceiver = session.CreateQpidReceiver(destination.ToString());
+                        qpidReceiver = session.CreateQpidReceiver(destination.Address);
                     }
                 }
                 catch (Org.Apache.Qpid.Messaging.QpidException e)

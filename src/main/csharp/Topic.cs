@@ -16,45 +16,57 @@
  */
 using System;
 
+// Typedef for options map
+using OptionsMap = System.Collections.Generic.Dictionary<System.String, System.Object>;
+
 namespace Apache.NMS.Amqp
 {
 
-	/// <summary>
-	/// Summary description for Topic.
-	/// </summary>
-	public class Topic : Destination, ITopic
-	{
+    /// <summary>
+    /// Summary description for Topic.
+    /// </summary>
+    public class Topic : Destination, ITopic
+    {
 
-		public Topic()
-			: base()
-		{
-		}
+        public Topic()
+            : base()
+        {
+        }
 
-		public Topic(String name)
-			: base(name)
-		{
-		}
+        public Topic(String name)
+            : base(name)
+        {
+        }
 
-		override public DestinationType DestinationType
-		{
-			get
-			{
-				return DestinationType.Topic;
-			}
-		}
+        public Topic(String name, string subject, OptionsMap options)
+            : base(name, subject, options, "topic")
+        {
+        }
 
-		public String TopicName
-		{
-			get { return Path; }
-		}
+        override public DestinationType DestinationType
+        {
+            get
+            {
+                return DestinationType.Topic;
+            }
+        }
+
+        public String TopicName
+        {
+            get { return Path; }
+        }
 
 
-		public override Destination CreateDestination(String name)
-		{
-			return new Topic(name);
-		}
+        public override Destination CreateDestination(String name)
+        {
+            return new Topic(name);
+        }
 
 
-	}
+        public override Destination CreateDestination(String name, string subject, OptionsMap options)
+        {
+            return new Topic(name, subject, options);
+        }
+    }
 }
 

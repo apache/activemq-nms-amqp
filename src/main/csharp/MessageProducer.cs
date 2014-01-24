@@ -79,7 +79,7 @@ namespace Apache.NMS.Amqp
                     Tracer.DebugFormat("Start Producer Id = " + ProducerId.ToString()); 
                     if (qpidSender == null)
                     {
-                        qpidSender = session.CreateQpidSender(destination.ToString());
+                        qpidSender = session.CreateQpidSender(destination.Address);
                     }
                 }
                 catch (Org.Apache.Qpid.Messaging.QpidException e)

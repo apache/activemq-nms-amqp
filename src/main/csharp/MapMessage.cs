@@ -19,15 +19,15 @@ using Apache.NMS.Util;
 
 namespace Apache.NMS.Amqp
 {
-	public class MapMessage : BaseMessage, IMapMessage
-	{
-		private IPrimitiveMap body = new PrimitiveMap();
+    public class MapMessage : BaseMessage, IMapMessage
+    {
+        private IPrimitiveMap body = new PrimitiveMap();
 
-		public IPrimitiveMap Body
-		{
-			get { return body; }
-			set { body = value; }
-		}
-	}
+        public IPrimitiveMap Body
+        {
+            get { return body; }
+            set { body = value; }
+        }
+    }
 }
 

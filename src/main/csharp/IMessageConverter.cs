@@ -18,10 +18,10 @@ using Org.Apache.Qpid.Messaging;
 
 namespace Apache.NMS.Amqp
 {
-	public interface IMessageConverter
-	{
+    public interface IMessageConverter
+    {
 
-		Message ToAmqpMessage(IMessage message);
-		IMessage ToNmsMessage(Message message);
-	}
+        Message ToAmqpMessage(IMessage message);
+        IMessage ToNmsMessage(Message message);
+    }
 }

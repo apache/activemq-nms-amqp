@@ -16,45 +16,56 @@
  */
 using System;
 
+// Typedef for options map
+using OptionsMap = System.Collections.Generic.Dictionary<System.String, System.Object>;
+
 namespace Apache.NMS.Amqp
 {
 
-	/// <summary>
-	/// Summary description for Queue.
-	/// </summary>
-	public class Queue : Destination, IQueue
-	{
+    /// <summary>
+    /// Summary description for Queue.
+    /// </summary>
+    public class Queue : Destination, IQueue
+    {
 
-		public Queue()
-			: base()
-		{
-		}
+        public Queue()
+            : base()
+        {
+        }
 
-		public Queue(String name)
-			: base(name)
-		{
-		}
+        public Queue(String name)
+            : base(name)
+        {
+        }
 
-		override public DestinationType DestinationType
-		{
-			get
-			{
-				return DestinationType.Queue;
-			}
-		}
+        public Queue(String name, string subject, OptionsMap options)
+            : base(name, subject, options, "queue")
+        {
+        }
 
-		public String QueueName
-		{
-			get { return Path; }
-		}
+        override public DestinationType DestinationType
+        {
+            get
+            {
+                return DestinationType.Queue;
+            }
+        }
+
+        public String QueueName
+        {
+            get { return Path; }
+        }
 
 
-		public override Destination CreateDestination(String name)
-		{
-			return new Queue(name);
-		}
+        public override Destination CreateDestination(String name)
+        {
+            return new Queue(name);
+        }
 
-
-	}
+        public override Destination CreateDestination(String name, string subject, OptionsMap options)
+        {
+            return new Queue(name, subject, options);
+        }
+    }
 }
 

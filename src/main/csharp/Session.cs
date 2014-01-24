@@ -20,6 +20,9 @@ using System.Threading;
 using Apache.NMS.Util;
 using Org.Apache.Qpid.Messaging;
 
+// Typedef for options map
+using OptionsMap = System.Collections.Generic.Dictionary<System.String, System.Object>;
+
 namespace Apache.NMS.Amqp
 {
     /// <summary>
@@ -382,6 +385,16 @@ namespace Apache.NMS.Amqp
             return new Topic(name);
         }
 
+        public IQueue GetQueue(string name, string subject, OptionsMap options)
+        {
+            return new Queue(name, subject, options);
+        }
+
+        public ITopic GetTopic(string name, string subject, OptionsMap options)
+        {
+            return new Topic(name, subject, options);
+        }
+
         public ITemporaryQueue CreateTemporaryQueue()
         {
             throw new NotSupportedException("TODO: Temp queue");
@@ -558,7 +571,7 @@ namespace Apache.NMS.Amqp
         }
 
 
-        public Org.Apache.Qpid.Messaging.Receiver CreateQpidReceiver(string address)
+        public Org.Apache.Qpid.Messaging.Receiver CreateQpidReceiver(Address address)
         {
             if (!IsStarted)
             {
@@ -567,7 +580,7 @@ namespace Apache.NMS.Amqp
             return qpidSession.CreateReceiver(address);
         }
 
-        public Org.Apache.Qpid.Messaging.Sender CreateQpidSender(string address)
+        public Org.Apache.Qpid.Messaging.Sender CreateQpidSender(Address address)
         {
             if (!IsStarted)
             {

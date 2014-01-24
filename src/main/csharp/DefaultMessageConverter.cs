@@ -98,7 +98,7 @@ namespace Apache.NMS.Amqp
             {
                 answer.NMSCorrelationID = message.CorrelationId;
                 answer.NMSDeliveryMode = (message.Durable ? MsgDeliveryMode.Persistent : MsgDeliveryMode.NonPersistent);
-                answer.NMSMessageId = message.Subject;
+                answer.NMSMessageId = message.MessageId;
                 answer.NMSPriority = ToNmsPriority(message.Priority);
                 answer.NMSRedelivered = message.Redelivered;
                 answer.NMSReplyTo = ToNmsDestination(message.ReplyTo);

@@ -22,73 +22,69 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 #endif
 
+// TODO: Any support
+
 namespace Apache.NMS.Amqp
 {
-	public class ObjectMessage : BaseMessage, IObjectMessage
-	{
-		private object body;
+    public class ObjectMessage : BaseMessage, IObjectMessage
+    {
+        private object body;
 #if !(PocketPC||NETCF||NETCF_2_0)
-		private IFormatter formatter;
+        private IFormatter formatter;
 #endif
 
-		public ObjectMessage()
-		{
-		}
+        public ObjectMessage()
+        {
+        }
 
-		public ObjectMessage(object body)
-		{
-			this.body = body;
-		}
+        public ObjectMessage(object body)
+        {
+            this.body = body;
+        }
 
-		public object Body
-		{
-			get
-			{
+        public object Body
+        {
+            get
+            {
 #if !(PocketPC||NETCF||NETCF_2_0)
-				if(body == null)
-				{
-					body = Formatter.Deserialize(new MemoryStream(Content));
-				}
+                if(body == null)
+                {
+                    body = Formatter.Deserialize(new MemoryStream(Content));
+                }
 #else
 #endif
-				return body;
-			}
+                return body;
+            }
 
-			set
-			{
+            set
+            {
 #if !(PocketPC||NETCF||NETCF_2_0)
-				body = value;
+                body = value;
 #else
-				throw new NotImplementedException();
+                throw new NotImplementedException();
 #endif
-			}
-		}
+            }
+        }
 
 
 #if !(PocketPC||NETCF||NETCF_2_0)
-		public IFormatter Formatter
-		{
-			get
-			{
-				if(formatter == null)
-				{
-					formatter = new BinaryFormatter();
-				}
-				return formatter;
-			}
+        public IFormatter Formatter
+        {
+            get
+            {
+                if(formatter == null)
+                {
+                    formatter = new BinaryFormatter();
+                }
+                return formatter;
+            }
 
-			set
-			{
-				formatter = value;
-			}
-		}
+            set
+            {
+                formatter = value;
+            }
+        }
 
 #endif
-	}
+    }
 }
-
-
-
-
-
-
