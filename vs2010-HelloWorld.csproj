@@ -65,8 +65,8 @@ under the License.
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="src\test\csharp\CommonAssemblyInfo.cs" />
     <Compile Include="src\test\csharp\HelloWorld\HelloWorld.cs" />
-    <Compile Include="src\test\csharp\HelloWorld\Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\test\csharp\HelloWorld\app.config" />
