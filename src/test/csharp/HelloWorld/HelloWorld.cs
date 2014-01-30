@@ -16,7 +16,6 @@
  */
 
 using System;
-using System.Diagnostics;
 using Apache.NMS;
 using Apache.NMS.Util;
 using Apache.NMS.Amqp;
@@ -25,64 +24,94 @@ namespace Apache.NMS.ActiveMQ.Test
 {
     public class TestMain
     {
-        public static void HelloWorld_amqpBroker_0_10Protocol(string[] args)
+        /// <summary>
+        /// AMQP Hello World
+        /// Using the AMQP protocol, send a message to a topic and retrieve that message again.
+        /// </summary>
+        /// <param name="uri">AMQP peer network address string. This string selects
+        /// the Apache.NMS.AMQP provider and further specifies the TCP address and port of the
+        /// peer AMQP entity.</param>
+        /// <param name="protocolVersion">Selects AMQP protocol version. Use 'amqp0-10' or 'amqp1.0'.
+        /// amqp1.0 is the default version if none is specified.</param>
+        /// <param name="topicAddress">The name of the topic through which the message is passed
+        /// in the AMQP peer.</param>
+        /// </summary>
+        public static void AMQP_HelloWorld(string uri, string protocolVersion, string topicAddress)
         {
-            // Connect to a qpid broker on localhost:5672
-            // Run HelloWorld using amqp0-10 protocol
+            // AMQP Hello World
             //
             // Notes:
-            //  * Run qpidd on localhost
+            //  * Run qpidd broker, activemq broker, or dispatch router on given uri.
             //  * Ensure the nmsprovider-amqp.config file exists 
             //    in the executable folder (build\net4-0\debug).
             //  * Ensure the unmanaged qpid*.dll and boost*.dll files from 
             //      .nant\library\local\org.apache.qpid\Apache.Qpid\<version>\net-4.0\debug
             //      are in project's Output Path (build\net-4.0\debug) so that they may be
             //      loaded by org.apache.qpid.messaging.dll.
-
-            Uri connecturi = new Uri("amqp:localhost:5672");
-
-            IConnectionFactory factory = new NMSConnectionFactory(connecturi, "Bob", "reconnect-timeout:5", "protocol:amqp0-10");
-
-            using (IConnection connection = factory.CreateConnection())
-            using (ISession session = connection.CreateSession())
+            try
             {
-                IDestination destination = SessionUtil.GetDestination(session, "amq.topic");
+                Uri connecturi = new Uri(uri);
 
-                // Create a consumer and producer
-                using (IMessageConsumer consumer = session.CreateConsumer(destination))
-                using (IMessageProducer producer = session.CreateProducer(destination))
+                Console.WriteLine("About to connect to " + connecturi);
+
+                IConnectionFactory factory = 
+                    new NMSConnectionFactory(connecturi, "Bob", "protocol:" + protocolVersion);
+
+                using (IConnection connection = factory.CreateConnection())
+                using (ISession session = connection.CreateSession())
                 {
-                    // Start the connection so that messages will be processed.
-                    connection.Start();
+                    IDestination destination = SessionUtil.GetDestination(session, topicAddress);
 
-                    // Create and send a message
-                    ITextMessage request = session.CreateTextMessage("Hello World!");
-                    request.Properties["NMSXGroupID"] = "cheese";
-                    request.Properties["myHeader"] = "Cheddar";
-
-                    producer.Send(request);
-
-                    //// Consume a message
-                    ITextMessage message = consumer.Receive() as ITextMessage;
-                    if (message == null)
+                    // Create a consumer and producer
+                    using (IMessageConsumer consumer = session.CreateConsumer(destination))
+                    using (IMessageProducer producer = session.CreateProducer(destination))
                     {
-                        Console.WriteLine("No message received!");
+                        // Start the connection so that messages will be processed.
+                        connection.Start();
+
+                        // Create a text message
+                        ITextMessage request = session.CreateTextMessage("Hello World!");
+                        request.Properties["NMSXGroupID"] = "cheese";
+                        request.Properties["myHeader"] = "Cheddar";
+
+                        // For dispatch router 0.1 messages require a routing property
+                        request.Properties["x-amqp-to"] = topicAddress;
+
+                        // Send the message
+                        producer.Send(request);
+
+                        // Consume a message
+                        ITextMessage message = consumer.Receive() as ITextMessage;
+                        if (message == null)
+                        {
+                            Console.WriteLine("No message received!");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Received message text: " + message.Text);
+                            Console.WriteLine("Received message properties: " + message.Properties.ToString());
+                        }
+                        connection.Stop();
                     }
-                    else
-                    {
-                        // Expected output:
-                        //  Received message text: Hello World!
-                        //  Received message properties: {x-amqp-0-10.routing-key=, NMSXGroupID=cheese, myHeader=Cheddar}
-                        Console.WriteLine("Received message text: " + message.Text);
-                        Console.WriteLine("Received message properties: " + message.Properties.ToString());
-                    }
-                    connection.Stop();
                 }
+            } catch (Exception e) {
+                Console.WriteLine("Exception {0}.", e);
             }
         }
+
+        
         public static void Main(string[] args)
         {
-            HelloWorld_amqpBroker_0_10Protocol(args);
+            string uriQpidd = "amqp:localhost:5672";
+            string uriActivemq = "amqp:localhost:5672";
+            string uriDispatch = "amqp:localhost:5672";
+
+            //AMQP_HelloWorld(uriQpidd, "amqp0-10", "amq.topic");
+            //AMQP_HelloWorld(uriQpidd, "amqp1.0", "amq.topic");
+
+            AMQP_HelloWorld(uriActivemq, "amqp1.0", "amq.topic");
+
+            //AMQP_HelloWorld(uriDispatch, "amqp1.0", "amq.topic");
         }
     }
 }
