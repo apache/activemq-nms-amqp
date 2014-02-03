@@ -137,7 +137,7 @@ namespace Apache.NMS.Amqp
 
         #region Duration Methods
         //
-        private static Duration ToQpidDuration(TimeSpan timespan)
+        public static Duration ToQpidDuration(TimeSpan timespan)
         {
             if (timespan.TotalMilliseconds <= 0)
             {
@@ -157,7 +157,7 @@ namespace Apache.NMS.Amqp
         }
 
         //
-        private static TimeSpan ToNMSTimespan(Duration duration)
+        public static TimeSpan ToNMSTimespan(Duration duration)
         {
             if (duration.Milliseconds > Int64.MaxValue)
             {
