@@ -196,8 +196,9 @@ namespace Apache.NMS.Amqp
             {
                 MapMessage mapMessage = message as MapMessage;
                 PrimitiveMap mapBody = mapMessage.Body as PrimitiveMap;
-                byte[] buf = mapBody.Marshal();
-                Message result = new Message(buf, 0, buf.Length);
+                Dictionary<string, object> dict = FromNmsPrimitiveMap(mapBody);
+
+                Message result = new Message(dict);
                 return result;
             }
             else if (message is StreamMessage)
@@ -223,11 +224,17 @@ namespace Apache.NMS.Amqp
 
             if ("amqp/map" == message.ContentType)
             {
-                // TODO: Return map message
+                Dictionary<string, object> dict = new Dictionary<string,object>();
+                message.GetContent(dict);
+                PrimitiveMap bodyMap = new PrimitiveMap();
+                SetNmsPrimitiveMap(bodyMap, dict);
+                MapMessage mapMessage = new MapMessage();
+                mapMessage.Body = bodyMap;
+                result = mapMessage;
             }
             else if ("amqp/list" == message.ContentType)
             {
-                // TODO: Return list message
+                // TODO: Return list message 
             }
             else
             {
