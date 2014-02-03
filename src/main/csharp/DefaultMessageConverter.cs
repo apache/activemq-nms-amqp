@@ -17,6 +17,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
 using Apache.NMS.Util;
@@ -189,7 +190,10 @@ namespace Apache.NMS.Amqp
             else if (message is ObjectMessage)
             {
                 ObjectMessage objectMessage = message as ObjectMessage;
-                Message result = new Message(objectMessage.Body);
+                Collection<object> objs = new Collection<object>();
+                objs = ConvertObjectToAmqpList(objectMessage.Body);
+
+                Message result = new Message(objs);
                 return result;
             }
             else if (message is MapMessage)
@@ -234,7 +238,11 @@ namespace Apache.NMS.Amqp
             }
             else if ("amqp/list" == message.ContentType)
             {
-                // TODO: Return list message 
+                Collection<object> coll = new Collection<object>();
+                message.GetContent(coll);
+                ObjectMessage objMessage = new ObjectMessage();
+                objMessage.Body = ConvertAmqpListToObject(coll);
+                result = objMessage;
             }
             else
             {
@@ -297,6 +305,61 @@ namespace Apache.NMS.Amqp
             }
             return dict;
         }
+        #endregion
+
+        #region AMQP List Conversion Methods
+
+        /// <summary>
+        /// Convert NMS Object message body into form used by amqp/list
+        /// </summary>
+        /// <param name="objectMessageBody">The generic object from NMS</param>
+        /// <returns>A collection of supported AMQP primitive types.
+        /// Throws if objectMessageBody is not an array.</returns>
+        public Collection<object> ConvertObjectToAmqpList(Object objectMessageBody)
+        {
+            Collection<object> result = null;
+
+            if (objectMessageBody.GetType().IsArray)
+            {
+                result = new Collection<object>();
+                Array valueArray = (Array)objectMessageBody;
+                foreach (object val in valueArray)
+                {
+                    result.Add(val);
+                }
+            }
+            else
+            {
+                throw new NMSException("NMS ObjectMessage body must be an array");
+            }
+            return result;
+        }
+
+
+        /// <summary>
+        /// Convert amqp/list to  NMS Object message body
+        /// </summary>
+        /// <param name="amqpList">A collection of AMQP primitive types</param>
+        /// <returns>An array object holding the AMPQ list.</returns>
+        public Object ConvertAmqpListToObject(Collection<object> amqpList)
+        {
+            object result = new object();
+
+            if (amqpList.Count > 0)
+            {
+                Type t = amqpList[0].GetType();
+
+                Array objs = Array.CreateInstance(t, amqpList.Count);
+                for (int i = 0; i < amqpList.Count; i++)
+                {
+                    objs.SetValue(amqpList[i], i);
+                }
+
+                result = objs;
+            }
+            return result;
+        }
+
         #endregion
     }
 }
