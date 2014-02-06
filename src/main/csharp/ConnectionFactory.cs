@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 using System;
+using System.Collections;
 using System.Collections.Specialized;
 using Apache.NMS.Policies;
 using Org.Apache.Qpid.Messaging;
@@ -26,15 +27,26 @@ namespace Apache.NMS.Amqp
     /// 
     /// @param brokerUri String or Uri specifying base connection address
     /// @param clientID String specifying client ID
-    /// @param connectionProperties 0..N Strings specifying Qpid connection connectionProperties in the form "name:value".
+    /// @param connectionProperties formed by one of:
+    ///     * 0..N Strings specifying Qpid connection connectionProperties in the form "name:value".
+    ///     * Hashtable containing properties as key/value pairs
     /// 
-    /// Example:
+    /// Example using property strings:
+    /// 
     /// Uri connecturi = new Uri("amqp:localhost:5673")
     /// IConnectionFactory factory = new NMSConnectionFactory();
     /// IConnectionFactory factory = new NMSConnectionFactory(connecturi);
     /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA");
     /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA", "protocol:amqp1.0");
     /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA", "protocol:amqp1.0", "reconnect:true", "reconnect_timeout:60", "username:bob", "password:secret");
+    /// 
+    /// Example using property table:
+    /// 
+    /// Uri connecturi = new Uri("amqp:localhost:5673")
+    /// Hashtable properties = new Hashtable();
+    /// properties.Add("protocol", "amqp1.0");
+    /// properties.Add("reconnect_timeout", 60)
+    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA", properties);
     /// 
     /// See http://qpid.apache.org/components/programming/book/connection-options.html 
     /// for more information on Qpid connection options.
@@ -64,27 +76,27 @@ namespace Apache.NMS.Amqp
         }
 
         public ConnectionFactory()
-            : this(new Uri(GetDefaultBrokerUrl()), string.Empty, null)
+            : this(new Uri(GetDefaultBrokerUrl()), string.Empty, (Object[])null)
         {
         }
 
         public ConnectionFactory(string brokerUri)
-            : this(new Uri(brokerUri), string.Empty, null)
+            : this(new Uri(brokerUri), string.Empty, (Object[])null)
         {
         }
 
         public ConnectionFactory(string brokerUri, string clientID)
-            : this(new Uri(brokerUri), clientID, null)
+            : this(new Uri(brokerUri), clientID, (Object[])null)
         {
         }
 
         public ConnectionFactory(Uri brokerUri)
-            : this(brokerUri, string.Empty, null)
+            : this(brokerUri, string.Empty, (Object[])null)
         {
         }
 
         public ConnectionFactory(Uri brokerUri, string clientID)
-            : this(brokerUri, clientID, null)
+            : this(brokerUri, clientID, (Object[])null)
         {
         }
 
@@ -118,6 +130,29 @@ namespace Apache.NMS.Amqp
                 throw;
             }
         }
+
+        public ConnectionFactory(Uri brokerUri, string clientID, Hashtable propsTable)
+        {
+            try
+            {
+                this.brokerUri = brokerUri;
+                this.clientID = clientID;
+
+                if (properties != null)
+                {
+                    foreach (var key in propsTable.Keys)
+                    {
+                        properties.Add(key.ToString(), propsTable[key].ToString());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Apache.NMS.Tracer.DebugFormat("Exception instantiating AMQP.ConnectionFactory: {0}", ex.Message);
+                throw;
+            }
+        }
+
         #endregion
 
         #region IConnectionFactory Members
