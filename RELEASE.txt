@@ -1,0 +1,136 @@
+=======================================================================
+ * Apache.NMS.AMQP : Apache NMS for AMQP Client Library
+ * Initial Release Notes
+=======================================================================
+
+1.0 Welcome
+
+Welcome to Apache NMS AMQP! This NMS Provider will connect to the AMQP
+messaging protocol. Versions Amqp1.0 and Amqp0.10 are supported. NMS
+applications using this provider may communicate with Amqp Brokers 
+such as Apache ActiveMQ and Apache Qpid qpidd, and messaging 
+infrastructure such as Apache Qpid Dispatch Router.
+
+2.0 Implementation Overview
+
+The AMQP Provider leverages the interop binding "Apache Qpid 
+.NET Binding for C++ Messaging". The .NET Binding is an interop layer
+that connects .NET programs to the Qpid native C++ protocol engine 
+libraries.
+
+The general architecture is:
+
+                      +----------------------------+
+                      | NMS Application            |
+                      |                            |
+                      +--------------+-------------+
+                                     |
+                                     V
+                      +----------------------------+
+                      | NMS AMQP Provider          |
+                      | Apache.NMS.AMQP.dll        |
+                      +--------------+-------------+
+                                     |
+managed                              V
+(.NET)                +-------------------------------+
+::::::::::::::::::::::| Qpid Interop Binding          |::::::::::::
+unmanaged             | org.apache.qpid.messaging.dll |
+(Native Win32/64)     +-------------+-----------------+
+                                     |
+                                     V
+          +----------------------------------+
+          |  Qpid C++ Messaging Libraries    |
+          |  qpid*.dll                       |
+          +--------+--------------+----------+
+                   |              |
+                   V              |
+          +-----------------+     |
+          | Boost Libraries |     |
+          +--------+--------+     |
+                   |              |
+                   V              V
+          +---------------------------------+
+          | MSVC Runtime Libraries          |
+          +---------------------------------+
+
+
+3.0 Getting Started
+
+3.1 Installing Apache Qpid vendor files
+
+In order to use the AMQP Provider your application must have the
+Apache Qpid native and supporting libraries available on the path. 
+These files are installed automatically during the nant 
+installation of the Apache.Qpid vendor kit.
+
+3.2 Selecting the correct Apache Qpid vendor files
+
+The Apache Qpid vendor files are shipped in two versions:
+ * .NET 2.0 Compiled with Visual Studio 2008
+ * .NET 4.0 Compiled with Visual Studio 2010
+ 
+Each of these kits is built for the 32-bit x86 platform in both Debug
+and Release configurations. A typical kit holds:
+ * The Apache Qpid interop library
+     org.apache.qpid.messaging.dll
+ * Apache Qpid/Proton library files
+     qpid-protond.dll
+     qpidclientd.dll
+     qpidcommond.dll
+     qpidmessagingd.dll
+     qpidtypesd.dll 
+ * Boost library files
+     boost_chrono-vc100-mt-gd-1_47.dll
+     boost_date_time-vc100-mt-gd-1_47.dll
+     boost_program_options-vc100-mt-gd-1_47.dll
+     boost_system-vc100-mt-gd-1_47.dll
+     boost_thread-vc100-mt-gd-1_47.dll
+
+3.3 Building your Application
+
+A HelloWorld application is included in the Apache.NMS.AMQP 
+development tree to get users off to a quick start.
+
+This project selects:
+    Visual Studio  : 2010
+	Configuration  : Debug
+	.NET Framework : 4.0
+	Platform       : AnyCPU
+
+HelloWorld builds and runs on both 32-bit x86 and 64-bit x64 systems
+as long as the base project is built with the AnyCPU or the x64 
+Platform. The Apache Qpid subsystem will not load under .NET projects
+that specify the x64 Platform.
+	
+4.0 Using the Apache.NMS.AMQP Provider
+
+4.1 Creating AMQP Connections
+
+Connections to AMQP brokers and endpoints are controlled by arguments
+to the ConnectionFactory constructor. By default connections use
+protocol "amqp1.0".
+
+  Uri connecturi = new Uri("amqp:tcp:localhost:5672");
+  string clientID = "abc";
+  Hashtable options = new Hashtable();
+  options["username"] = "guest";
+  options["password"] = "secret";
+  options["protocol"] = "amqp1.0"; // or "amqp0-10"
+  
+  IConnectionFactory factory = new
+    NMSConnectionFactory(connecturi, clientID, options);
+	  
+In this release connection options are passed through an option table
+and not through the connect URI/URL. More information about connection
+options is available at:
+
+http://qpid.apache.org/components/programming/book/connection-options.html 
+  
+5.0 Future Considerations
+
+ * 64-bit x64 Apache Qpid vendor kit
+ * Support for more robust object message formats
+ * Transactions and message durability
+ * Unit test/system tests
+ 
+
