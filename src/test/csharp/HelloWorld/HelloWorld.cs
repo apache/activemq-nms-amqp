@@ -20,7 +20,7 @@ using Apache.NMS;
 using Apache.NMS.Util;
 using Apache.NMS.Amqp;
 
-namespace Apache.NMS.ActiveMQ.Test
+namespace Apache.NMS.Amqp.Test
 {
     public class TestMain
     {
@@ -35,7 +35,6 @@ namespace Apache.NMS.ActiveMQ.Test
         /// amqp1.0 is the default version if none is specified.</param>
         /// <param name="topicAddress">The name of the topic through which the message is passed
         /// in the AMQP peer.</param>
-        /// </summary>
         public static void AMQP_HelloWorld(string uri, string protocolVersion, string topicAddress)
         {
             // AMQP Hello World

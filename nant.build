@@ -53,8 +53,7 @@
     <property name="build.netcf-3.5.skip" value="true" />
     <property name="build.mono-2.0.skip" value="true" />
     <property name="build.net-3.5.skip" value="true" />
-    <property name="build.net-2.0.skip" value="true" />
-    <property name="build.framework.strings" value="net-4.0"/>
+    <property name="build.framework.strings" value="net-2.0,net-4.0"/>
 
     <target name="vendor-init" description="Initializes Vendor library from local repository.">
         <!--
@@ -79,7 +78,7 @@
         <!-- Property grouping for 'vendor.qpid.apache.org' -->
         <property name="vendor.qpid.apache.org.name"      value="Apache.Qpid" />
         <property name="vendor.qpid.apache.org.group"     value="org.apache.qpid" />
-        <property name="vendor.qpid.apache.org.version"   value="0.27.0.16034" />
+        <property name="vendor.qpid.apache.org.version"   value="0.27.0.16097" />
 		<property name="vcver"                            value="${if(current.build.framework == 'net-4.0', 'vc100', 'vc90')}" />
 		<property name="debugsuffix"                      value="${if(project.release.type == 'release', '', 'd')}" />
 		<property name="boostdebug"                       value="${if(project.release.type == 'release', '', '-gd')}" />

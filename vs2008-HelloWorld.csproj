@@ -4,15 +4,13 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{5CDFDA77-CFC2-4A6E-B731-6C06B59BFFE3}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <RootNamespace>Apache.NMS.AMQP</RootNamespace>
-    <AssemblyName>Apache.NMS.AMQP</AssemblyName>
+    <ProjectGuid>{DC7079D8-D4A1-41FB-9997-78914CFAACB0}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Apache.NMS.AMQP.Test</RootNamespace>
+    <AssemblyName>vs2008-HelloWorld</AssemblyName>
     <WarningLevel>4</WarningLevel>
     <StartupObject>
     </StartupObject>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>keyfile\NMSKey.snk</AssemblyOriginatorKeyFile>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <OldToolsVersion>2.0</OldToolsVersion>
@@ -33,6 +31,8 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>keyfile\NMSKey.snk</AssemblyOriginatorKeyFile>
     <SccProjectName>
     </SccProjectName>
     <SccLocalPath>
@@ -50,6 +50,7 @@
     <OutputPath>build\net-2.0\debug\</OutputPath>
     <DefineConstants>TRACE;DEBUG;NET,NET_2_0</DefineConstants>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <NoWarn>3016</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -58,44 +59,21 @@
     <DefineConstants>TRACE;NET,NET_2_0</DefineConstants>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <DebugType>full</DebugType>
+    <NoWarn>3016</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Apache.NMS, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>lib\Apache.NMS\net-2.0\Apache.NMS.dll</HintPath>
     </Reference>
-    <Reference Include="org.apache.qpid.messaging, Version=0.22.0.16034, Culture=neutral, PublicKeyToken=7e57166074abee8c, processorArchitecture=x86">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(USERPROFILE)\.nant\repository\local\org.apache.qpid.messaging\Apache.Qpid.Messaging\0.22.0.16034\net-2.0\debug\org.apache.qpid.messaging.dll</HintPath>
-    </Reference>
+    <Reference Include="Apache.NMS.AMQP, Version=1.6.0.3335, Culture=neutral, PublicKeyToken=82756feee3957618, processorArchitecture=MSIL" />
     <Reference Include="System" />
-    <Reference Include="System.Data" />
+    <Reference Include="System.Messaging" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="src\main\csharp\ConnectionClosedException.cs" />
-    <Compile Include="src\main\csharp\DefaultMessageConverter.cs" />
-    <Compile Include="src\main\csharp\IMessageConverter.cs" />
-    <Compile Include="src\main\csharp\BaseMessage.cs" />
-    <Compile Include="src\main\csharp\BytesMessage.cs" />
-    <Compile Include="src\main\csharp\CommonAssemblyInfo.cs" />
-    <Compile Include="src\main\csharp\Connection.cs" />
-    <Compile Include="src\main\csharp\ConnectionFactory.cs" />
-    <Compile Include="src\main\csharp\ConnectionMetaData.cs" />
-    <Compile Include="src\main\csharp\Destination.cs" />
-    <Compile Include="src\main\csharp\MapMessage.cs" />
-    <Compile Include="src\main\csharp\MessageConsumer.cs" />
-    <Compile Include="src\main\csharp\MessageProducer.cs" />
-    <Compile Include="src\main\csharp\ObjectMessage.cs" />
-    <Compile Include="src\main\csharp\Queue.cs" />
-    <Compile Include="src\main\csharp\Session.cs" />
-    <Compile Include="src\main\csharp\SessionClosedException.cs" />
-    <Compile Include="src\main\csharp\StreamMessage.cs" />
-    <Compile Include="src\main\csharp\TextMessage.cs" />
-    <Compile Include="src\main\csharp\Topic.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="keyfile\NMSKey.snk" />
+    <Compile Include="src\test\csharp\CommonAssemblyInfo.cs" />
+    <Compile Include="src\test\csharp\HelloWorld\HelloWorld.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">
@@ -114,10 +92,16 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="nmsprovider-test.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="keyfile\NMSKey.snk" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSHARP.Targets" />
   <PropertyGroup>
-    <PreBuildEvent>cd $(ProjectDir)
-nant -nologo download-vendor -D:vendor.build.config=$(ConfigurationName) -D:vendor.build.framework=net-2.0</PreBuildEvent>
     <PostBuildEvent>cd $(ProjectDir)
 nant -nologo -q install-all -D:compile.skip=true</PostBuildEvent>
   </PropertyGroup>

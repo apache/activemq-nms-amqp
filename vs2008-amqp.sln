@@ -5,6 +5,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vs2008-amqp", "vs2008-amqp.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vs2008-amqp-test", "vs2008-amqp-test.csproj", "{2F31ED5C-44A2-464A-BD55-2B5B010654E8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vs2008-HelloWorld", "vs2008-HelloWorld.csproj", "{DC7079D8-D4A1-41FB-9997-78914CFAACB0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -19,6 +21,10 @@ Global
 		{2F31ED5C-44A2-464A-BD55-2B5B010654E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2F31ED5C-44A2-464A-BD55-2B5B010654E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2F31ED5C-44A2-464A-BD55-2B5B010654E8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DC7079D8-D4A1-41FB-9997-78914CFAACB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC7079D8-D4A1-41FB-9997-78914CFAACB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC7079D8-D4A1-41FB-9997-78914CFAACB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC7079D8-D4A1-41FB-9997-78914CFAACB0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
