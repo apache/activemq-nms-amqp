@@ -66,7 +66,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>lib\Apache.NMS\net-2.0\Apache.NMS.dll</HintPath>
     </Reference>
-    <Reference Include="Apache.NMS.AMQP, Version=1.6.0.3335, Culture=neutral, PublicKeyToken=82756feee3957618, processorArchitecture=MSIL" />
     <Reference Include="System" />
     <Reference Include="System.Messaging" />
     <Reference Include="System.Xml" />
@@ -99,6 +98,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="keyfile\NMSKey.snk" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="vs2008-amqp.csproj">
+      <Project>{5CDFDA77-CFC2-4A6E-B731-6C06B59BFFE3}</Project>
+      <Name>vs2008-amqp</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSHARP.Targets" />
   <PropertyGroup>

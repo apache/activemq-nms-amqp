@@ -2,7 +2,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{2F31ED5C-44A2-464A-BD55-2B5B010654E8}</ProjectGuid>
     <OutputType>Library</OutputType>
@@ -79,7 +79,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="src\test\csharp\CommonAssemblyInfo.cs" />
+    <Compile Include="src\test\csharp\MessageTest.cs" />
+    <Compile Include="src\main\csharp\CommonAssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">
@@ -105,6 +106,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="keyfile\NMSKey.snk" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="vs2008-amqp.csproj">
+      <Project>{5CDFDA77-CFC2-4A6E-B731-6C06B59BFFE3}</Project>
+      <Name>vs2008-amqp</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSHARP.Targets" />
   <PropertyGroup>
