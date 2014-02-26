@@ -34,6 +34,13 @@ namespace Apache.NMS.Amqp
             this.Text = text;
         }
 
+        public override object Clone()
+        {
+            TextMessage tm = (TextMessage) base.Clone();
+
+            tm.text = text;
+            return (TextMessage)tm;
+        }
 
         // Properties
 

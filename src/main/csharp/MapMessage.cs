@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+using System.Collections.Generic;
 using Apache.NMS.Util;
 
 namespace Apache.NMS.Amqp
@@ -22,6 +23,16 @@ namespace Apache.NMS.Amqp
     public class MapMessage : BaseMessage, IMapMessage
     {
         private IPrimitiveMap body = new PrimitiveMap();
+
+        public override object Clone()
+        {
+            MapMessage mm = (MapMessage)base.Clone();
+            DefaultMessageConverter msgConverter = new DefaultMessageConverter();
+            Dictionary<string, object> properties = new Dictionary<string, object>();
+            properties = msgConverter.FromNmsPrimitiveMap((PrimitiveMap)body);
+            msgConverter.SetNmsPrimitiveMap(mm.body, properties);
+            return (MapMessage)mm;
+        }
 
         public IPrimitiveMap Body
         {

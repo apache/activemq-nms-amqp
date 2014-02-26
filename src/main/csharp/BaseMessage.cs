@@ -22,21 +22,192 @@ namespace Apache.NMS.Amqp
 {
     public delegate void AcknowledgeHandler(BaseMessage baseMessage);
 
-    public class BaseMessage : IMessage
+    public class BaseMessage : IMessage, ICloneable
     {
         private PrimitiveMap propertiesMap = new PrimitiveMap();
         private IDestination destination;
         private string correlationId;
         private TimeSpan timeToLive;
         private string messageId;
-        private MsgDeliveryMode deliveryMode;
-        private MsgPriority priority;
+        private MsgDeliveryMode deliveryMode = MsgDeliveryMode.NonPersistent;
+        private MsgPriority priority = MsgPriority.Normal;
         private Destination replyTo;
         private byte[] content;
         private string type;
         private event AcknowledgeHandler Acknowledger;
         private DateTime timestamp = new DateTime();
         private bool readOnlyMsgBody = false;
+
+        public BaseMessage() { }
+
+        public BaseMessage(BaseMessage copy)
+        {
+            this.propertiesMap = copy.propertiesMap;
+            this.destination = copy.destination;
+            this.correlationId = copy.correlationId;
+            this.timeToLive = copy.timeToLive;
+            this.messageId = copy.messageId;
+            this.deliveryMode = copy.deliveryMode;
+            this.priority = copy.priority;
+            this.replyTo = copy.replyTo;
+            this.content = copy.content;
+            this.type = copy.type;
+            this.Acknowledger = copy.Acknowledger;
+            this.timestamp = copy.timestamp;
+            this.readOnlyMsgBody = copy.readOnlyMsgBody;
+        }
+
+        ///
+        /// <summary>
+        ///  Clone this object and return a new instance that the caller now owns.
+        /// </summary>
+        ///
+        public virtual Object Clone()
+        {
+            return this.MemberwiseClone();
+        }
+
+
+        public override bool Equals(object obj)
+        {
+            // If parameter is null return false.
+            if (obj == null)
+            {
+                return false;
+            }
+
+            // If parameter cannot be cast to BaseMessage return false.
+            BaseMessage p = obj as BaseMessage;
+            if ((System.Object)p == null)
+            {
+                return false;
+            }
+
+            if (propertiesMap == null ^ p.propertiesMap == null)
+            {
+                return false;
+            }
+            if (propertiesMap != null)
+            {
+                if (!propertiesMap.ToString().Equals(p.propertiesMap.ToString()))
+                {
+                    return false;
+                }
+            }
+
+            if (destination == null ^ p.destination == null)
+            {
+                return false;
+            }
+            if (destination != null)
+            {
+                if (!destination.ToString().Equals(p.destination.ToString()))
+                {
+                    return false;
+                }
+            }
+
+            if (correlationId == null ^ p.correlationId == null)
+            {
+                return false;
+            }
+            if (correlationId != null)
+            {
+                if (!correlationId.Equals(p.correlationId))
+                {
+                    return false;
+                }
+            }
+
+            if (timeToLive == null ^ p.timeToLive == null)
+            {
+                return false;
+            }
+            if (timeToLive != null)
+            {
+                if (!timeToLive.ToString().Equals(p.timeToLive.ToString()))
+                {
+                    return false;
+                }
+            }
+
+            if (messageId == null ^ p.messageId == null)
+            {
+                return false;
+            }
+            if (messageId != null)
+            {
+                if (!messageId.Equals(p.messageId))
+                {
+                    return false;
+                }
+            }
+
+            if (deliveryMode != p.deliveryMode)
+            {
+                return false;
+            }
+
+            if (priority != p.priority)
+            {
+                return false;
+            }
+
+            if (replyTo == null ^ p.replyTo == null)
+            {
+                return false;
+            }
+            if (replyTo != null)
+            {
+                if (!replyTo.ToString().Equals(p.replyTo.ToString()))
+                {
+                    return false;
+                }
+            }
+
+            if (content == null ^ p.content == null)
+            {
+                return false;
+            }
+            if (content != null)
+            {
+                if (!content.ToString().Equals(p.content.ToString()))
+                {
+                    return false;
+                }
+            }
+
+            if (type == null ^ p.type == null)
+            {
+                return false;
+            }
+            if (type != null)
+            {
+                if (!type.Equals(p.type))
+                {
+                    return false;
+                }
+            }
+
+            if (timestamp == null ^ p.timestamp == null)
+            {
+                return false;
+            }
+            if (timestamp != null)
+            {
+                if (!timestamp.ToString().Equals(p.timestamp.ToString()))
+                {
+                    return false;
+                }
+            }
+
+            if (readOnlyMsgBody != p.readOnlyMsgBody)
+            {
+                return false;
+            }
+
+            return true;
+        }
 
         public bool ReadOnlyBody
         {
