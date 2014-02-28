@@ -22,7 +22,7 @@ using System.Collections;
 using Apache.NMS.Util;
 using Apache.NMS.Amqp;
 
-namespace Apache.NMS.Amqp.Test.Commands
+namespace Apache.NMS.Amqp.Test
 {
     [TestFixture]
     public class MessageTest

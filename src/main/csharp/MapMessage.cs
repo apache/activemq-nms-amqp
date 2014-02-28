@@ -34,6 +34,13 @@ namespace Apache.NMS.Amqp
             return (MapMessage)mm;
         }
 
+        public override void ClearBody()
+        {
+            base.ClearBody();
+
+            body.Clear();
+        }
+
         public IPrimitiveMap Body
         {
             get { return body; }

@@ -80,6 +80,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="src\test\csharp\MessageTest.cs" />
+    <Compile Include="src\test\csharp\MapMessageTest.cs" />
+    <Compile Include="src\test\csharp\TextMessageTest.cs" />
     <Compile Include="src\main\csharp\CommonAssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
