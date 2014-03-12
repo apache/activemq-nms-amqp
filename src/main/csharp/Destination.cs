@@ -100,6 +100,12 @@ namespace Apache.NMS.Amqp
             qpidAddress = new Org.Apache.Qpid.Messaging.Address(other.Address);
         }
 
+		/**
+		 * Dispose of the destination object.
+		 */
+		public void Dispose()
+		{
+		}
 
         /**
          * Path property
@@ -194,7 +200,6 @@ namespace Apache.NMS.Amqp
             }
             return result;
         }
-
 
         /**
          * Qpid Address accessor
