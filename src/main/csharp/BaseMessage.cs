@@ -209,6 +209,62 @@ namespace Apache.NMS.Amqp
             return true;
         }
 
+		public override int GetHashCode()
+		{
+			int hashCode = 0;
+
+			if(propertiesMap != null)
+			{
+				hashCode ^= propertiesMap.GetHashCode();
+			}
+
+			if(destination != null)
+			{
+				hashCode ^= destination.GetHashCode();
+			}
+
+			if(correlationId != null)
+			{
+				hashCode ^= correlationId.GetHashCode();
+			}
+
+			if(timeToLive != null)
+			{
+				hashCode ^= timeToLive.GetHashCode();
+			}
+
+			if(messageId != null)
+			{
+				hashCode ^= messageId.GetHashCode();
+			}
+
+			hashCode ^= deliveryMode.GetHashCode();
+			hashCode ^= priority.GetHashCode();
+
+			if(replyTo != null)
+			{
+				hashCode ^= replyTo.GetHashCode();
+			}
+
+			if(content != null)
+			{
+				hashCode ^= content.GetHashCode();
+			}
+
+			if(type != null)
+			{
+				hashCode ^= type.GetHashCode();
+			}
+
+			if(timestamp != null)
+			{
+				hashCode ^= timestamp.GetHashCode();
+			}
+
+			hashCode ^= readOnlyMsgBody.GetHashCode();
+			return hashCode;
+		}
+
         public bool ReadOnlyBody
         {
             get { return readOnlyMsgBody; }
