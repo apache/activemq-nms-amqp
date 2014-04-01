@@ -335,6 +335,7 @@ namespace Apache.NMS.Amqp
                             // Allocate a Qpid connection
                             if (qpidConnection == null)
                             {
+                                Tracer.DebugFormat("Amqp: create qpid connection to: {0}", this.BrokerUri.ToString());
                                 qpidConnection =
                                     new Org.Apache.Qpid.Messaging.Connection(
                                         brokerUri.ToString(),
@@ -351,6 +352,8 @@ namespace Apache.NMS.Amqp
                         }
                         catch (Org.Apache.Qpid.Messaging.QpidException e)
                         {
+                            Tracer.DebugFormat("Amqp: create qpid connection to: {0} failed with {1}", 
+                                this.BrokerUri.ToString(), e.Message);
                             throw new ConnectionClosedException(e.Message);
                         }
                     }

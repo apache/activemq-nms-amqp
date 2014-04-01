@@ -31,6 +31,9 @@ namespace Apache.NMS.Amqp
     ///     * 0..N Strings specifying Qpid connection connectionProperties in the form "name:value".
     ///     * Hashtable containing properties as key/value pairs
     /// 
+    /// Connection URI are defined in
+    /// http://qpid.apache.org/releases/qpid-trunk/programming/book/connections.html#connection-url
+    /// 
     /// Example using property strings:
     /// 
     /// Uri connecturi = new Uri("amqp:localhost:5673")
@@ -42,7 +45,7 @@ namespace Apache.NMS.Amqp
     /// 
     /// Example using property table:
     /// 
-    /// Uri connecturi = new Uri("amqp:localhost:5673")
+    /// Uri connecturi = new Uri("amqp:localhost:5672")
     /// Hashtable properties = new Hashtable();
     /// properties.Add("protocol", "amqp1.0");
     /// properties.Add("reconnect_timeout", 60)
@@ -102,6 +105,7 @@ namespace Apache.NMS.Amqp
 
         public ConnectionFactory(Uri brokerUri, string clientID, params Object[] propsArray)
         {
+            Tracer.DebugFormat("Amqp: create connection factory for Uri: {0}", brokerUri.ToString()); 
             try
             {
                 this.brokerUri = brokerUri;
@@ -133,6 +137,7 @@ namespace Apache.NMS.Amqp
 
         public ConnectionFactory(Uri brokerUri, string clientID, Hashtable propsTable)
         {
+            Tracer.DebugFormat("Amqp: create connection factory for Uri: {0}", brokerUri.ToString());
             try
             {
                 this.brokerUri = brokerUri;
