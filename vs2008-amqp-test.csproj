@@ -75,14 +75,16 @@
       <HintPath>lib\NUnit\net-2.0\nunit.framework.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.Messaging" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="src\test\csharp\MessageTest.cs" />
     <Compile Include="src\test\csharp\MapMessageTest.cs" />
     <Compile Include="src\test\csharp\TextMessageTest.cs" />
+    <Compile Include="src\test\csharp\NMSConnectionFactoryTest.cs" />
+    <Compile Include="src\test\csharp\MessageDeliveryTest.cs" />
     <Compile Include="src\main\csharp\CommonAssemblyInfo.cs" />
+    <Compile Include="src\test\csharp\NmsConsoleTracer.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">

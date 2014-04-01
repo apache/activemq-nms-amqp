@@ -64,10 +64,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>lib\Apache.NMS\net-2.0\Apache.NMS.dll</HintPath>
     </Reference>
-    <Reference Include="org.apache.qpid.messaging, Version=0.22.0.16034, Culture=neutral, PublicKeyToken=7e57166074abee8c, processorArchitecture=x86">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(USERPROFILE)\.nant\repository\local\org.apache.qpid.messaging\Apache.Qpid.Messaging\0.22.0.16034\net-2.0\debug\org.apache.qpid.messaging.dll</HintPath>
-    </Reference>
+    <Reference Include="org.apache.qpid.messaging, Version=0.27.0.16097, Culture=neutral, PublicKeyToken=7e57166074abee8c, processorArchitecture=x86" />
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
