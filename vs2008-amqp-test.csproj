@@ -83,7 +83,7 @@
     <Compile Include="src\test\csharp\TextMessageTest.cs" />
     <Compile Include="src\test\csharp\NMSConnectionFactoryTest.cs" />
     <Compile Include="src\test\csharp\MessageDeliveryTest.cs" />
-    <Compile Include="src\main\csharp\CommonAssemblyInfo.cs" />
+    <Compile Include="src\test\csharp\CommonAssemblyInfo.cs" />
     <Compile Include="src\test\csharp\NmsConsoleTracer.cs" />
   </ItemGroup>
   <ItemGroup>

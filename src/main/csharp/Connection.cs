@@ -69,7 +69,6 @@ namespace Apache.NMS.Amqp
         /// <summary>
         /// Creates new connection
         /// </summary>
-        /// <param name="connectionUri"></param>
         public Connection()
         {
         }

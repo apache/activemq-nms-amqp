@@ -61,7 +61,8 @@ under the License.
     <SccProvider>
     </SccProvider>
     <RunPostBuildEvent>OnOutputUpdated</RunPostBuildEvent>
-    <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -99,7 +100,13 @@ under the License.
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="src\MapMessageTest.cs" />
+    <Compile Include="src\MessageDeliveryTest.cs" />
+    <Compile Include="src\MessageTest.cs" />
+    <Compile Include="src\NMSConnectionFactoryTest.cs" />
+    <Compile Include="src\NmsConsoleTracer.cs" />
     <Compile Include="src\test\csharp\CommonAssemblyInfo.cs" />
+    <Compile Include="src\TextMessageTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">
@@ -125,6 +132,12 @@ under the License.
   </ItemGroup>
   <ItemGroup>
     <None Include="keyfile\NMSKey.snk" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="vs2010-amqp.csproj">
+      <Project>{5E1E5956-2AC0-4134-BA91-CE3A13268432}</Project>
+      <Name>vs2010-amqp</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSHARP.Targets" />
   <PropertyGroup>
