@@ -68,8 +68,8 @@ under the License.
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>build\net-2.0\debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NET,NET_2_0</DefineConstants>
+    <OutputPath>build\net-4.0\debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;NET,NET_4_0</DefineConstants>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <NoWarn>3016</NoWarn>
   </PropertyGroup>
@@ -100,13 +100,13 @@ under the License.
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="src\MapMessageTest.cs" />
-    <Compile Include="src\MessageDeliveryTest.cs" />
-    <Compile Include="src\MessageTest.cs" />
-    <Compile Include="src\NMSConnectionFactoryTest.cs" />
-    <Compile Include="src\NmsConsoleTracer.cs" />
+    <Compile Include="src\test\csharp\MapMessageTest.cs" />
+    <Compile Include="src\test\csharp\MessageDeliveryTest.cs" />
+    <Compile Include="src\test\csharp\MessageTest.cs" />
+    <Compile Include="src\test\csharp\NMSConnectionFactoryTest.cs" />
+    <Compile Include="src\test\csharp\NmsConsoleTracer.cs" />
     <Compile Include="src\test\csharp\CommonAssemblyInfo.cs" />
-    <Compile Include="src\TextMessageTest.cs" />
+    <Compile Include="src\test\csharp\TextMessageTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">

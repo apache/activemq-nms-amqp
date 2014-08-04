@@ -48,12 +48,13 @@
     <property name="Apache.Qpid.dll"           value="${basedir}/lib/Apache.Qpid/${current.build.framework}/org.apache.qpid.messaging.dll" dynamic="true" />
     <property name="NUnit.Projectfile"         value="Apache.NMS.AMQP.Test.nunit" />
 
-    <!-- Skip certain frameworks, since Apache Qpid is not supported on those platforms. -->
-    <property name="build.netcf-2.0.skip" value="true" />
-    <property name="build.netcf-3.5.skip" value="true" />
-    <property name="build.mono-2.0.skip" value="true" />
-    <property name="build.net-3.5.skip" value="true" />
+    <!-- Skip certain frameworks, since Apache Qpid is not supported on those platforms.
+         net-2.0 built by Visual Studio 2008, net4.0 built by Visual Studio 2010
+         to align .NET build with underlying unmanaged C runtime. -->
     <property name="build.framework.strings" value="net-2.0,net-4.0"/>
+    
+    <!-- Limit to debug until lib\Apache.Qpid\net-X.0 gets debug/release subdirectories -->
+    <property name="build.config.strings"    value="debug" />
 
     <target name="vendor-init" description="Initializes Vendor library from local repository.">
         <!--
@@ -78,11 +79,12 @@
         <!-- Property grouping for 'vendor.qpid.apache.org' -->
         <property name="vendor.qpid.apache.org.name"      value="Apache.Qpid" />
         <property name="vendor.qpid.apache.org.group"     value="org.apache.qpid" />
-        <property name="vendor.qpid.apache.org.version"   value="0.27.0.16097" />
+        <property name="vendor.qpid.apache.org.version"   value="0.28.0.16239" />
+        <!-- net-4.0 built with VS2010 (vc100), net-2.0 built with VS2008 (vc90) -->
 		<property name="vcver"                            value="${if(current.build.framework == 'net-4.0', 'vc100', 'vc90')}" />
-		<property name="debugsuffix"                      value="${if(project.release.type == 'release', '', 'd')}" />
-		<property name="boostdebug"                       value="${if(project.release.type == 'release', '', '-gd')}" />
-		<echo message="Vendor-init current.build.framework = ${current.build.framework}, project.release.type = ${project.release.type}" />
+		<property name="debugsuffix"                      value="${if(current.build.config == 'release', '', 'd')}" />
+		<property name="boostdebug"                       value="${if(current.build.config == 'release', '', '-gd')}" />
+		<echo message="Vendor-init current.build.framework = ${current.build.framework}, current.build.config = ${current.build.config}" />
 		<echo message="vcver = ${vcver}, debugsuffix = ${debugsuffix}, boostdebug = ${boostdebug}" />
 		 
         <property name="vendor.qpid.apache.org.filenames" value="org.apache.qpid.messaging.dll,${boost_chrono},${boost_date_time},${boost_program_options},${boost_system},${boost_thread},${qpidclient},${qpidcommon},${qpidmessaging},${qpid-proton},${qpidtypes}" dynamic="true"/>
@@ -130,6 +132,19 @@
 
     </target>
 
+    <target name="copy-unmanaged-content" description="Copies native DLLs from \lib to \build">
+        <foreach item="File" property="filename">
+            <in> <items>
+                <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpid*" />
+                <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost*" />
+            </items> </in>
+            <do>
+                <echo message="Copying unmanaged: ${filename}" />
+                <copy todir="${build.bin.dir}" file="${filename}" if="${not file::up-to-date(filename, '${build.bin.dir}/${filename}')}" />
+            </do>
+        </foreach>
+    </target>
+    
     <target name="default" depends="install-all" />
 
     <zipfileset id="src.package.contents" basedir="${basedir}">

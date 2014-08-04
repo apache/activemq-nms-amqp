@@ -43,13 +43,13 @@
     <property name="download.skip"           value="false" unless="${property::exists('download.skip')}"/>
     <property name="install.skip"            value="false" unless="${property::exists('install.skip')}"/>
     <property name="compile.skip"            value="false" unless="${property::exists('compile.skip')}" />
-    <property name="current.build.config"    value="${if(project.release.type == 'release', 'release', 'debug')}" overwrite="false" />
+    <property name="current.build.config"    value="${if(project.release.type == 'SNAPSHOT', 'debug', 'release')}" overwrite="false" />
     <property name="current.build.framework" value="${framework::get-target-framework()}" overwrite="false" />
     <property name="current.build.defines"   value="${build.defines}" />
     <property name="build.framework.strings" value="net-2.0,net-3.5,net-4.0,mono-2.0,mono-4.0,netcf-2.0,netcf-3.5" unless="${property::exists('build.framework.strings')}"/>
     <property name="current.build.framework.assembly.dir" value="${framework::get-assembly-directory(framework::get-target-framework())}" dynamic="true" />
 
-    <property name="build.config.strings"    value="${if(property::exists('configuration'), configuration, if(build.skip.release == 'true', 'debug', 'debug,release'))}" dynamic="true" />
+    <property name="build.config.strings"    value="debug,release" unless="${property::exists('build.config.strings')}" />
 
     <!-- Figure out the user's HOME directory -->
     <property name="user.home" value="${environment::get-variable('HOME')}"
@@ -384,6 +384,7 @@
                 <copy todir="${build.bin.dir}" file="${content.filename}" if="${not file::up-to-date(content.filename, '${build.bin.dir}/${content.filename}')}" />
             </do>
         </foreach>
+        <call target="copy-unmanaged-content" /> 
     </target>
 
     <!-- ============================================================================================ -->

@@ -47,10 +47,9 @@ namespace Apache.NMS.Amqp.Test
         //[TestCase("amqp:tcp:host-._~%ff%23:42")]
 
         // These test cases fail to parse the URI
-        // TODO: The SEHException is fixed in  upstream qpid but not yet in vendor kit.
-        [TestCase("amqp:tcp:",  ExpectedException = typeof(System.Runtime.InteropServices.SEHException))]
-        [TestCase("amqp:",      ExpectedException = typeof(System.Runtime.InteropServices.SEHException))]
-        [TestCase("amqp::5672", ExpectedException = typeof(System.Runtime.InteropServices.SEHException))]
+        [TestCase("amqp:tcp:", ExpectedException = typeof(ConnectionClosedException))]
+        [TestCase("amqp:", ExpectedException = typeof(ConnectionClosedException))]
+        [TestCase("amqp::5672", ExpectedException = typeof(ConnectionClosedException))]
 
         // These test cases pass parsing the URI but fail to connect
         [TestCase("amqp:tcp:localhost:42",               ExpectedException = typeof(ConnectionClosedException))]
