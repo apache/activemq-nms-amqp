@@ -69,11 +69,45 @@ namespace Apache.NMS.Amqp
                 // TODO: transactions
                 throw new NotSupportedException("Transactions are not supported by Qpid/Amqp");
             }
+            else if (acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge)
+            {
+                this.acknowledgementMode = AcknowledgementMode.AutoAcknowledge;
+            }
             if (connection.IsStarted)
             {
                 this.Start();
             }
             connection.AddSession(this);
+        }
+
+        public AcknowledgementMode AcknowledgementMode
+        {
+            get { return this.acknowledgementMode; }
+        }
+
+        public bool IsClientAcknowledge
+        {
+            get { return this.acknowledgementMode == AcknowledgementMode.ClientAcknowledge; }
+        }
+
+        public bool IsAutoAcknowledge
+        {
+            get { return this.acknowledgementMode == AcknowledgementMode.AutoAcknowledge; }
+        }
+
+        public bool IsDupsOkAcknowledge
+        {
+            get { return this.acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge; }
+        }
+
+        public bool IsIndividualAcknowledge
+        {
+            get { return this.acknowledgementMode == AcknowledgementMode.IndividualAcknowledge; }
+        }
+
+        public bool IsTransacted
+        {
+            get { return this.acknowledgementMode == AcknowledgementMode.Transactional; }
         }
 
         #region IStartable Methods
@@ -503,11 +537,6 @@ namespace Apache.NMS.Amqp
             get { return acknowledgementMode == AcknowledgementMode.Transactional; }
         }
 
-        public AcknowledgementMode AcknowledgementMode
-        {
-            get { throw new NotImplementedException(); }
-        }
-
         private ConsumerTransformerDelegate consumerTransformer;
         public ConsumerTransformerDelegate ConsumerTransformer
         {
@@ -588,6 +617,35 @@ namespace Apache.NMS.Amqp
             }
             return qpidSession.CreateSender(address);
         }
+
+        //
+        // Acknowledges all outstanding messages that have been received
+        // by the application on this session.
+        // 
+        // @param sync if true, blocks until the acknowledgement has been
+        // processed by the server
+        //
+        public void Acknowledge()
+        {
+            qpidSession.Acknowledge(false);
+        }
+
+        public void Acknowledge(bool sync)
+        {
+            qpidSession.Acknowledge(sync);
+        }
+
+        //
+        // These flavors of acknowledge are available in the qpid messaging
+        // interface but not exposed to the NMS message/session stack.
+        //
+        // Acknowledges the specified message.
+        //
+        // void acknowledge(Message&, bool sync=false);
+        //
+        // Acknowledges all message up to the specified message.
+        //
+        // void acknowledgeUpTo(Message&, bool sync=false);
 
         #region Transaction State Events
 

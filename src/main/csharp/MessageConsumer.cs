@@ -196,6 +196,10 @@ namespace Apache.NMS.Amqp
             {
                 nmsMessage = session.MessageConverter.ToNmsMessage(qpidMessage);
                 nmsMessage.NMSReplyTo = replyToDestination;
+                if (this.session.IsAutoAcknowledge)
+                {
+                    this.session.Acknowledge();
+                }
             }
             return nmsMessage;
         }
