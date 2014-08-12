@@ -103,6 +103,7 @@ namespace Apache.NMS.Amqp
                 try
                 {
                     Tracer.DebugFormat("Stop  Producer Id = " + ProducerId);
+                    qpidSender.Close();
                     qpidSender.Dispose();
                     qpidSender = null;
                 }
@@ -168,6 +169,7 @@ namespace Apache.NMS.Amqp
 
         public void Close()
         {
+            Stop();
         }
 
         public void Dispose()

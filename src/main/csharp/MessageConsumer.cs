@@ -116,6 +116,7 @@ namespace Apache.NMS.Amqp
             {
                 try
                 {
+                    qpidReceiver.Close();
                     qpidReceiver.Dispose();
                     qpidReceiver = null;
                 }
@@ -213,6 +214,7 @@ namespace Apache.NMS.Amqp
         public void Close()
         {
             StopAsyncDelivery();
+            Stop();
         }
 
         protected virtual void StopAsyncDelivery()
