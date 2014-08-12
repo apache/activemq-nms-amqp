@@ -384,6 +384,7 @@
                 <copy todir="${build.bin.dir}" file="${content.filename}" if="${not file::up-to-date(content.filename, '${build.bin.dir}/${content.filename}')}" />
             </do>
         </foreach>
+        <call target="copy-unmanaged-content" /> 
     </target>
 
     <!-- ============================================================================================ -->
