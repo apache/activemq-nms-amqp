@@ -118,9 +118,29 @@
             <include name="${Apache.NMS.pdb}" />
             <include name="${Apache.NMS.Test.dll}" />
             <include name="${Apache.NMS.Test.pdb}" />
-			<include name="${Apache.Qpid.dll}" />
+            <include name="${Apache.Qpid.dll}" />
             <include name="${nunit.dll}" />
             <include name="${NUnit.Projectfile}" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_chrono-vc100-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_chrono-vc100-mt-gd-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_date_time-vc100-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_date_time-vc100-mt-gd-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_program_options-vc100-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_program_options-vc100-mt-gd-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_system-vc100-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_system-vc100-mt-gd-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_thread-vc100-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_thread-vc100-mt-gd-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpid-proton.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpid-protond.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidclient.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidclientd.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidcommon.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidcommond.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidmessaging.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidmessagingd.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidtypes.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidtypesd.dll" />         
         </fileset>
 
         <fileset id="install.filenames">
@@ -132,19 +152,6 @@
 
     </target>
 
-    <target name="copy-unmanaged-content" description="Copies native DLLs from \lib to \build">
-        <foreach item="File" property="filename">
-            <in> <items>
-                <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpid*" />
-                <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost*" />
-            </items> </in>
-            <do>
-                <echo message="Copying unmanaged: ${filename}" />
-                <copy todir="${build.bin.dir}" file="${filename}" if="${not file::up-to-date(filename, '${build.bin.dir}/${filename}')}" />
-            </do>
-        </foreach>
-    </target>
-    
     <target name="default" depends="install-all" />
 
     <zipfileset id="src.package.contents" basedir="${basedir}">
