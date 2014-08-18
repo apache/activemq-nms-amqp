@@ -116,13 +116,14 @@ namespace Apache.NMS.Amqp
             {
                 try
                 {
+                    Tracer.DebugFormat("Stop Consumer Id = " + ConsumerId);
                     qpidReceiver.Close();
                     qpidReceiver.Dispose();
                     qpidReceiver = null;
                 }
                 catch (Org.Apache.Qpid.Messaging.QpidException e)
                 {
-                    throw new NMSException("Failed to close session with Id " + ConsumerId.ToString() + " : " + e.Message);
+                    throw new NMSException("Failed to close consumer with Id " + ConsumerId.ToString() + " : " + e.Message);
                 }
             }
         }

@@ -122,9 +122,6 @@ namespace Apache.NMS.Amqp
         /// </summary>
         public void Stop()
         {
-            // Close qpidConnection
-            CheckDisconnected();
-
             // Administratively close NMS objects
             if (started.CompareAndSet(true, false))
             {
@@ -134,6 +131,9 @@ namespace Apache.NMS.Amqp
                     session.Stop();
                 }
             }
+
+            // Close qpidConnection
+            CheckDisconnected();
         }
         #endregion
 

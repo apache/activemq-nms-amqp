@@ -109,7 +109,7 @@ namespace Apache.NMS.Amqp
                 }
                 catch (Org.Apache.Qpid.Messaging.QpidException e)
                 {
-                    throw new NMSException("Failed to close session with Id " + ProducerId.ToString() + " : " + e.Message);
+                    throw new NMSException("Failed to close producer with Id " + ProducerId.ToString() + " : " + e.Message);
                 }
             }
         }
