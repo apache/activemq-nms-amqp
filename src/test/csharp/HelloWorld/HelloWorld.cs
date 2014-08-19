@@ -69,7 +69,7 @@ namespace Apache.NMS.Amqp.Test
                         connection.Start();
 
                         // Create a text message
-                        ITextMessage request = session.CreateTextMessage("Hello World!");
+                        ITextMessage request = session.CreateTextMessage("Hello World! " + DateTime.Now.ToString("HH:mm:ss tt"));
                         request.Properties["NMSXGroupID"] = "cheese";
                         request.Properties["myHeader"] = "Cheddar";
 
@@ -90,6 +90,9 @@ namespace Apache.NMS.Amqp.Test
                             Console.WriteLine("Received message text: " + message.Text);
                             Console.WriteLine("Received message properties: " + message.Properties.ToString());
                         }
+                        producer.Close();
+                        consumer.Close();
+                        session.Close();
                         connection.Stop();
                     }
                 }

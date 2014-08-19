@@ -28,16 +28,16 @@
     <property name="project.description"       value="Apache NMS for AMQP Class Library (.Net Messaging Library Implementation): An implementation of the NMS API for AMQP using Apache QPID and Proton" />
 	
 	<!-- Native Qpid DLLs -->
-    <property name="boost_chrono"              value="boost_chrono-${vcver}-mt${boostdebug}-1_47.dll"          dynamic="true" />
-    <property name="boost_date_time"           value="boost_date_time-${vcver}-mt${boostdebug}-1_47.dll"       dynamic="true" />
-    <property name="boost_program_options"     value="boost_program_options-${vcver}-mt${boostdebug}-1_47.dll" dynamic="true" />
-    <property name="boost_system"              value="boost_system-${vcver}-mt${boostdebug}-1_47.dll"          dynamic="true" />
-    <property name="boost_thread"              value="boost_thread-${vcver}-mt${boostdebug}-1_47.dll"          dynamic="true" />
-    <property name="qpidclient"                value="qpidclient${debugsuffix}.dll"    dynamic="true" />
-    <property name="qpidcommon"                value="qpidcommon${debugsuffix}.dll"    dynamic="true" />
-    <property name="qpidmessaging"             value="qpidmessaging${debugsuffix}.dll" dynamic="true" />
-    <property name="qpid-proton"               value="qpid-proton${debugsuffix}.dll"   dynamic="true" />
-    <property name="qpidtypes"                 value="qpidtypes${debugsuffix}.dll"     dynamic="true" />
+    <property name="boost_chrono"              value="boost_chrono-${vcver}-mt-1_47.dll"          dynamic="true" />
+    <property name="boost_date_time"           value="boost_date_time-${vcver}-mt-1_47.dll"       dynamic="true" />
+    <property name="boost_program_options"     value="boost_program_options-${vcver}-mt-1_47.dll" dynamic="true" />
+    <property name="boost_system"              value="boost_system-${vcver}-mt-1_47.dll"          dynamic="true" />
+    <property name="boost_thread"              value="boost_thread-${vcver}-mt-1_47.dll"          dynamic="true" />
+    <property name="qpidclient"                value="qpidclient.dll"    dynamic="true" />
+    <property name="qpidcommon"                value="qpidcommon.dll"    dynamic="true" />
+    <property name="qpidmessaging"             value="qpidmessaging.dll" dynamic="true" />
+    <property name="qpid-proton"               value="qpid-proton.dll"   dynamic="true" />
+    <property name="qpidtypes"                 value="qpidtypes.dll"     dynamic="true" />
 
     <!-- Repository organized as: organization/module/version/plaform/artifact, platform might be something like 'all' or 'net-2.0/release' -->
     <property name="nunit.dll"                 value="${basedir}/lib/NUnit/${current.build.framework}/nunit.framework.dll"                 dynamic="true" />
@@ -53,9 +53,6 @@
          to align .NET build with underlying unmanaged C runtime. -->
     <property name="build.framework.strings" value="net-2.0,net-4.0"/>
     
-    <!-- Limit to debug until lib\Apache.Qpid\net-X.0 gets debug/release subdirectories -->
-    <property name="build.config.strings"    value="debug" />
-
     <target name="vendor-init" description="Initializes Vendor library from local repository.">
         <!--
            Vendor specific info.  The prefix of 'vendor.apache.org' is taken from the property
@@ -82,10 +79,7 @@
         <property name="vendor.qpid.apache.org.version"   value="0.28.0.16239" />
         <!-- net-4.0 built with VS2010 (vc100), net-2.0 built with VS2008 (vc90) -->
 		<property name="vcver"                            value="${if(current.build.framework == 'net-4.0', 'vc100', 'vc90')}" />
-		<property name="debugsuffix"                      value="${if(current.build.config == 'release', '', 'd')}" />
-		<property name="boostdebug"                       value="${if(current.build.config == 'release', '', '-gd')}" />
-		<echo message="Vendor-init current.build.framework = ${current.build.framework}, current.build.config = ${current.build.config}" />
-		<echo message="vcver = ${vcver}, debugsuffix = ${debugsuffix}, boostdebug = ${boostdebug}" />
+		<echo message="Vendor-init current.build.framework = ${current.build.framework}, current.build.config = ${current.build.config}, vcver = ${vcver}" />
 		 
         <property name="vendor.qpid.apache.org.filenames" value="org.apache.qpid.messaging.dll,${boost_chrono},${boost_date_time},${boost_program_options},${boost_system},${boost_thread},${qpidclient},${qpidcommon},${qpidmessaging},${qpid-proton},${qpidtypes}" dynamic="true"/>
     </target>
@@ -118,29 +112,27 @@
             <include name="${Apache.NMS.pdb}" />
             <include name="${Apache.NMS.Test.dll}" />
             <include name="${Apache.NMS.Test.pdb}" />
-            <include name="${Apache.Qpid.dll}" />
+			<include name="${Apache.Qpid.dll}" />
             <include name="${nunit.dll}" />
             <include name="${NUnit.Projectfile}" />
+            <!-- boost unmanaged: net-2.0 -->
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_chrono-vc90-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_date_time-vc90-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_program_options-vc90-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_system-vc90-mt-1_47.dll" />
+            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_thread-vc90-mt-1_47.dll" />
+            <!-- boost unmanaged net-4.0 -->
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_chrono-vc100-mt-1_47.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_chrono-vc100-mt-gd-1_47.dll" />
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_date_time-vc100-mt-1_47.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_date_time-vc100-mt-gd-1_47.dll" />
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_program_options-vc100-mt-1_47.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_program_options-vc100-mt-gd-1_47.dll" />
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_system-vc100-mt-1_47.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_system-vc100-mt-gd-1_47.dll" />
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_thread-vc100-mt-1_47.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/boost_thread-vc100-mt-gd-1_47.dll" />
+            <!-- qpid native: identical names regardless of framework -->
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpid-proton.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpid-protond.dll" />
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidclient.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidclientd.dll" />
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidcommon.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidcommond.dll" />
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidmessaging.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidmessagingd.dll" />
             <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidtypes.dll" />
-            <include name="${basedir}/lib/Apache.Qpid/${current.build.framework}/qpidtypesd.dll" />         
         </fileset>
 
         <fileset id="install.filenames">
@@ -159,11 +151,11 @@
         <include name="NOTICE.txt" />
         <include name="nant-common.xml" />
         <include name="nant.build" />
-        <include name="nant.build" />
         <include name="nmsprovider*.config" />
         <include name="vs2008-*.csproj" />
-        <include name="vs2008-*.csproj" />
+        <include name="vs2010-*.csproj" />
         <include name="vs2008-*.sln" />
+        <include name="vs2010-*.sln" />
         <include name="keyfile/*" />
         <include name="src/**/*.cs" />
         <exclude name="src/sandbox/**" />
