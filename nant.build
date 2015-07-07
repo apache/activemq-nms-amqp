@@ -22,7 +22,7 @@
     <property name="basedir"                   value="${project::get-base-directory()}" />
     <property name="project.name"              value="Apache.NMS.AMQP" />
     <property name="project.group"             value="org.apache.activemq" />
-    <property name="project.version"           value="1.7.0" unless="${property::exists('project.version')}" />
+    <property name="project.version"           value="1.8.0" unless="${property::exists('project.version')}" />
     <property name="project.release.type"      value="SNAPSHOT" unless="${property::exists('project.release.type')}" />
     <property name="project.short_description" value="Apache NMS for AMQP Class Library" />
     <property name="project.description"       value="Apache NMS for AMQP Class Library (.Net Messaging Library Implementation): An implementation of the NMS API for AMQP using Apache QPID and Proton" />
@@ -64,7 +64,7 @@
         <!-- Property grouping for 'vendor.apache.org' -->
         <property name="vendor.apache.org.name"      value="Apache.NMS" />
         <property name="vendor.apache.org.group"     value="org.apache.activemq" />
-        <property name="vendor.apache.org.version"   value="1.7.0" />
+        <property name="vendor.apache.org.version"   value="1.8.0" />
         <property name="vendor.apache.org.filenames" value="Apache.NMS.dll,Apache.NMS.pdb,Apache.NMS.Test.dll,Apache.NMS.Test.pdb" />
 
         <!-- Property grouping for 'vendor.nunit.org' -->
