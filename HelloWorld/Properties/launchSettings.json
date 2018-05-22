@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "HelloWorld": {
+      "commandName": "Project",
+      "commandLineArgs": "--uri=amqp://127.0.0.1"
+    }
+  }
+}

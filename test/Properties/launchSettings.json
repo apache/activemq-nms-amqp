@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "NMS-AMQP.Test": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Users\\rpaulson\\.nuget\\packages\\nunit.consolerunner\\3.7.0\\tools\\nunit3-console.exe",
+      "commandLineArgs": "NMS.AMQP.Test.dll --test NMS.AMQP.Test.TestCase.MessageTest.TestBytesMessage",
+      "workingDirectory": "D:\\sb\\github\\activemq-nms-amqp\\test\\bin\\Debug\\net452"
+    }
+  }
+}
