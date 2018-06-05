@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,35 +15,40 @@
  * limitations under the License.
  */
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Apache.NMS;
 
-// Typedef for options map
-using OptionsMap = System.Collections.Generic.Dictionary<System.String, System.Object>;
-
-namespace Apache.NMS.Amqp
+namespace NMS.AMQP
 {
-
     /// <summary>
-    /// Summary description for Queue.
+    /// NMS.AMQP.Queue implements Apache.NMS.IQueue
+    /// Queue is an concrete implementation for an abstract Destination.
     /// </summary>
-    public class Queue : Destination, IQueue
+    class Queue : Destination, IQueue
     {
+        
+        #region Constructor
 
-        public Queue()
-            : base()
+        internal Queue(Connection conn, string queueString) : base(conn, queueString, true)
+        {}
+        
+        #endregion
+
+        #region Destination Methods
+
+        protected override void ValidateName(string name)
         {
+            
         }
 
-        public Queue(String name)
-            : base(name)
-        {
-        }
+        #endregion
 
-        public Queue(String name, string subject, OptionsMap options)
-            : base(name, subject, options, "queue")
-        {
-        }
+        #region Destination Properties
 
-        override public DestinationType DestinationType
+        public override DestinationType DestinationType
         {
             get
             {
@@ -51,21 +56,85 @@ namespace Apache.NMS.Amqp
             }
         }
 
-        public String QueueName
+        #endregion
+
+        #region IQueue Properties
+
+        public string QueueName
         {
-            get { return Path; }
+            get
+            {
+                return destinationName;
+            }
         }
 
+        #endregion
 
-        public override Destination CreateDestination(String name)
+        #region IDisposable
+
+        protected override void Dispose(bool disposing)
         {
-            return new Queue(name);
+            base.Dispose(disposing);
         }
 
-        public override Destination CreateDestination(String name, string subject, OptionsMap options)
-        {
-            return new Queue(name, subject, options);
-        }
+        #endregion
     }
-}
 
+    /// <summary>
+    /// NMS.AMQP.TemporaryQueue implements Apache.NMS.ITemporaryQueue
+    /// TemporaryQueue is an concrete implementation for an abstract TemporaryDestination.
+    /// </summary>
+    class TemporaryQueue : TemporaryDestination, ITemporaryQueue
+    {
+        #region Constructor
+
+        internal TemporaryQueue(Connection conn) : base(conn, conn.TemporaryQueueGenerator.GenerateId(), true) { }
+
+        internal TemporaryQueue(Connection conn, string destinationName) : base(conn, destinationName, true) { }
+        
+        #endregion
+
+        #region Destination Methods
+
+        protected override void ValidateName(string name)
+        {
+            
+        }
+
+        #endregion
+
+        #region Destination Properties
+
+        public override DestinationType DestinationType
+        {
+            get
+            {
+                return DestinationType.TemporaryQueue;
+            }
+        }
+
+        #endregion
+
+        #region IQueue Properties
+
+        public string QueueName
+        {
+            get
+            {
+                return destinationName;
+            }
+        }
+
+        #endregion
+
+        #region ITemporaryQueue Methods
+
+        public override void Delete()
+        {
+            base.Delete();
+        }
+
+        #endregion
+    }
+
+}

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,390 +15,564 @@
  * limitations under the License.
  */
 using System;
-using System.Collections;
 using System.Threading;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Reflection;
+using Apache.NMS;
 using Apache.NMS.Util;
-using Org.Apache.Qpid.Messaging;
+using Amqp.Framing;
+using NMS.AMQP.Util;
+using NMS.AMQP.Message;
+using NMS.AMQP.Message.Factory;
 
-// Typedef for options map
-using OptionsMap = System.Collections.Generic.Dictionary<System.String, System.Object>;
 
-namespace Apache.NMS.Amqp
+namespace NMS.AMQP
 {
-    /// <summary>
-    /// Amqp provider of ISession
-    /// </summary>
-    public class Session : ISession, IStartable, IStoppable
+    
+    enum SessionState
     {
-        /// <summary>
-        /// Private object used for synchronization, instead of public "this"
-        /// </summary>
-        private readonly object myLock = new object();
+        UNKNOWN,
+        INITIAL,
+        BEGINSENT,
+        OPENED,
+        ENDSENT,
+        CLOSED
+    }
 
-        private readonly IDictionary consumers = Hashtable.Synchronized(new Hashtable());
-        private readonly IDictionary producers = Hashtable.Synchronized(new Hashtable());
+    /// <summary>
+    /// NMS.AMQP.Session facilitates management and creates the underlying Amqp.Session protocol engine object.
+    /// NMS.AMQP.Session is also a Factory for NMS.AMQP.MessageProcuder, NMS.AMQP.MessageConsumer, NMS.AMQP.Message.Message, NMS.AMQP.Destination, etc.
+    /// </summary>
+    class Session : NMSResource<SessionInfo>, ISession
+    {
 
         private Connection connection;
-        private AcknowledgementMode acknowledgementMode;
-        private IMessageConverter messageConverter;
-        private readonly int id;
+        private Amqp.ISession impl;
+        private Dictionary<string, MessageConsumer> consumers;
+        private Dictionary<string, MessageProducer> producers;
+        private SessionInfo sessInfo;
+        private CountDownLatch responseLatch;
+        private Atomic<SessionState> state = new Atomic<SessionState>(SessionState.INITIAL);
+        private DispatchExecutor dispatcher;
+        private readonly IdGenerator prodIdGen;
+        private readonly IdGenerator consIdGen;
+        private bool recovered = false;
 
-        private int consumerCounter;
-        private int producerCounter;
-        private long nextDeliveryId;
-        private long lastDeliveredSequenceId;
-        private readonly object sessionLock = new object();
-        private readonly Atomic<bool> started = new Atomic<bool>(false);
-        protected bool disposed = false;
-        protected bool closed = false;
-        protected bool closing = false;
-        private TimeSpan disposeStopTimeout = TimeSpan.FromMilliseconds(30000);
-        private TimeSpan closeStopTimeout = TimeSpan.FromMilliseconds(Timeout.Infinite);
-        private TimeSpan requestTimeout;
-
-        private Org.Apache.Qpid.Messaging.Session qpidSession = null; // Don't create until Start()
-
-        public Session(Connection connection, int sessionId, AcknowledgementMode acknowledgementMode)
+        #region Constructor
+        
+        internal Session(Connection conn)
         {
-            this.connection = connection;
-            this.acknowledgementMode = acknowledgementMode;
-            MessageConverter = connection.MessageConverter;
-            id = sessionId;
-            if (this.acknowledgementMode == AcknowledgementMode.Transactional)
-            {
-                // TODO: transactions
-                throw new NotSupportedException("Transactions are not supported by Qpid/Amqp");
-            }
-            else if (acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge)
-            {
-                this.acknowledgementMode = AcknowledgementMode.AutoAcknowledge;
-            }
-            if (connection.IsStarted)
-            {
-                this.Start();
-            }
-            connection.AddSession(this);
+            consumers = new Dictionary<string, MessageConsumer>();
+            producers = new Dictionary<string, MessageProducer>();
+            sessInfo = new SessionInfo(conn.SessionIdGenerator.GenerateId());
+            Info = sessInfo;
+            dispatcher = new DispatchExecutor();
+            this.Configure(conn);
+            prodIdGen = new NestedIdGenerator("ID:producer", this.sessInfo.Id, true);
+            consIdGen = new NestedIdGenerator("ID:consumer", this.sessInfo.Id, true);
+            
         }
-
-        public AcknowledgementMode AcknowledgementMode
-        {
-            get { return this.acknowledgementMode; }
-        }
-
-        public bool IsClientAcknowledge
-        {
-            get { return this.acknowledgementMode == AcknowledgementMode.ClientAcknowledge; }
-        }
-
-        public bool IsAutoAcknowledge
-        {
-            get { return this.acknowledgementMode == AcknowledgementMode.AutoAcknowledge; }
-        }
-
-        public bool IsDupsOkAcknowledge
-        {
-            get { return this.acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge; }
-        }
-
-        public bool IsIndividualAcknowledge
-        {
-            get { return this.acknowledgementMode == AcknowledgementMode.IndividualAcknowledge; }
-        }
-
-        public bool IsTransacted
-        {
-            get { return this.acknowledgementMode == AcknowledgementMode.Transactional; }
-        }
-
-        #region IStartable Methods
-        /// <summary>
-        /// Create new unmanaged session and start senders and receivers
-        /// Associated connection must be open.
-        /// </summary>
-        public void Start()
-        {
-            // Don't try creating session if connection not yet up
-            if (!connection.IsStarted)
-            {
-                throw new ConnectionClosedException();
-            }
-
-            if (started.CompareAndSet(false, true))
-            {
-                try
-                {
-                    // Create qpid session
-                    if (qpidSession == null)
-                    {
-                        qpidSession = connection.CreateQpidSession();
-                    }
-
-                    // Start producers and consumers
-                    lock (producers.SyncRoot)
-                    {
-                        foreach (MessageProducer producer in producers.Values)
-                        {
-                            producer.Start();
-                        }
-                    }
-                    lock (consumers.SyncRoot)
-                    {
-                        foreach (MessageConsumer consumer in consumers.Values)
-                        {
-                            consumer.Start();
-                        }
-                    }
-                }
-                catch (Org.Apache.Qpid.Messaging.QpidException e)
-                {
-                    throw new SessionClosedException( "Failed to create session : " + e.Message );
-                }
-            }
-        }
-
-        public bool IsStarted
-        {
-            get { return started.Value; }
-        }
+        
         #endregion
 
-        #region IStoppable Methods
-        public void Stop()
-        {
-            if (started.CompareAndSet(true, false))
-            {
-                try
-                {
-                    lock (producers.SyncRoot)
-                    {
-                        foreach (MessageProducer producer in producers.Values)
-                        {
-                            producer.Stop();
-                        }
-                    }
-                    lock (consumers.SyncRoot)
-                    {
-                        foreach (MessageConsumer consumer in consumers.Values)
-                        {
-                            consumer.Stop();
-                        }
-                    }
+        #region Internal Properties
 
-                    qpidSession.Dispose();
-                    qpidSession = null;
-                }
-                catch (Org.Apache.Qpid.Messaging.QpidException e)
-                {
-                    throw new NMSException("Failed to close session with Id " + SessionId.ToString() + " : " + e.Message);
-                }
+        internal Connection Connection { get => this.connection;  }
+
+        internal IdGenerator ProducerIdGenerator
+        {
+            get { return prodIdGen; }
+        }
+
+        internal IdGenerator ConsumerIdGenerator
+        {
+            get { return consIdGen; }
+        }
+
+        internal Amqp.ISession InnerSession { get { return this.impl; } }
+        
+        internal string SessionId
+        {
+            get
+            {
+                return sessInfo.sessionId;
             }
         }
+
+        internal StringDictionary Properties
+        {
+            get { return PropertyUtil.GetProperties(this.sessInfo); }
+        }
+        
+        internal DispatchExecutor Dispatcher {  get { return dispatcher; } }
+
+        private object ThisProducerLock { get { return producers; } }
+        private object ThisConsumerLock { get { return consumers; } }
+
+        internal bool IsClosed { get => this.state.Value.Equals(SessionState.CLOSED); }
+
         #endregion
 
-        #region IDisposable Methods
-        public void Dispose()
+        #region Internal/Private Methods
+
+        internal void Configure(Connection conn)
         {
-            Dispose(true);
+            this.connection = conn;
+            
+            PropertyUtil.SetProperties(this.sessInfo, conn.Properties);
+            this.RequestTimeout = conn.RequestTimeout;
+            sessInfo.maxHandle = conn.MaxChannel;
+            
         }
-        #endregion
-
-
-        protected void Dispose(bool disposing)
+        
+        internal void OnException(Exception e)
         {
-            if (this.disposed)
-            {
-                return;
-            }
-
-            try
-            {
-                // Force a Stop when we are Disposing vs a Normal Close.
-                Close();
-            }
-            catch
-            {
-                // Ignore network errors.
-            }
-
-            this.disposed = true;
+            Connection.OnException(e);
         }
 
-        public virtual void Close()
+        internal bool IsDestinationInUse(IDestination destination)
         {
-            if (!this.closed)
+            MessageConsumer[] messageConsumers = consumers.Values.ToArray();
+            foreach(MessageConsumer consumer in messageConsumers)
             {
+                if (consumer.IsUsingDestination(destination))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        internal bool ContainsSubscriptionName(string name)
+        {
+            MessageConsumer[] messageConsumers = consumers.Values.ToArray();
+            foreach (MessageConsumer consumer in messageConsumers)
+            {
+                if (consumer.HasSubscription(name))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        internal void Remove (MessageLink link)
+        {
+            if (link is MessageConsumer)
+            {
+                lock (ThisConsumerLock)
+                {
+                    consumers.Remove(link.Id.ToString());
+                }
+            }
+            else if (link is MessageProducer)
+            {
+                lock (ThisProducerLock)
+                {
+                    producers.Remove(link.Id.ToString());
+                }
+            }
+        }
+
+        internal bool IsRecovered { get => recovered; }
+
+        internal void ClearRecovered() { recovered = false; }
+
+        internal void Acknowledge(AckType ackType)
+        {
+            MessageConsumer[] consumers = null;
+            lock(ThisConsumerLock)
+            {
+                consumers = this.consumers.Values.ToArray();
+            }
+            foreach(MessageConsumer mc in consumers)
+            {
+                mc.Acknowledge(ackType);
+            }
+        }
+
+        internal void Begin()
+        {
+            if (Connection.IsConnected && this.state.CompareAndSet(SessionState.INITIAL, SessionState.BEGINSENT))
+            {
+                this.responseLatch = new CountDownLatch(1);
+                this.impl = new Amqp.Session(Connection.InnerConnection as Amqp.Connection, this.CreateBeginFrame(), this.OnBeginResp);
+                impl.AddClosedCallback(OnInternalClosed);
+                SessionState finishedState = SessionState.UNKNOWN;
                 try
                 {
-                    Tracer.InfoFormat("Closing The Session with Id {0}", SessionId);
-                    DoClose();
-                    Tracer.InfoFormat("Closed The Session with Id {0}", SessionId);
-                }
-                catch (Exception ex)
-                {
-                    Tracer.ErrorFormat("Error closing Session with id {0} : {1}", SessionId, ex);
-                }
-            }
-        }
-
-        internal void DoClose()
-        {
-            Shutdown();
-        }
-
-        internal void Shutdown()
-        {
-            //Tracer.InfoFormat("Executing Shutdown on Session with Id {0}", this.info.SessionId);
-
-            if (this.closed)
-            {
-                return;
-            }
-
-            lock (myLock)
-            {
-                if (this.closed || this.closing)
-                {
-                    return;
-                }
-
-                try
-                {
-                    this.closing = true;
-
-                    // Stop all message deliveries from this Session
-                    lock (consumers.SyncRoot)
+                    bool received = true;
+                    if(sessInfo.requestTimeout <= 0)
                     {
-                        foreach (MessageConsumer consumer in consumers.Values)
+                        this.responseLatch.await();
+                    }
+                    else
+                    {
+                        received = this.responseLatch.await(TimeSpan.FromMilliseconds(sessInfo.requestTimeout));
+                    }
+                        
+                        
+                    if (received && this.impl.Error == null)
+                    {
+                        finishedState = SessionState.OPENED;
+                    }
+                    else
+                    {
+                        finishedState = SessionState.INITIAL;
+                        if (!received)
                         {
-                            consumer.Close();
+                            Tracer.InfoFormat("Session {0} Begin timeout in {1}ms", sessInfo.nextOutgoingId, sessInfo.requestTimeout);
+                            throw ExceptionSupport.GetTimeoutException(this.impl, "Performative Begin Timeout while waiting for response.");
+                        }
+                        else 
+                        {
+                            Tracer.InfoFormat("Session {0} Begin error: {1}", sessInfo.nextOutgoingId, this.impl.Error);
+                            throw ExceptionSupport.GetException(this.impl, "Performative Begin Error.");
                         }
                     }
-                    consumers.Clear();
-
-                    lock (producers.SyncRoot)
-                    {
-                        foreach (MessageProducer producer in producers.Values)
-                        {
-                            producer.Close();
-                        }
-                    }
-                    producers.Clear();
-
-                    Connection.RemoveSession(this);
-                }
-                catch (Exception ex)
-                {
-                    Tracer.ErrorFormat("Error closing Session with Id {0} : {1}", SessionId, ex);
                 }
                 finally
                 {
-                    this.closed = true;
-                    this.closing = false;
+                    this.responseLatch = null;
+                    this.state.GetAndSet(finishedState);
+                    if(finishedState != SessionState.OPENED && this.impl != null && !this.impl.IsClosed)
+                    {
+                        this.impl.Close();
+                    }
+
                 }
             }
         }
 
-        public IMessageProducer CreateProducer()
+        protected void End()
         {
-            return CreateProducer(null);
+            Tracer.InfoFormat("End(Session {0}): Dispatcher {1}", SessionId, Dispatcher.Name);
+            if (this.impl != null && this.state.CompareAndSet(SessionState.OPENED, SessionState.ENDSENT))
+            {
+                this.Stop();
+
+                this.dispatcher?.Close();
+
+                try
+                {
+                    if (!this.impl.IsClosed)
+                    {
+                        this.impl.Close(TimeSpan.FromMilliseconds(this.sessInfo.closeTimeout), null);
+                    }
+                }
+                catch (TimeoutException tex)
+                {
+                    throw ExceptionSupport.GetTimeoutException(this.impl,
+                        "Timeout for Amqp Session end for Session {0}. Cause {1}",
+                        this.Id, tex.Message);
+                }
+                catch (Amqp.AmqpException amqpEx)
+                {
+                    throw ExceptionSupport.Wrap(amqpEx,
+                        "Failed to end Amqp Session for Session {0}", this.Id);
+                }
+                finally
+                {
+                    if (this.state.CompareAndSet(SessionState.ENDSENT, SessionState.CLOSED))
+                    {
+                        this.Connection.Remove(this);
+                    }
+                    this.impl = null;
+                    this.dispatcher = null;
+                }
+            }
         }
 
-        public IMessageProducer CreateProducer(IDestination destination)
+        private Begin CreateBeginFrame()
         {
-            if (destination == null)
-            {
-                throw new InvalidDestinationException("Cannot create a Consumer with a Null destination");
-            }
-            MessageProducer producer = null;
+            Begin begin = new Begin();
+            
+            begin.HandleMax = this.sessInfo.maxHandle;
+            begin.IncomingWindow = this.sessInfo.incomingWindow;
+            begin.OutgoingWindow = this.sessInfo.outgoingWindow;
+            begin.NextOutgoingId = this.sessInfo.nextOutgoingId;
+
+            return begin;
+        }
+
+        private void OnBeginResp(Amqp.ISession session, Begin resp)
+        {
+            Tracer.DebugFormat("Received Begin for Session {0}, Response: {1}", session, resp);
+            
+            this.sessInfo.remoteChannel = resp.RemoteChannel;
+            this.responseLatch.countDown();
+            
+        }
+        
+        private void OnInternalClosed(Amqp.IAmqpObject sender, Error error)
+        {
+            string name = null;
+            Connection parent = null;
+            Session self = null;
+            CountDownLatch latch = null;
             try
             {
-                Queue queue = new Queue(destination.ToString());
-                producer = DoCreateMessageProducer(queue);
-
-                this.AddProducer(producer);
-            }
-            catch (Exception)
-            {
-                if (producer != null)
+                self = this;
+                parent = this.Connection;
+                name = this.Id.ToString();
+                latch = this.responseLatch;
+                if (self.state.CompareAndSet(SessionState.OPENED, SessionState.CLOSED))
                 {
-                    this.RemoveProducer(producer.ProducerId);
-                    producer.Close();
+                    // unexpected close or parent close.
+                    parent.Remove(self);
+                    if (IsStarted)
+                    {
+                        // unexpected close
+                        this.Shutdown();
+                    }
+                    else
+                    {
+                        // parent close
+                        self.dispatcher?.Shutdown();
+                    }
                 }
-
-                throw;
+                else if (self.state.CompareAndSet(SessionState.ENDSENT, SessionState.CLOSED))
+                {
+                    // application close.
+                    // cleanup parent reference
+                    parent.Remove(self);
+                    // non-blocking close for event dispatch executor.
+                    self.dispatcher?.Shutdown();
+                }
             }
-
-            return producer;
-        }
-
-        internal virtual MessageProducer DoCreateMessageProducer(Destination destination)
-        {
-            return new MessageProducer(this, GetNextProducerId(), destination);
-        }
-
-        public IMessageConsumer CreateConsumer(IDestination destination)
-        {
-            return CreateConsumer(destination, null, false);
-        }
-
-        public IMessageConsumer CreateConsumer(IDestination destination, string selector)
-        {
-            return CreateConsumer(destination, selector, false);
-        }
-
-        public IMessageConsumer CreateConsumer(IDestination destination, string selector, bool noLocal)
-        {
-            if (destination == null)
+            catch (Exception ex)
             {
-                throw new InvalidDestinationException("Cannot create a Consumer with a Null destination");
+                Tracer.DebugFormat("Caught Exception during Amqp Session close for NMS Session{0}. Exception {1}", 
+                    name != null ? (" " + name) : "", ex);
             }
 
-            MessageConsumer consumer = null;
+            if (error != null)
+            {
+                Tracer.WarnFormat("Session{0} Unexpectedly closed with error: {1}", name != null ? (" " + name) : "", error);
+                latch?.countDown();
+            }
 
+        }
+
+        private IMessageConsumer DoCreateConsumer(IDestination destination, string name, string selector, bool noLocal)
+        {
+            this.ThrowIfClosed();
+            if (destination.IsTemporary)
+            {
+                if(!(destination is TemporaryDestination))
+                {
+                    throw new InvalidDestinationException(
+                        String.Format("Cannot create consumer with temporary Destination from another provider."));
+                }
+                else if(!this.Connection.Equals((destination as TemporaryDestination).Connection))
+                {
+                    throw new InvalidDestinationException(
+                        String.Format("Temporary Destiantion {0} does not belong to connection {1}", 
+                        destination.ToString(), this.Connection.ClientId));
+                }
+            }
+            MessageConsumer consumer = new MessageConsumer(this, destination, name, selector, noLocal);
             try
             {
-                Queue queue = new Queue(destination.ToString());
-                consumer = DoCreateMessageConsumer(GetNextConsumerId(), queue, acknowledgementMode);
-
-                consumer.ConsumerTransformer = this.ConsumerTransformer;
-
-                this.AddConsumer(consumer);
-
-                if (this.Connection.IsStarted)
-                {
-                    consumer.Start();
-                }
+                consumer.Attach();
             }
-            catch (Exception)
+            catch (NMSException) { throw; }
+            catch (Exception ex)
             {
-                if (consumer != null)
-                {
-                    this.RemoveConsumer(consumer);
-                    consumer.Close();
-                }
+                throw ExceptionSupport.Wrap(ex, "Failed to establish link for Consumer {0} with destination {1}.", consumer.ConsumerId, destination.ToString());
+            }
 
-                throw;
+            lock (ThisConsumerLock)
+            {
+                consumers.Add(consumer.ConsumerId.ToString(), consumer);
+            }
+            if (IsStarted)
+            {
+                consumer.Start();
             }
 
             return consumer;
         }
 
+        #endregion
 
-        public IMessageConsumer CreateDurableConsumer(ITopic destination, string name, string selector, bool noLocal)
+        #region NMSResource Methods
+
+        protected override void ThrowIfClosed()
         {
-            throw new NotSupportedException("TODO: Durable Consumer");
+            if (state.Value.Equals(SessionState.CLOSED))
+            {
+                throw new IllegalStateException("Invalid Operation on Closed session.");
+            }
         }
 
-        internal virtual MessageConsumer DoCreateMessageConsumer(int id, Destination destination, AcknowledgementMode mode)
+        protected override void StartResource()
         {
-            return new MessageConsumer(this, id, destination, mode);
+            this.Begin();
+
+            // start dispatch thread.
+            dispatcher.Start();
+
+            // start all producers and consumers here
+            lock (ThisProducerLock)
+            {
+                foreach (MessageProducer p in producers.Values)
+                {
+                    p.Start();
+                }
+            }
+            lock (ThisConsumerLock)
+            {
+                foreach (MessageConsumer c in consumers.Values)
+                {
+                    c.Start();
+                }
+            }
+            
         }
 
-        public void DeleteDurableConsumer(string name)
+        protected override void StopResource()
         {
-            throw new NotSupportedException("TODO: Durable Consumer");
+            // stop all producers and consumers here
+            
+            lock (ThisProducerLock)
+            {
+                foreach (MessageProducer p in producers.Values)
+                {
+                    p.Stop();
+                }
+            }
+            lock (ThisConsumerLock)
+            {
+                foreach (MessageConsumer c in consumers.Values)
+                {
+                    c.Stop();
+                }
+            }
+            dispatcher.Stop();
         }
 
+        #endregion
+
+        #region ISession Property Fields
+
+        /// <summary>
+        /// See <seealso cref="ISession.AcknowledgementMode"/>.
+        /// <para>
+        /// Throws <see cref="NotImplementedException"/> for <see cref="AcknowledgementMode.Transactional"/>.
+        /// </para>
+        /// </summary>
+        public AcknowledgementMode AcknowledgementMode
+        {
+            get
+            {
+                return sessInfo.ackMode;
+            }
+            internal set
+            {
+                if(value.Equals(AcknowledgementMode.Transactional))
+                {
+                    throw new NotImplementedException("Amqp Provider does not Implement Transactinal AcknoledgementMode.");
+                }
+                else
+                {
+                    sessInfo.ackMode = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Not Implemented, throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public ConsumerTransformerDelegate ConsumerTransformer
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+
+            set
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        /// <summary>
+        /// Not Implemented, throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public ProducerTransformerDelegate ProducerTransformer
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+
+            set
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public TimeSpan RequestTimeout
+        {
+            get
+            {
+                return TimeSpan.FromMilliseconds(this.sessInfo.requestTimeout);
+            }
+
+            set
+            {
+                sessInfo.requestTimeout = Convert.ToInt64(value.TotalMilliseconds);
+            }
+        }
+
+        public bool Transacted
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        #endregion
+
+        #region ISession Events
+
+        /// <summary>
+        /// Not Implemented, throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public event SessionTxEventDelegate TransactionCommittedListener
+        {
+            add => throw new NotImplementedException("AMQP Provider does not implement transactions.");
+            remove => throw new NotImplementedException("AMQP Provider does not implement transactions.");
+        }
+
+        /// <summary>
+        /// Not Implemented, throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public event SessionTxEventDelegate TransactionRolledBackListener
+        {
+            add => throw new NotImplementedException("AMQP Provider does not implement transactions.");
+            remove => throw new NotImplementedException("AMQP Provider does not implement transactions.");
+        }
+
+        /// <summary>
+        /// Not Implemented, throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public event SessionTxEventDelegate TransactionStartedListener
+        {
+            add => throw new NotImplementedException("AMQP Provider does not implement transactions.");
+            remove => throw new NotImplementedException("AMQP Provider does not implement transactions.");
+        }
+
+        #endregion
+
+        #region ISession Methods
+        
         public IQueueBrowser CreateBrowser(IQueue queue)
         {
             throw new NotImplementedException();
@@ -409,251 +583,337 @@ namespace Apache.NMS.Amqp
             throw new NotImplementedException();
         }
 
-        public IQueue GetQueue(string name)
-        {
-            return new Queue(name);
-        }
-
-        public ITopic GetTopic(string name)
-        {
-            return new Topic(name);
-        }
-
-        public IQueue GetQueue(string name, string subject, OptionsMap options)
-        {
-            return new Queue(name, subject, options);
-        }
-
-        public ITopic GetTopic(string name, string subject, OptionsMap options)
-        {
-            return new Topic(name, subject, options);
-        }
-
-        public ITemporaryQueue CreateTemporaryQueue()
-        {
-            throw new NotSupportedException("TODO: Temp queue");
-        }
-
-        public ITemporaryTopic CreateTemporaryTopic()
-        {
-            throw new NotSupportedException("TODO: Temp topic");
-        }
-
-        /// <summary>
-        /// Delete a destination (Queue, Topic, Temp Queue, Temp Topic).
-        /// </summary>
-        public void DeleteDestination(IDestination destination)
-        {
-            // TODO: Implement if possible.  If not possible, then change exception to NotSupportedException().
-            throw new NotImplementedException();
-        }
-
-        public IMessage CreateMessage()
-        {
-            BaseMessage answer = new BaseMessage();
-            return answer;
-        }
-
-
-        public ITextMessage CreateTextMessage()
-        {
-            TextMessage answer = new TextMessage();
-            return answer;
-        }
-
-        public ITextMessage CreateTextMessage(string text)
-        {
-            TextMessage answer = new TextMessage(text);
-            return answer;
-        }
-
-        public IMapMessage CreateMapMessage()
-        {
-            return new MapMessage();
-        }
-
         public IBytesMessage CreateBytesMessage()
         {
-            return new BytesMessage();
+            ThrowIfClosed();
+            return MessageFactory<ConnectionInfo>.Instance(Connection).CreateBytesMessage();
         }
 
         public IBytesMessage CreateBytesMessage(byte[] body)
         {
-            BytesMessage answer = new BytesMessage();
-            answer.Content = body;
-            return answer;
+            IBytesMessage msg = CreateBytesMessage();
+            msg.WriteBytes(body);
+            return msg;
+        }
+
+        public IMessageConsumer CreateConsumer(IDestination destination)
+        {
+            return CreateConsumer(destination, null);
+        }
+
+        public IMessageConsumer CreateConsumer(IDestination destination, string selector)
+        {
+            return CreateConsumer(destination, selector, false);
+        }
+
+        public IMessageConsumer CreateConsumer(IDestination destination, string selector, bool noLocal)
+        {
+            return DoCreateConsumer(destination, null, selector, noLocal);
+        }
+
+        public IMessageConsumer CreateDurableConsumer(ITopic destination, string name, string selector, bool noLocal)
+        {
+            this.ThrowIfClosed();
+            if (Connection.ContainsSubscriptionName(name))
+            {
+                throw new NMSException(string.Format("The subscription name {0} must be unique to a client's Id {1}", name, Connection?.ClientId), NMSErrorCode.INTERNAL_ERROR);
+            }
+            return DoCreateConsumer(destination, name, selector, noLocal);
+        }
+        
+        public IMapMessage CreateMapMessage()
+        {
+            this.ThrowIfClosed();
+            return Connection.MessageFactory.CreateMapMessage();
+        }
+
+        public IMessage CreateMessage()
+        {
+            this.ThrowIfClosed();
+            return Connection.MessageFactory.CreateMessage();
+        }
+
+        public IObjectMessage CreateObjectMessage(object body)
+        {
+            this.ThrowIfClosed();
+            return Connection.MessageFactory.CreateObjectMessage(body);
+        }
+
+        /// <summary>
+        /// Creates an Anonymous Producer. This is equivalent to calling <see cref="ISession"/>.CreateProducer(null).
+        /// </summary>
+        /// <returns>An Anonymous <see cref="IMessageProducer"/>.</returns>
+        public IMessageProducer CreateProducer()
+        {
+            return CreateProducer(null);
+        }
+
+        /// <summary>
+        /// See <seealso cref="ISession.CreateProducer(IDestination)"/>.
+        /// </summary>
+        /// <param name="destination">The destination to create the producer on. Can be null for anonymous producers.</param>
+        /// <returns><see cref="IMessageProducer"/> to send messages on.</returns>
+        public IMessageProducer CreateProducer(IDestination destination)
+        {
+            ThrowIfClosed();
+            if(destination == null && !Connection.IsAnonymousRelay)
+            {
+                throw new NotImplementedException("Anonymous producers are only supported with Anonymous-Relay-Node Connections.");
+            }
+            MessageProducer prod = new MessageProducer(this, destination);
+            try
+            {
+                prod.Attach();
+            }
+            catch(NMSException) { throw; }
+            catch(Exception ex)
+            {
+                throw ExceptionSupport.Wrap(ex, "Failed to Establish link for producer {0} with Destination {1}", prod.ProducerId, destination?.ToString() ?? "Anonymous");
+            }
+            lock (ThisProducerLock)
+            {
+                //Todo Fix adding multiple producers
+                producers.Add(prod.ProducerId.ToString(), prod);
+            }
+            if (IsStarted)
+            {
+                prod.Start();
+            }
+            return prod;
         }
 
         public IStreamMessage CreateStreamMessage()
         {
-            return new StreamMessage();
+            this.ThrowIfClosed();
+            return Connection.MessageFactory.CreateStreamMessage();
         }
 
-        public IObjectMessage CreateObjectMessage(Object body)
+        public ITemporaryQueue CreateTemporaryQueue()
         {
-            ObjectMessage answer = new ObjectMessage();
-            answer.Body = body;
-            return answer;
+            this.ThrowIfClosed();
+            return Connection.CreateTemporaryQueue();
+        }
+
+        public ITemporaryTopic CreateTemporaryTopic()
+        {
+            this.ThrowIfClosed();
+            return Connection.CreateTemporaryTopic();
+        }
+
+        public ITextMessage CreateTextMessage()
+        {
+            ThrowIfClosed();
+            return Connection.MessageFactory.CreateTextMessage();
+        }
+
+        public ITextMessage CreateTextMessage(string text)
+        {
+            ITextMessage msg = CreateTextMessage();
+            msg.Text = text;
+            return msg;
+        }
+
+        /// <summary>
+        /// Delete a destination (Temp Queue, Temp Topic). 
+        /// This is equivalent to calling the <see cref="ITemporaryTopic"/> or <see cref="ITemporaryQueue"/> delete method.
+        /// Queue, Topic, destinations are not supported for deletion.
+        /// Destinations of type Queue or Topic will throw <see cref="NotSupportedException"/>.
+        /// </summary>
+        /// <param name="destination">The destination to delete.</param>
+        public void DeleteDestination(IDestination destination)
+        {
+            this.ThrowIfClosed();
+            if (destination == null)
+            {
+                return;
+            }
+            if (destination is TemporaryDestination)
+            {
+                (destination as TemporaryDestination).Delete();
+            }
+            else if(destination is ITemporaryQueue)
+            {
+                (destination as ITemporaryQueue).Delete();
+            }
+            else if(destination is ITemporaryTopic)
+            {
+                (destination as ITemporaryTopic).Delete();
+            }
+            else
+            {
+                throw new NotSupportedException("AMQP can not delete a Queue or Topic destination.");
+            }
+        }
+
+        public void DeleteDurableConsumer(string name)
+        {
+            this.ThrowIfClosed();
+            this.Connection.Unsubscribe(name);
+        }
+
+        public IQueue GetQueue(string name)
+        {
+            this.ThrowIfClosed();
+            return new Queue(Connection, name);
+        }
+
+        public ITopic GetTopic(string name)
+        {
+            this.ThrowIfClosed();
+            return new Topic(Connection, name);
         }
 
         public void Commit()
         {
-            throw new NotSupportedException("Transactions not supported by Qpid/Amqp");
-        }
-
-        public void Rollback()
-        {
-            throw new NotSupportedException("Transactions not supported by Qpid/Amqp");
+            throw new NotImplementedException();
         }
 
         public void Recover()
         {
-            throw new NotSupportedException("Transactions not supported by Qpid/Amqp");
-        }
-
-        // Properties
-        public Connection Connection
-        {
-            get { return connection; }
-        }
-
-        /// <summary>
-        /// The default timeout for network requests.
-        /// </summary>
-        public TimeSpan RequestTimeout
-        {
-            get { return NMSConstants.defaultRequestTimeout; }
-            set { }
-        }
-
-        public IMessageConverter MessageConverter
-        {
-            get { return messageConverter; }
-            set { messageConverter = value; }
-        }
-
-        public bool Transacted
-        {
-            get { return acknowledgementMode == AcknowledgementMode.Transactional; }
-        }
-
-        private ConsumerTransformerDelegate consumerTransformer;
-        public ConsumerTransformerDelegate ConsumerTransformer
-        {
-            get { return this.consumerTransformer; }
-            set { this.consumerTransformer = value; }
-        }
-
-        private ProducerTransformerDelegate producerTransformer;
-        public ProducerTransformerDelegate ProducerTransformer
-        {
-            get { return this.producerTransformer; }
-            set { this.producerTransformer = value; }
-        }
-
-        public void AddConsumer(MessageConsumer consumer)
-        {
-            if (!this.closing)
+            this.ThrowIfClosed();
+            recovered = true;
+            MessageConsumer[] consumers = this.consumers.Values.ToArray();
+            foreach(MessageConsumer mc in consumers)
             {
-                // Registered with Connection before we register at the broker.
-                consumers[consumer.ConsumerId] = consumer;
+                mc.Recover();
             }
         }
 
-        public void RemoveConsumer(MessageConsumer consumer)
+        public void Rollback()
         {
-            if (!this.closing)
-            {
-                consumers.Remove(consumer.ConsumerId);
-            }
+            throw new NotImplementedException();
         }
-
-        public void AddProducer(MessageProducer producer)
-        {
-            if (!this.closing)
-            {
-                this.producers[producer.ProducerId] = producer;
-            }
-        }
-
-        public void RemoveProducer(int objectId)
-        {
-            if (!this.closing)
-            {
-                producers.Remove(objectId);
-            }
-        }
-
-        public int GetNextConsumerId()
-        {
-            return Interlocked.Increment(ref consumerCounter);
-        }
-
-        public int GetNextProducerId()
-        {
-            return Interlocked.Increment(ref producerCounter);
-        }
-
-        public int SessionId
-        {
-            get { return id; }
-        }
-
-
-        public Org.Apache.Qpid.Messaging.Receiver CreateQpidReceiver(Address address)
-        {
-            if (!IsStarted)
-            {
-                throw new SessionClosedException();
-            }
-            return qpidSession.CreateReceiver(address);
-        }
-
-        public Org.Apache.Qpid.Messaging.Sender CreateQpidSender(Address address)
-        {
-            if (!IsStarted)
-            {
-                throw new SessionClosedException();
-            }
-            return qpidSession.CreateSender(address);
-        }
-
-        //
-        // Acknowledges all outstanding messages that have been received
-        // by the application on this session.
-        // 
-        // @param sync if true, blocks until the acknowledgement has been
-        // processed by the server
-        //
-        public void Acknowledge()
-        {
-            qpidSession.Acknowledge(false);
-        }
-
-        public void Acknowledge(bool sync)
-        {
-            qpidSession.Acknowledge(sync);
-        }
-
-        //
-        // These flavors of acknowledge are available in the qpid messaging
-        // interface but not exposed to the NMS message/session stack.
-        //
-        // Acknowledges the specified message.
-        //
-        // void acknowledge(Message&, bool sync=false);
-        //
-        // Acknowledges all message up to the specified message.
-        //
-        // void acknowledgeUpTo(Message&, bool sync=false);
-
-        #region Transaction State Events
-
-        public event SessionTxEventDelegate TransactionStartedListener;
-        public event SessionTxEventDelegate TransactionCommittedListener;
-        public event SessionTxEventDelegate TransactionRolledBackListener;
 
         #endregion
 
+        #region IDisposable Methods
+
+        internal void CheckOnDispatchThread()
+        {
+            if (!IsClosed && Dispatcher != null && Dispatcher.IsOnDispatchThread)
+            {
+                throw new IllegalStateException("Session " + SessionId + " can not closed From MessageListener.");
+            }
+        }
+
+        internal void Shutdown()
+        {
+            // stop all producers and consumers here
+
+            lock (ThisProducerLock)
+            {
+                foreach (MessageProducer p in producers.Values)
+                {
+                    p.Shutdown();
+                }
+            }
+            lock (ThisConsumerLock)
+            {
+                foreach (MessageConsumer c in consumers.Values)
+                {
+                    c.Shutdown();
+                }
+            }
+            dispatcher?.Shutdown();
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (IsClosed) return;
+            if (disposing)
+            {
+                CheckOnDispatchThread();
+                try
+                {
+                    this.End();
+                }
+                catch (Exception ex)
+                {
+                    NMSException nmse = ExceptionSupport.Wrap(ex,"Amqp Session end failure for NMS Session {0}", this.Id);
+                    Tracer.DebugFormat("Caught Exception while closing Session {0}. Exception {1}", this.Id, nmse);
+                }
+                
+            }
+        }
+
+        public void Close()
+        {
+            Dispose(true);
+            if (IsClosed)
+            {
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                Tracer.DebugFormat("Caught exception while disposing {0} {1}. Exception {2}", this.GetType().Name, this.Id, ex);
+            }
+        }
+
+        #endregion
+
+
     }
+
+    #region SessionInfo Class
+
+    internal class SessionInfo : ResourceInfo
+    {
+        private static readonly uint DEFAULT_INCOMING_WINDOW;
+        private static readonly uint DEFAULT_OUTGOING_WINDOW;
+
+        static SessionInfo()
+        {
+            DEFAULT_INCOMING_WINDOW = 1024 * 10 - 1;
+            DEFAULT_OUTGOING_WINDOW = uint.MaxValue - 2u;
+        }
+        
+        internal SessionInfo(Id sessionId) : base(sessionId)
+        {
+            ulong endId = (ulong)sessionId.GetLastComponent(typeof(ulong));
+            nextOutgoingId = Convert.ToUInt16(endId);
+        }
+        
+        public string sessionId { get { return Id.ToString(); } }
+
+        public AcknowledgementMode ackMode { get; set; }
+        public ushort remoteChannel { get; internal set; }
+        public uint nextOutgoingId { get; internal set; }
+        public uint incomingWindow { get; set; } = DEFAULT_INCOMING_WINDOW;
+        public uint outgoingWindow { get; set; } = DEFAULT_OUTGOING_WINDOW;
+        public uint maxHandle { get; set; }
+        public bool isTransacted { get => false;  set { } }
+        public long requestTimeout { get; set; }
+        public int closeTimeout { get; set; }
+        public long sendTimeout { get; set; }
+
+        public override string ToString()
+        {
+            string result = "";
+            result += "sessInfo = [\n";
+            foreach (MemberInfo info in this.GetType().GetMembers())
+            {
+                if (info is PropertyInfo)
+                {
+                    PropertyInfo prop = info as PropertyInfo;
+                    if (prop.GetGetMethod(true).IsPublic)
+                    {
+                        result += string.Format("{0} = {1},\n", prop.Name, prop.GetValue(this, null));
+                    }
+                }
+            }
+            result = result.Substring(0, result.Length - 2) + "\n]";
+            return result;
+        }
+    }
+
+    #endregion
+
 }

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -17,204 +17,220 @@
 using System;
 using System.Collections;
 using System.Collections.Specialized;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Apache.NMS;
+using Apache.NMS.Util;
 using Apache.NMS.Policies;
-using Org.Apache.Qpid.Messaging;
+using NMS.AMQP.Util;
+using NMS.AMQP.Transport;
+using NMS.AMQP.Transport.AMQP;
+using NMS.AMQP.Transport.Secure;
+using NMS.AMQP.Transport.Secure.AMQP;
+using System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
+using System.Security.Authentication;
+using Amqp;
 
-namespace Apache.NMS.Amqp
+namespace NMS.AMQP
 {
+    internal delegate Task<Amqp.Connection> ProviderCreateConnection(Amqp.Address addr, Amqp.Framing.Open open, Amqp.OnOpened onOpened);
     /// <summary>
-    /// A Factory that can establish NMS connections to AMQP using QPID.
-    /// 
-    /// @param brokerUri String or Uri specifying base connection address
-    /// @param clientID String specifying client ID
-    /// @param connectionProperties formed by one of:
-    ///     * 0..N Strings specifying Qpid connection connectionProperties in the form "name:value".
-    ///     * Hashtable containing properties as key/value pairs
-    /// 
-    /// Connection URI are defined in
-    /// http://qpid.apache.org/releases/qpid-trunk/programming/book/connections.html#connection-url
-    /// 
-    /// Example using property strings:
-    /// 
-    /// Uri connecturi = new Uri("amqp:localhost:5673")
-    /// IConnectionFactory factory = new NMSConnectionFactory();
-    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi);
-    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA");
-    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA", "protocol:amqp1.0");
-    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA", "protocol:amqp1.0", "reconnect:true", "reconnect_timeout:60", "username:bob", "password:secret");
-    /// 
-    /// Example using property table:
-    /// 
-    /// Uri connecturi = new Uri("amqp:localhost:5672")
-    /// Hashtable properties = new Hashtable();
-    /// properties.Add("protocol", "amqp1.0");
-    /// properties.Add("reconnect_timeout", 60)
-    /// IConnectionFactory factory = new NMSConnectionFactory(connecturi, "UserA", properties);
-    /// 
-    /// See http://qpid.apache.org/components/programming/book/connection-options.html 
-    /// for more information on Qpid connection options.
+    /// NMS.AMQP.ConnectionFactory implements Apache.NMS.IConnectionFactory.
+    /// NMS.AMQP.ConnectionFactory creates, manages and configures the Amqp.ConnectionFactory used to create Amqp Connections.
     /// </summary>
-    public class ConnectionFactory : IConnectionFactory
+    public class ConnectionFactory : Apache.NMS.IConnectionFactory
     {
+
         public const string DEFAULT_BROKER_URL = "tcp://localhost:5672";
-        public const string ENV_BROKER_URL = "AMQP_BROKER_URL";
-        private const char SEP_NAME_VALUE = ':';
+        internal static readonly string CLIENT_ID_PROP = PropertyUtil.CreateProperty("ClientId", "", ConnectionPropertyPrefix);
+        internal static readonly string USERNAME_PROP = PropertyUtil.CreateProperty("UserName", "", ConnectionPropertyPrefix);
+        internal static readonly string PASSWORD_PROP = PropertyUtil.CreateProperty("Password", "", ConnectionPropertyPrefix);
 
+        internal const string ConnectionPropertyPrefix = "connection.";
+        internal const string ConnectionPropertyAlternativePrefix = PropertyUtil.PROPERTY_PREFIX;
+        internal const string TransportPropertyPrefix = "transport.";
+
+        private Amqp.Address amqpHost = null;
         private Uri brokerUri;
-        private string clientID;
-
+        private string clientId;
+        private IdGenerator clientIdGenerator = new IdGenerator();
+        
         private StringDictionary properties = new StringDictionary();
+        private StringDictionary applicationProperties = null;
+
+        private TransportPropertyInterceptor transportProperties;
+        private ConnectionFactoryPropertyInterceptor connectionProperties;
         private IRedeliveryPolicy redeliveryPolicy = new RedeliveryPolicy();
+        
+        private Amqp.ConnectionFactory impl;
+        private TransportContext transportContext;
 
         #region Constructor Methods
 
-        public static string GetDefaultBrokerUrl()
-        {
-            string answer = Environment.GetEnvironmentVariable(ENV_BROKER_URL);
-            if (answer == null)
-            {
-                answer = DEFAULT_BROKER_URL;
-            }
-            return answer;
-        }
-
         public ConnectionFactory()
-            : this(new Uri(GetDefaultBrokerUrl()), string.Empty, (Object[])null)
+            : this(DEFAULT_BROKER_URL)
         {
         }
 
         public ConnectionFactory(string brokerUri)
-            : this(new Uri(brokerUri), string.Empty, (Object[])null)
+            : this(URISupport.CreateCompatibleUri(brokerUri), null, null)
         {
+
         }
 
-        public ConnectionFactory(string brokerUri, string clientID)
-            : this(new Uri(brokerUri), clientID, (Object[])null)
+        public ConnectionFactory(string brokerUri, string clientId)
+            : this(URISupport.CreateCompatibleUri(brokerUri), clientId, null)
         {
         }
 
         public ConnectionFactory(Uri brokerUri)
-            : this(brokerUri, string.Empty, (Object[])null)
-        {
-        }
+            : this(brokerUri, null, null)
+        { }
 
-        public ConnectionFactory(Uri brokerUri, string clientID)
-            : this(brokerUri, clientID, (Object[])null)
-        {
-        }
+        public ConnectionFactory(Uri brokerUri, StringDictionary props)
+            : this(brokerUri, null, props)
+        { }
 
-        public ConnectionFactory(Uri brokerUri, string clientID, params Object[] propsArray)
+        public ConnectionFactory(Uri brokerUri, string clientId, StringDictionary props)
         {
-            Tracer.DebugFormat("Amqp: create connection factory for Uri: {0}", brokerUri.ToString()); 
-            try
+            impl = new Amqp.ConnectionFactory();
+            this.clientId = clientId;
+            if (props != null)
             {
-                this.brokerUri = brokerUri;
-                this.clientID = clientID;
-
-                if (propsArray != null)
+                this.InitApplicationProperties(props);
+            }
+            BrokerUri = brokerUri;
+            impl.AMQP.HostName = BrokerUri.Host;
+            //
+            // Set up tracing in AMQP.  We capture all AMQP traces in the TraceListener below
+            // and map to NMS 'Tracer' logs as follows:
+            //    AMQP          Tracer
+            //    Verbose       Debug
+            //    Frame         Debug
+            //    Information   Info
+            //    Output        Info    (should not happen)
+            //    Warning       Warn
+            //    Error         Error
+            //
+            Amqp.Trace.TraceLevel = Amqp.TraceLevel.Verbose | Amqp.TraceLevel.Frame;
+            Amqp.Trace.TraceListener = (level, format, args) =>
+            {
+                switch (level)
                 {
-                    foreach (object prop in propsArray)
-                    {
-                        string nvp = prop.ToString();
-                        int sepPos = nvp.IndexOf(SEP_NAME_VALUE);
-                        if (sepPos > 0)
-                        {
-                            properties.Add(nvp.Substring(0, sepPos), nvp.Substring(sepPos + 1));
-                        }
-                        else
-                        {
-                            throw new NMSException("Connection property is not in the form \"name:value\" :" + nvp);
-                        }
-                    }
+                    case Amqp.TraceLevel.Verbose:
+                    case Amqp.TraceLevel.Frame:
+                        Tracer.DebugFormat(format, args);
+                        break;
+                    case Amqp.TraceLevel.Information:
+                    case Amqp.TraceLevel.Output:
+                        // 
+                        // Applications should not access AmqpLite directly so there
+                        // should be no 'Output' level logs.
+                        Tracer.InfoFormat(format, args);
+                        break;
+                    case Amqp.TraceLevel.Warning:
+                        Tracer.WarnFormat(format, args);
+                        break;
+                    case Amqp.TraceLevel.Error:
+                        Tracer.ErrorFormat(format, args);
+                        break;
+                    default:
+                        Tracer.InfoFormat("Unknown AMQP LogLevel: {}", level);
+                        Tracer.InfoFormat(format, args);
+                        break;
                 }
-            }
-            catch (Exception ex)
-            {
-                Apache.NMS.Tracer.DebugFormat("Exception instantiating AMQP.ConnectionFactory: {0}", ex.Message);
-                throw;
-            }
-        }
+            };
 
-        public ConnectionFactory(Uri brokerUri, string clientID, Hashtable propsTable)
-        {
-            Tracer.DebugFormat("Amqp: create connection factory for Uri: {0}", brokerUri.ToString());
-            try
-            {
-                this.brokerUri = brokerUri;
-                this.clientID = clientID;
-
-                if (properties != null)
-                {
-                    foreach (var key in propsTable.Keys)
-                    {
-                        properties.Add(key.ToString(), propsTable[key].ToString());
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Apache.NMS.Tracer.DebugFormat("Exception instantiating AMQP.ConnectionFactory: {0}", ex.Message);
-                throw;
-            }
         }
 
         #endregion
 
-        #region IConnectionFactory Members
+        #region Connection Factory Properties
 
-        /// <summary>
-        /// Creates a new connection to Qpid/Amqp.
-        /// </summary>
-        public IConnection CreateConnection()
+        internal bool IsClientIdSet
         {
-            return CreateConnection(string.Empty, string.Empty);
+            get => this.clientId == null;
         }
 
-        /// <summary>
-        /// Creates a new connection to Qpid/Amqp.
-        /// </summary>
-        public IConnection CreateConnection(string userName, string password)
+        public string ClientId
         {
-            Connection connection = new Connection();
-
-            connection.RedeliveryPolicy = this.redeliveryPolicy.Clone() as IRedeliveryPolicy;
-            //connection.ConsumerTransformer = this.consumerTransformer; // TODO:
-            //connection.ProducerTransformer = this.producerTransformer; // TODO:
-            connection.BrokerUri = this.BrokerUri;
-            connection.ClientId = this.clientID;
-            connection.ConnectionProperties = this.properties;
-
-            if (!String.IsNullOrEmpty(userName))
+            get { return this.clientId; }
+            internal set
             {
-                connection.SetConnectionProperty(Connection.USERNAME_OPTION, userName);
+                this.clientId = value;
             }
-            if (!String.IsNullOrEmpty(password))
-            {
-                connection.SetConnectionProperty(Connection.PASSWORD_OPTION, password);
-            }
-
-            IConnection ReturnValue = null;
-            ReturnValue = connection;
-
-            return ReturnValue;
         }
 
-        /// <summary>
-        /// Get/or set the broker Uri.
-        /// </summary>
+
+        private IdGenerator ClientIDGenerator
+        {
+            get
+            {
+                IdGenerator cig = clientIdGenerator;
+                lock (this)
+                {
+                    if (cig == null)
+                    {
+                        clientIdGenerator = new IdGenerator();
+                        cig = clientIdGenerator;
+                    }
+                }
+                return cig;
+            }
+        }
+
+        internal Amqp.IConnectionFactory Factory { get => this.impl; }
+
+        internal IProviderTransportContext Context { get => this.transportContext; }
+
+        #endregion
+
+        #region IConnection Members
+
         public Uri BrokerUri
         {
             get { return brokerUri; }
-            set { brokerUri = value; }
+            set
+            {
+                brokerUri = value;
+                if (value != null)
+                {
+                    amqpHost = UriUtil.ToAddress(value);
+                }
+                else
+                {
+                    amqpHost = null;
+                }   
+                InitTransportProperties();
+                UpdateConnectionProperties();
+            }
         }
 
-        /// <summary>
-        /// Get/or set the redelivery policy that new IConnection objects are
-        /// assigned upon creation.
-        /// </summary>
+        public ConsumerTransformerDelegate ConsumerTransformer
+        {
+            get => throw new NotImplementedException();
+            set => throw new NotImplementedException();
+        }
+
+        public ProducerTransformerDelegate ProducerTransformer
+        {
+            get => throw new NotImplementedException();
+            set => throw new NotImplementedException();
+        }
+
         public IRedeliveryPolicy RedeliveryPolicy
         {
-            get { return this.redeliveryPolicy; }
+            get
+            {
+                if (redeliveryPolicy == null)
+                {
+                    this.redeliveryPolicy = new RedeliveryPolicy();
+                }
+                return this.redeliveryPolicy;
+            }
             set
             {
                 if (value != null)
@@ -224,83 +240,226 @@ namespace Apache.NMS.Amqp
             }
         }
 
-        private ConsumerTransformerDelegate consumerTransformer;
-        public ConsumerTransformerDelegate ConsumerTransformer
+        public Apache.NMS.IConnection CreateConnection()
         {
-            get { return this.consumerTransformer; }
-            set { this.consumerTransformer = value; }
+            try
+            {
+                Connection conn = new Connection(brokerUri, ClientIDGenerator);
+
+                Tracer.Info("Configuring Connection Properties");
+
+                bool shouldSetClientID = this.clientId != null;
+
+                conn.Configure(this);
+
+                if (shouldSetClientID)
+                {
+                    conn.ClientId = this.clientId;
+
+                    conn.Connect();
+                }
+
+                return conn;
+
+            }
+            catch (Exception ex)
+            {
+                if (ex is NMSException)
+                {
+                    throw ex;
+                }
+                else
+                {
+                    throw new NMSException(ex.Message, ex);
+                }
+            }
         }
 
-        private ProducerTransformerDelegate producerTransformer;
-        public ProducerTransformerDelegate ProducerTransformer
+        public Apache.NMS.IConnection CreateConnection(string userName, string password)
         {
-            get { return this.producerTransformer; }
-            set { this.producerTransformer = value; }
+
+            if(ConnectionProperties.ContainsKey(USERNAME_PROP))
+            {
+                ConnectionProperties[USERNAME_PROP] = userName;
+            }
+            else
+            {
+                ConnectionProperties.Add(USERNAME_PROP, userName);
+            }
+
+            if (ConnectionProperties.ContainsKey(PASSWORD_PROP))
+            {
+                ConnectionProperties[PASSWORD_PROP] = password;
+            }
+            else
+            {
+                ConnectionProperties.Add(PASSWORD_PROP, password);
+            }
+
+            return CreateConnection();
+        }
+
+
+
+        #endregion
+        #region AMQP Connection Properties
+        public Amqp.TraceLevel AMQPlogLevel
+        {
+            get { return this.AMQPlogLevel; }
+            set
+            {
+                if (null != this.transportContext)
+                {
+                    this.AMQPlogLevel = value;
+                    Amqp.Trace.TraceLevel = value;
+                }
+
+            }
+        }
+        #endregion
+
+        #region SSLConnection Methods
+
+        public RemoteCertificateValidationCallback CertificateValidationCallback
+        {
+            get
+            {
+                return (IsSSL) ? (transportContext as IProviderSecureTransportContext).ServerCertificateValidateCallback : null;
+            }
+            set
+            {
+                if (IsSSL)
+                {
+                    (transportContext as IProviderSecureTransportContext).ServerCertificateValidateCallback = value;
+                }
+            }
+        }
+
+        public LocalCertificateSelectionCallback LocalCertificateSelect
+        {
+            get
+            {
+                return (IsSSL) ? (transportContext as IProviderSecureTransportContext).ClientCertificateSelectCallback : null;
+            }
+            set
+            {
+                if (IsSSL)
+                {
+                    (transportContext as IProviderSecureTransportContext).ClientCertificateSelectCallback = value;
+                }
+            }
+        }
+
+        public bool IsSSL
+        {
+            get
+            {
+                return amqpHost?.UseSsl ?? false;
+            }
+        }
+        
+        private void InitTransportProperties()
+        {
+            if (IsSSL)
+            {
+                SecureTransportContext stc = new SecureTransportContext(this);
+                this.transportContext = stc;
+            }
+            else
+            {
+                this.transportContext = new TransportContext(this);
+            }
+            
+            StringDictionary queryProps = URISupport.ParseParameters(this.brokerUri);
+            StringDictionary transportProperties = URISupport.GetProperties(queryProps, TransportPropertyPrefix);
+            if (this.applicationProperties != null)
+            {
+                StringDictionary appTProps = URISupport.GetProperties(this.applicationProperties, TransportPropertyPrefix);
+                transportProperties = PropertyUtil.Merge(transportProperties, appTProps, string.Empty, string.Empty, TransportPropertyPrefix);
+            }
+            PropertyUtil.SetProperties(this.transportContext, transportProperties, TransportPropertyPrefix);
+            if (IsSSL)
+            {
+                this.transportProperties = new SecureTransportPropertyInterceptor(this.transportContext as IProviderSecureTransportContext, transportProperties);
+            }
+            else
+            {
+                this.transportProperties = new TransportPropertyInterceptor(this.transportContext, transportProperties);
+            }
+        }
+
+        private void InitApplicationProperties(StringDictionary props)
+        {
+            // copy properties to temporary dictionary
+            StringDictionary result = PropertyUtil.Clone(props);
+            // extract connections properties
+            StringDictionary connProps = ExtractConnectionProperties(result);
+            // initialize applications properties as the union of temp and conn properties
+            this.applicationProperties = PropertyUtil.Merge(result, connProps, "", "", "");
+
+        }
+
+        private StringDictionary ExtractConnectionProperties(StringDictionary rawProps)
+        {
+            // find and extract properties with ConnectionPropertyPrefix
+            StringDictionary connectionProperties = URISupport.ExtractProperties(rawProps, ConnectionPropertyPrefix);
+            // find and extract properties with ConnectionPropertyAlternativePrefix
+            StringDictionary connectionAlternativeProperties = URISupport.ExtractProperties(rawProps, ConnectionPropertyAlternativePrefix);
+            // return Union of Conn and AltConn properties prefering Conn over AltConn.
+            return PropertyUtil.Merge(connectionProperties, connectionAlternativeProperties, ConnectionPropertyPrefix, ConnectionPropertyAlternativePrefix, ConnectionPropertyPrefix);
+        }
+
+        private StringDictionary CreateConnectionProperties(StringDictionary rawProps)
+        {
+            // read properties with ConnectionPropertyPrefix
+            StringDictionary connectionProperties = URISupport.GetProperties(rawProps, ConnectionPropertyPrefix);
+            // read properties with ConnectionPropertyAlternativePrefix
+            StringDictionary connectionAlternativeProperties = URISupport.GetProperties(rawProps, ConnectionPropertyAlternativePrefix);
+            // return Union of Conn and AltConn properties prefering Conn over AltConn.
+            return PropertyUtil.Merge(connectionProperties, connectionAlternativeProperties, ConnectionPropertyPrefix, ConnectionPropertyAlternativePrefix, ConnectionPropertyPrefix);
+        }
+
+        private void UpdateConnectionProperties()
+        {
+            StringDictionary queryProps = URISupport.ParseParameters(this.brokerUri);
+            StringDictionary brokerConnectionProperties = CreateConnectionProperties(queryProps);
+            if (this.applicationProperties != null)
+            {
+                // combine connection properties with application properties prefering URI properties over application
+                this.properties = PropertyUtil.Merge(brokerConnectionProperties, applicationProperties, "", "", "");
+            }
+            else
+            {
+                this.properties = brokerConnectionProperties;
+            }
+            // update connection factory members.
+            connectionProperties = new ConnectionFactoryPropertyInterceptor(this, this.properties);
+        }
+        #endregion
+
+        #region Connection Factory Property Methods
+        
+        public StringDictionary TransportProperties
+        {
+            get { return this.transportProperties; }
         }
 
         #endregion
 
-        #region ConnectionProperties Methods
+        #region Connection Properties Methods
 
-        /// <summary>
-        /// Connection connectionProperties acceessor
-        /// </summary>
-        /// <remarks>This factory does not check for legal property names. Users
-        /// my specify anything they want. Propery name processing happens when
-        /// connections are created and started.</remarks>
         public StringDictionary ConnectionProperties
         {
-            get { return properties; }
-            set { properties = value; }
+            get { return this.connectionProperties; }
         }
 
-        /// <summary>
-        /// Test existence of named property
-        /// </summary>
-        /// <param name="name">The name of the connection property to test.</param>
-        /// <returns>Boolean indicating if property exists in setting dictionary.</returns>
-        public bool ConnectionPropertyExists(string name)
+        public bool HasConnectionProperty(string key)
         {
-            return properties.ContainsKey(name);
+            return this.properties.ContainsKey(key);
         }
 
-        /// <summary>
-        /// Get value of named property
-        /// </summary>
-        /// <param name="name">The name of the connection property to get.</param>
-        /// <returns>string value of property.</returns>
-        /// <remarks>Throws if requested property does not exist.</remarks>
-        public string GetConnectionProperty(string name)
-        {
-            if (properties.ContainsKey(name))
-            {
-                return properties[name];
-            }
-            else
-            {
-                throw new NMSException("Amqp connection property '" + name + "' does not exist");
-            }
-        }
-
-        /// <summary>
-        /// Set value of named property
-        /// </summary>
-        /// <param name="name">The name of the connection property to set.</param>
-        /// <param name="value">The value of the connection property.</param>
-        /// <returns>void</returns>
-        /// <remarks>Existing property values are overwritten. New property values
-        /// are added.</remarks>
-        public void SetConnectionProperty(string name, string value)
-        {
-            if (properties.ContainsKey(name))
-            {
-                properties[name] = value;
-            }
-            else
-            {
-                properties.Add(name, value);
-            }
-        }
         #endregion
     }
+
+    
 }

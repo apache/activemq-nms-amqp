@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,35 +15,39 @@
  * limitations under the License.
  */
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Apache.NMS;
 
-// Typedef for options map
-using OptionsMap = System.Collections.Generic.Dictionary<System.String, System.Object>;
-
-namespace Apache.NMS.Amqp
+namespace NMS.AMQP
 {
-
     /// <summary>
-    /// Summary description for Topic.
+    /// NMS.AMQP.Topic implements Apache.NMS.ITopic
+    /// Topic is an concrete implementation for an abstract Destination.
     /// </summary>
-    public class Topic : Destination, ITopic
+    class Topic : Destination, ITopic
     {
+        
+        #region Constructor
 
-        public Topic()
-            : base()
+        internal Topic(Connection conn, string topicString) : base(conn, topicString, false) {}
+
+        #endregion
+
+        #region Destination Methods
+
+        protected override void ValidateName(string name)
         {
+            
         }
 
-        public Topic(String name)
-            : base(name)
-        {
-        }
+        #endregion
 
-        public Topic(String name, string subject, OptionsMap options)
-            : base(name, subject, options, "topic")
-        {
-        }
+        #region Destination Properties
 
-        override public DestinationType DestinationType
+        public override DestinationType DestinationType
         {
             get
             {
@@ -51,22 +55,84 @@ namespace Apache.NMS.Amqp
             }
         }
 
-        public String TopicName
+        #endregion
+
+        #region ITopic Properties
+
+        public string TopicName
         {
-            get { return Path; }
+            get
+            {
+                return destinationName;
+            }
         }
 
+        #endregion
 
-        public override Destination CreateDestination(String name)
+        #region IDisposable Methods
+
+        protected override void Dispose(bool disposing)
         {
-            return new Topic(name);
+            base.Dispose(disposing);
         }
 
+        #endregion
+    }
 
-        public override Destination CreateDestination(String name, string subject, OptionsMap options)
+    /// <summary>
+    /// NMS.AMQP.TemporaryTopic implements Apache.NMS.ITemporaryTopic.
+    /// TemporaryTopic is an concrete implementation for an abstract TemporaryDestination.
+    /// </summary>
+    class TemporaryTopic :  TemporaryDestination, ITemporaryTopic
+    {
+        #region Constructor
+
+        internal TemporaryTopic(Connection conn) : base(conn, conn.TemporaryTopicGenerator.GenerateId(), false) { }
+
+        internal TemporaryTopic(Connection conn, string destinationName) : base(conn, destinationName, false) { }
+
+        #endregion
+
+        #region Destination Methods
+
+        protected override void ValidateName(string name)
         {
-            return new Topic(name, subject, options);
+            
         }
+
+        #endregion
+
+        #region Destination Properties
+
+        public override DestinationType DestinationType
+        {
+            get
+            {
+                return DestinationType.TemporaryTopic;
+            }
+        }
+
+        #endregion
+
+        #region ITopic Properties
+
+        public string TopicName
+        {
+            get
+            {
+                return destinationName;
+            }
+        }
+
+        #endregion
+
+        #region TemporaryDestination Methods
+
+        public override void Delete()
+        {
+            base.Delete();
+        }
+
+        #endregion 
     }
 }
-

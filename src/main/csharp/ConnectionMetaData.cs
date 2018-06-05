@@ -14,94 +14,200 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Apache.NMS;
 using System.Reflection;
+using System.Diagnostics;
 
-namespace Apache.NMS.Amqp
+namespace NMS.AMQP
 {
-	/// <summary>
-	/// Implements the Connection Meta-Data feature for Apache.NMS.Qpid/Amqp
-	/// </summary>
-	public class ConnectionMetaData : IConnectionMetaData
-	{
-		private int nmsMajorVersion;
-		private int nmsMinorVersion;
+    /// <summary>
+    /// NMS.AMQP.ConnectionMetaData implements Apache.NMS.IConnectionMetaData
+    /// Contains version information for Apache.NMS and AmqpNetLite assemblies.
+    /// </summary>
+    class ConnectionMetaData : IConnectionMetaData
+    {
+        private static ConnectionMetaData inst = null;
+        private static object StaticLock = new object();
+        public static ConnectionMetaData Version
+        {
+            get
+            {
+                ConnectionMetaData instance = inst;
+                // unsafe test for performance
+                if (instance == null)
+                {
+                    lock (StaticLock)
+                    {
+                        // safe test 
+                        instance = inst;
+                        if (instance == null)
+                        {
+                            inst = new ConnectionMetaData();
+                            instance = inst;
+                        }
+                        
+                    }
+                }
+                return instance;
+            }
+        }
 
-		private string nmsProviderName;
-		private string nmsVersion;
+        private string AssemblyVersion = "-";
+        private string NMSAssemblyVersion = "-";
+        private string AMQPAssemblyVersion = "-";
+        private string AssemblyFileVersion = "-";
+        private string AssemblyInformationalVersion = "-";
+        private string ProviderName = "-";
+        private string AMQPAssemblyName = "-";
+        private readonly int Major;
+        private readonly int Minor;
+        private readonly int NMSMajor;
+        private readonly int NMSMinor;
+        private ConnectionMetaData()
+        {
+            Assembly assembly = Assembly.GetAssembly(typeof(ConnectionFactory));
+            AssemblyVersion = assembly.GetName().Version.ToString();
 
-		private int providerMajorVersion;
-		private int providerMinorVersion;
-		private string providerVersion;
+            ProviderName = assembly.GetName().Name;
 
-		private string[] nmsxProperties;
+            Assembly NMSAssembly = Assembly.GetAssembly(typeof(Apache.NMS.NMSConnectionFactory));
+            NMSAssemblyVersion = NMSAssembly.GetName().Version.ToString();
 
-		public ConnectionMetaData()
-		{
-			Assembly self = Assembly.GetExecutingAssembly();
-			AssemblyName asmName = self.GetName();
+            Assembly AMQPAssembly = Assembly.GetAssembly(typeof(Amqp.ConnectionFactory));
+            AMQPAssemblyVersion = AMQPAssembly.GetName().Version.ToString();
 
-			this.nmsProviderName = asmName.Name;
-			this.providerMajorVersion = asmName.Version.Major;
-			this.providerMinorVersion = asmName.Version.Minor;
-			this.providerVersion = asmName.Version.ToString();
+            AMQPAssemblyName = AMQPAssembly.GetName().Name;
 
-			this.nmsxProperties = new String[] { };
+            try
+            {
+                FileVersionInfo info = FileVersionInfo.GetVersionInfo(assembly.Location);
+                AssemblyFileVersion = info.FileVersion.ToString();
+                AssemblyInformationalVersion = info.ProductVersion.ToString();
 
-			foreach(AssemblyName name in self.GetReferencedAssemblies())
-			{
-				if(0 == string.Compare(name.Name, "Apache.NMS", true))
-				{
-					this.nmsMajorVersion = name.Version.Major;
-					this.nmsMinorVersion = name.Version.Minor;
-					this.nmsVersion = name.Version.ToString();
+                string[] parts = AssemblyVersion.Split('.');
+                if (parts.Length > 1)
+                {
+                    Major = Convert.ToInt32(parts[0]);
+                    Minor = Convert.ToInt32(parts[1]);
+                }
+                else
+                {
+                    Major = -1;
+                    Minor = -1;
+                }
 
-					return;
-				}
-			}
+                parts = NMSAssemblyVersion.Split('.');
+                if (parts.Length > 1)
+                {
+                    NMSMajor = Convert.ToInt32(parts[0]);
+                    NMSMinor = Convert.ToInt32(parts[1]);
+                }
+                else
+                {
+                    NMSMajor = -1;
+                    NMSMinor = -1;
+                }
 
-			throw new NMSException("Could not find a reference to the Apache.NMS Assembly.");
-		}
 
-		public int NMSMajorVersion
-		{
-			get { return this.nmsMajorVersion; }
-		}
+            }
+            catch (Exception ex)
+            {
+                Tracer.ErrorFormat("Unable to load Provider version. Message: {0}", ex.Message);
+            }
+        }
+        
+        public int NMSMajorVersion
+        {
+            get
+            {
+                return NMSMajor;
+            }
+        }
 
-		public int NMSMinorVersion
-		{
-			get { return this.nmsMinorVersion; }
-		}
+        public int NMSMinorVersion
+        {
+            get
+            {
+                return NMSMinor;
+            }
+        }
 
-		public string NMSProviderName
-		{
-			get { return this.nmsProviderName; }
-		}
+        public string NMSProviderName
+        {
+            get
+            {
+                return ProviderName;
+            }
+        }
 
-		public string NMSVersion
-		{
-			get { return this.nmsVersion; }
-		}
+        public string NMSVersion
+        {
+            get
+            {
+                return string.Format("{0}.{1}.{2}",NMSMajorVersion, NMSMinorVersion, 2);
+            }
+        }
 
-		public string[] NMSXPropertyNames
-		{
-			get { return this.nmsxProperties; }
-		}
+        public string[] NMSXPropertyNames
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
 
-		public int ProviderMajorVersion
-		{
-			get { return this.providerMajorVersion; }
-		}
+        public int ProviderMajorVersion
+        {
+            get
+            {
+                return Major;
+            }
+        }
 
-		public int ProviderMinorVersion
-		{
-			get { return this.providerMinorVersion; }
-		}
+        public int ProviderMinorVersion
+        {
+            get
+            {
+                return Minor;
+            }
+        }
 
-		public string ProviderVersion
-		{
-			get { return this.providerVersion; }
-		}
-	}
+        public string ProviderVersion
+        {
+            get
+            {
+                return AssemblyInformationalVersion;
+            }
+        }
+
+        public override string ToString()
+        {
+            string result = "NMS AMQP Version: [\n";
+
+            // NMS Version
+
+            result += "NMSVersion = " + NMSMajorVersion + "." + NMSMinorVersion;
+
+            // NMS Provider Assembly Information
+
+            result += ",\nNMSProviderName = " + NMSProviderName;
+            result += ",\nProvider AssemblyVersion = " + AssemblyVersion;
+            result += ",\nProvider AssemblyFileVersion = " + AssemblyFileVersion;
+            result += ",\nProvider AssemblyInformationalVersion = " + AssemblyInformationalVersion;
+
+            // Amqp Library version Information
+
+            result += ",\nProvider AMQP Assembly Name = " + AMQPAssemblyName;
+            result += ",\nProvider AMQP Assembly Version = " + AMQPAssemblyVersion;
+
+            result += "\n]";
+
+            return result;
+        }
+    }
 }

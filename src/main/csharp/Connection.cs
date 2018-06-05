@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -14,612 +14,1145 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
+using Apache.NMS;
+using Amqp;
+using Amqp.Framing;
+using NMS.AMQP.Util;
+using NMS.AMQP.Transport;
+using System.Reflection;
 using Apache.NMS.Util;
-using Org.Apache.Qpid.Messaging;
 
-namespace Apache.NMS.Amqp
+namespace NMS.AMQP
 {
-    /// <summary>
-    /// Represents a NMS Qpid/Amqp connection.
-    /// </summary>
-    ///
-    public class Connection : IConnection
+    using Message.Factory;
+    enum ConnectionState
     {
-        // Connections options indexes and constants
-        private const string PROTOCOL_OPTION = "protocol";
-        private const string PROTOCOL_1_0 = "amqp1.0";
-        private const string PROTOCOL_0_10 = "amqp0-10";
-        private const char SEP_ARGS = ',';
-        private const char SEP_NAME_VALUE = ':';
-        public const string USERNAME_OPTION = "username";
-        public const string PASSWORD_OPTION = "password";
+        UNKNOWN = -1,
+        INITIAL = 0,
+        CONNECTING = 1,
+        CONNECTED = 2,
+        CLOSING = 3,
+        CLOSED = 4,
 
-        private static readonly TimeSpan InfiniteTimeSpan = TimeSpan.FromMilliseconds(Timeout.Infinite);
+    }
 
-        private AcknowledgementMode acknowledgementMode = AcknowledgementMode.AutoAcknowledge;
-        private IMessageConverter messageConverter = new DefaultMessageConverter();
-
+    /// <summary>
+    /// NMS.AMQP.Connection facilitates management and creates the underlying Amqp.Connection protocol engine object.
+    /// NMS.AMQP.Connection is also the NMS.AMQP.Session Factory.
+    /// </summary>
+    class Connection : NMSResource<ConnectionInfo>, Apache.NMS.IConnection
+    {
+        public static readonly string MESSAGE_OBJECT_SERIALIZATION_PROP = PropertyUtil.CreateProperty("Message.Serialization", ConnectionFactory.ConnectionPropertyPrefix);
+        
         private IRedeliveryPolicy redeliveryPolicy;
-        private ConnectionMetaData metaData = null;
+        private Amqp.IConnection impl;
+        private ProviderCreateConnection implCreate;
+        private ConnectionInfo connInfo;
+        private readonly IdGenerator clientIdGenerator;
+        private Atomic<bool> clientIdCanSet = new Atomic<bool>(true);
+        private Atomic<bool> closing = new Atomic<bool>(false);
+        private Atomic<ConnectionState> state = new Atomic<ConnectionState>(ConnectionState.INITIAL);
+        private CountDownLatch latch;
+        private ConcurrentDictionary<Id, Session> sessions = new ConcurrentDictionary<Id, Session>();
+        private IdGenerator sesIdGen = null;
+        private IdGenerator tempTopicIdGen = null;
+        private IdGenerator tempQueueIdGen = null;
+        private StringDictionary properties;
+        private TemporaryLinkCache temporaryLinks = null;
+        private IProviderTransportContext transportContext = null;
+        private DispatchExecutor exceptionExecutor = null;
 
-        private readonly object connectedLock = new object();
-        private readonly Atomic<bool> connected = new Atomic<bool>(false);
-        private readonly Atomic<bool> closed = new Atomic<bool>(false);
-        private readonly Atomic<bool> closing = new Atomic<bool>(false);
+        #region Contructor
 
-        private readonly Atomic<bool> started = new Atomic<bool>(false);
-        private bool disposed = false;
-
-        private Uri brokerUri;
-        private string clientId;
-        private StringDictionary connectionProperties;
-
-        private int sessionCounter = 0;
-        private readonly IList sessions = ArrayList.Synchronized(new ArrayList());
-
-        private Org.Apache.Qpid.Messaging.Connection qpidConnection = null; // Don't create until Start()
-
-        #region Constructor Methods
-
-        /// <summary>
-        /// Creates new connection
-        /// </summary>
-        public Connection()
+        internal Connection(Uri addr, IdGenerator clientIdGenerator)
         {
+            connInfo = new ConnectionInfo();
+            connInfo.remoteHost = addr;
+            Info = connInfo;
+            this.clientIdGenerator = clientIdGenerator;
+            latch = new CountDownLatch(1);
+            temporaryLinks = new TemporaryLinkCache(this);
         }
-
-        /// <summary>
-        /// Destroys connection
-        /// </summary>
-        ~Connection()
-        {
-            Dispose(false);
-        }
-
+        
         #endregion
 
-        #region IStartable Members
-        /// <summary>
-        /// Starts message delivery for this connection.
-        /// </summary>
-        public void Start()
-        {
-            // Create and open qpidConnection
-            CheckConnected();
+        #region Internal Properties
 
-            if (started.CompareAndSet(false, true))
+        internal Amqp.IConnection InnerConnection { get { return this.impl; } }
+
+        internal IdGenerator SessionIdGenerator
+        {
+            get
             {
-                lock (sessions.SyncRoot)
+                IdGenerator sig = sesIdGen;
+                lock (this)
                 {
-                    foreach (Session session in sessions)
+                    if (sig == null)
                     {
-                        // Create and start qpidSessions
-                        session.Start();
+                        sig = new NestedIdGenerator("ID:ses", connInfo.Id, true);
+                        sesIdGen = sig;
+                    }
+                }
+                return sig;
+            }
+        }
+
+        internal IdGenerator TemporaryTopicGenerator
+        {
+            get
+            {
+                IdGenerator ttg = tempTopicIdGen;
+                lock (this)
+                {
+                    if (ttg == null)
+                    {
+                        ttg = new NestedIdGenerator("ID:nms-temp-topic", Info.Id, true);
+                        tempTopicIdGen = ttg;
+                    }
+                }
+                return ttg;
+            }
+        }
+
+        internal IdGenerator TemporaryQueueGenerator
+        {
+            get
+            {
+                IdGenerator tqg = tempQueueIdGen;
+                lock (this)
+                {
+                    if (tqg == null)
+                    {
+                        tqg = new NestedIdGenerator("ID:nms-temp-queue", Info.Id, true);
+                        tempQueueIdGen = tqg;
+                    }
+                }
+                return tqg;
+            }
+        }
+
+        internal bool IsConnected
+        {
+            get
+            {
+                return this.state.Value.Equals(ConnectionState.CONNECTED);
+            }
+        }
+
+        internal bool IsClosed
+        {
+            get
+            {
+                return this.state.Value.Equals(ConnectionState.CLOSED);
+            }
+        }
+
+        internal ushort MaxChannel
+        {
+            get { return connInfo.channelMax; }
+        }
+
+        internal MessageTransformation TransformFactory
+        {
+            get
+            {
+                return MessageFactory<ConnectionInfo>.Instance(this).GetTransformFactory();
+            }
+        }
+
+        internal IMessageFactory MessageFactory
+        {
+            get
+            {
+                return MessageFactory<ConnectionInfo>.Instance(this);
+            }
+        }
+
+        internal string TopicPrefix
+        {
+            get { return connInfo.TopicPrefix; }
+        }
+
+        internal string QueuePrefix
+        {
+            get { return connInfo.QueuePrefix; }
+        }
+
+        internal bool IsAnonymousRelay
+        {
+            get { return connInfo.IsAnonymousRelay; }
+        }
+
+        internal bool IsDelayedDelivery
+        {
+            get { return connInfo.IsDelayedDelivery; }
+        }
+        
+        #endregion
+
+        #region Internal Methods
+
+        internal ITemporaryTopic CreateTemporaryTopic()
+        {
+            TemporaryTopic temporaryTopic = new TemporaryTopic(this);
+
+            CreateTemporaryLink(temporaryTopic);
+
+            return temporaryTopic;
+        }
+
+        internal ITemporaryQueue CreateTemporaryQueue()
+        {
+            TemporaryQueue temporaryQueue = new TemporaryQueue(this);
+
+            CreateTemporaryLink(temporaryQueue);
+
+            return temporaryQueue;
+        }
+
+        private void CreateTemporaryLink(TemporaryDestination temporaryDestination)
+        {
+            TemporaryLink link = new TemporaryLink(temporaryLinks.Session, temporaryDestination);
+
+            link.Attach();
+
+            temporaryLinks.AddLink(temporaryDestination, link);
+
+        }
+
+        /// <summary>
+        /// Unsubscribes Durable Consumers on the connection
+        /// </summary>
+        /// <param name="name">The subscription name.</param>
+        internal void Unsubscribe(string name)
+        {
+            // check for any active consumers on the subscription name.
+            foreach (Session session in GetSessions())
+            {
+                if (session.ContainsSubscriptionName(name))
+                {
+                    throw new IllegalStateException("Cannot unsubscribe from Durable Consumer while consuming messages.");
+                }
+            }
+            // unsubscribe using an instance of RemoveSubscriptionLink.
+            RemoveSubscriptionLink removeLink = new RemoveSubscriptionLink(this.temporaryLinks.Session, name);
+            removeLink.Unsubscribe();
+        }
+
+        internal bool ContainsSubscriptionName(string name)
+        {
+            foreach (Session session in GetSessions())
+            {
+                if (session.ContainsSubscriptionName(name))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        internal void Configure(ConnectionFactory cf)
+        {
+            Amqp.ConnectionFactory cfImpl = cf.Factory as Amqp.ConnectionFactory;
+            
+            // get properties from connection factory
+            StringDictionary properties = cf.ConnectionProperties;
+
+            // apply connection properties to connection factory and connection info.
+            PropertyUtil.SetProperties(cfImpl.AMQP, properties, ConnectionFactory.ConnectionPropertyPrefix);
+            PropertyUtil.SetProperties(connInfo, properties, ConnectionFactory.ConnectionPropertyPrefix);
+            
+            // create copy of transport context
+            this.transportContext = cf.Context.Copy();
+
+            // Store raw properties for future objects
+            this.properties = PropertyUtil.Clone(properties);
+            
+            // Create Connection builder delegate.
+            this.implCreate = this.transportContext.CreateConnectionBuilder();
+        }
+
+        internal StringDictionary Properties
+        {
+            get { return PropertyUtil.Merge(this.properties, PropertyUtil.GetProperties(this.connInfo)); }
+        }
+
+        internal void Remove(TemporaryDestination destination)
+        {
+            temporaryLinks.RemoveLink(destination);
+        }
+
+        internal void DestroyTemporaryDestination(TemporaryDestination destination)
+        {
+            ThrowIfClosed();
+            foreach(Session session in GetSessions())
+            {
+                if (session.IsDestinationInUse(destination))
+                {
+                    throw new IllegalStateException("Cannot delete Temporary Destination, {0}, while consuming messages.");
+                }
+            }
+            try
+            {
+                TemporaryLink link = temporaryLinks.RemoveLink(destination);
+                if(link != null && !link.IsClosed)
+                {
+                    link.Close();
+                }
+            }
+            catch (Exception e)
+            {
+                throw ExceptionSupport.Wrap(e);
+            }
+        }
+
+        internal void Remove(Session ses)
+        {
+            Session result = null;
+            if(!sessions.TryRemove(ses.Id, out result))
+            {
+                Tracer.WarnFormat("Could not disassociate Session {0} with Connection {1}.", ses.Id, ClientId);
+            }
+        }
+
+        private Session[] GetSessions()
+        {   
+            return sessions.Values.ToArray();
+        }
+
+        private void CheckIfClosed()
+        {
+            if (this.state.Value.Equals(ConnectionState.CLOSED))
+            {
+                throw new IllegalStateException("Operation invalid on closed connection.");
+            }
+        }
+
+        private void ProcessCapabilities(Open openResponse)
+        {
+            if(openResponse.OfferedCapabilities != null || openResponse.OfferedCapabilities.Length > 0)
+            {
+                foreach(Amqp.Types.Symbol symbol in openResponse.OfferedCapabilities)
+                {
+                    if (SymbolUtil.OPEN_CAPABILITY_ANONYMOUS_RELAY.Equals(symbol))
+                    {
+                        connInfo.IsAnonymousRelay = true;
+                    }
+                    else if (SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY.Equals(symbol))
+                    {
+                        connInfo.IsDelayedDelivery = true;
+                    }
+                    else
+                    {
+                        connInfo.AddCapability(symbol);
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// This property determines if the asynchronous message delivery of incoming
-        /// messages has been started for this connection.
-        /// </summary>
-        public bool IsStarted
+        private void ProcessRemoteConnectionProperties(Open openResponse)
         {
-            get { return started.Value; }
-        }
-        #endregion
-
-        #region IStoppable Members
-        /// <summary>
-        /// Temporarily stop asynchronous delivery of inbound messages for this connection.
-        /// The sending of outbound messages is unaffected.
-        /// </summary>
-        public void Stop()
-        {
-            // Administratively close NMS objects
-            if (started.CompareAndSet(true, false))
+            if (openResponse.Properties != null && openResponse.Properties.Count > 0)
             {
-                foreach (Session session in sessions)
+                foreach(object key in openResponse.Properties.Keys)
                 {
-                    // Create and start qpidSessions
-                    session.Stop();
+                    string keyString = key.ToString();
+                    string valueString = openResponse.Properties[key]?.ToString();
+                    this.connInfo.RemotePeerProperies.Add(keyString, valueString);
                 }
             }
-
-            // Close qpidConnection
-            CheckDisconnected();
-        }
-        #endregion
-
-        #region IDisposable Methods
-        public void Dispose()
-        {
-            Dispose(true);
-        }
-        #endregion
-
-        #region AMQP IConnection Class Methods
-        /// <summary>
-        /// Creates a new session to work on this connection
-        /// </summary>
-        public ISession CreateSession()
-        {
-            return CreateSession(acknowledgementMode);
         }
 
-        /// <summary>
-        /// Creates a new session to work on this connection
-        /// </summary>
-        public ISession CreateSession(AcknowledgementMode mode)
+        private void OpenResponse(Amqp.IConnection conn, Open openResp)
         {
-            return new Session(this, GetNextSessionId(), mode);
-        }
-
-        internal void AddSession(Session session)
-        {
-            if (!this.closing.Value)
+            Tracer.InfoFormat("Connection {0}, Open {0}", conn.ToString(), openResp.ToString());
+            Tracer.DebugFormat("Open Response : \n Hostname = {0},\n ContainerId = {1},\n MaxChannel = {2},\n MaxFrame = {3}\n", openResp.HostName, openResp.ContainerId, openResp.ChannelMax, openResp.MaxFrameSize);
+            Tracer.DebugFormat("Open Response Descriptor : \n Descriptor Name = {0},\n Descriptor Code = {1}\n", openResp.Descriptor.Name, openResp.Descriptor.Code);
+            ProcessCapabilities(openResp);
+            ProcessRemoteConnectionProperties(openResp);
+            if (SymbolUtil.CheckAndCompareFields(openResp.Properties, SymbolUtil.CONNECTION_ESTABLISH_FAILED, SymbolUtil.BOOLEAN_TRUE))
             {
-                sessions.Add(session);
+                Tracer.InfoFormat("Open response contains {0} property the connection {1} will soon be closed.", SymbolUtil.CONNECTION_ESTABLISH_FAILED, this.ClientId);
+            }
+            else
+            {
+                object value = SymbolUtil.GetFromFields(openResp.Properties, SymbolUtil.CONNECTION_PROPERTY_TOPIC_PREFIX);
+                if(value != null && value is string)
+                {
+                    this.connInfo.TopicPrefix = value as string;
+                }
+                value = SymbolUtil.GetFromFields(openResp.Properties, SymbolUtil.CONNECTION_PROPERTY_QUEUE_PREFIX);
+                if (value != null && value is string)
+                {
+                    this.connInfo.QueuePrefix = value as string;
+                }
+                this.latch?.countDown();
             }
         }
 
-        internal void RemoveSession(Session session)
+        private Open CreateOpenFrame(ConnectionInfo connInfo)
         {
-            if (!this.closing.Value)
+            Open frame = new Open();
+            frame.ContainerId = connInfo.clientId;
+            frame.ChannelMax = connInfo.channelMax;
+            frame.MaxFrameSize = Convert.ToUInt32(connInfo.maxFrameSize);
+            frame.HostName = connInfo.remoteHost.Host;
+            frame.IdleTimeOut = Convert.ToUInt32(connInfo.idleTimout);
+            frame.DesiredCapabilities = new Amqp.Types.Symbol[] {
+                SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER,
+                SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY
+            };
+
+            return frame;
+        }
+
+        internal void Connect()
+        {
+            if (this.state.CompareAndSet(ConnectionState.INITIAL, ConnectionState.CONNECTING))
             {
-                sessions.Remove(session);
+                Address addr = UriUtil.ToAddress(connInfo.remoteHost, connInfo.username, connInfo.password ?? string.Empty);
+                Tracer.InfoFormat("Creating Address: {0}", addr.Host);
+                if (this.clientIdCanSet.CompareAndSet(true, false))
+                {
+                    if (this.ClientId == null)
+                    {
+                        connInfo.ResourceId = this.clientIdGenerator.GenerateId();
+                    }
+                    else
+                    {
+                        connInfo.ResourceId = new Id(ClientId);
+                    }
+                    Tracer.InfoFormat("Staring Connection with Client Id : {0}", this.ClientId);
+                }
+                
+                Open openFrame = CreateOpenFrame(this.connInfo);
+                
+                Task<Amqp.Connection> fconn = this.implCreate(addr, openFrame, this.OpenResponse);
+                // wait until the Open request is sent
+                this.impl = TaskUtil.Wait(fconn, connInfo.connectTimeout);
+                if(fconn.Exception != null)
+                {
+                    // exceptions thrown from TaskUtil are typically System.AggregateException and are usually transport exceptions for secure transport.
+                    // extract the innerException of interest and wrap it as an NMS exception
+                    if (fconn.Exception is AggregateException)
+                    {
+                        throw ExceptionSupport.Wrap(fconn.Exception.InnerException,
+                               "Failed to connect host {0}. Cause: {1}", openFrame.HostName, fconn.Exception.InnerException?.Message ?? fconn.Exception.Message);
+                    }
+                    else {
+                        throw ExceptionSupport.Wrap(fconn.Exception, 
+                               "Failed to connect host {0}. Cause: {1}", openFrame.HostName, fconn.Exception?.Message);
+                    }
+                }
+
+                this.impl.Closed += OnInternalClosed;
+                this.impl.AddClosedCallback(OnInternalClosed);
+                this.latch = new CountDownLatch(1);
+
+                ConnectionState finishedState = ConnectionState.UNKNOWN;
+                // Wait for Open response 
+                try
+                {
+                    bool received = this.latch.await((this.Info.requestTimeout==0) ? Timeout.InfiniteTimeSpan : this.RequestTimeout);
+                    if (received && this.impl.Error == null && fconn.Exception == null)
+                    {
+
+                        Tracer.InfoFormat("Connection {0} has connected.", this.impl.ToString());
+                        finishedState = ConnectionState.CONNECTED;
+                        // register connection factory once client Id accepted.
+                        MessageFactory<ConnectionInfo>.Register(this);
+                    }
+                    else
+                    {
+                        if (!received)
+                        {
+                            // Timeout occured waiting on response
+                            Tracer.InfoFormat("Connection Response Timeout. Failed to receive response from {0} in {1}ms", addr.Host, this.Info.requestTimeout);
+                        }
+                        finishedState = ConnectionState.INITIAL;
+                        
+                        if (fconn.Exception == null)
+                        {
+                            if (!received) throw ExceptionSupport.GetTimeoutException(this.impl, "Connection {0} has failed to connect in {1}ms.", ClientId, connInfo.closeTimeout);
+                            Tracer.ErrorFormat("Connection {0} has Failed to connect. Message: {1}", ClientId, (this.impl.Error == null ? "Unknown" : this.impl.Error.ToString()));
+
+                            throw ExceptionSupport.GetException(this.impl, "Connection {0} has failed to connect.", ClientId);
+                        }
+                        else
+                        {
+                            throw ExceptionSupport.Wrap(fconn.Exception, "Connection {0} failed to connect.", ClientId);
+                        }
+
+                    }
+                }
+                finally
+                {
+                    this.latch = null;
+                    this.state.GetAndSet(finishedState);
+                    if (finishedState != ConnectionState.CONNECTED)
+                    {
+                        this.impl.Close(TimeSpan.FromMilliseconds(connInfo.closeTimeout),null);
+                    }
+                }
             }
         }
 
-        protected void Dispose(bool disposing)
+        private void Shutdown()
         {
-            if (disposed)
+            foreach(NMS.AMQP.Session s in GetSessions())
             {
-                return;
+                s.Shutdown();
             }
+            // signals to the DispatchExecutor to stop enqueue exception notifications
+            // and drain off remaining notifications.
+            this.exceptionExecutor?.Shutdown();
+        }
 
-            if (disposing)
-            {
-                // Dispose managed code here.
-            }
-
+        private void OnInternalClosed(IAmqpObject sender, Error error)
+        {
+            string name = null;
+            Connection self = null;
             try
             {
-                Close();
+                self = this;
+                // name should throw should the finalizer of the Connection object already completed.
+                name = self.ClientId;
+                Tracer.InfoFormat("Received Close Request for Connection {0}.", name);
+                if (self.state.CompareAndSet(ConnectionState.CONNECTED, ConnectionState.CLOSED))
+                {
+                    // unexpected or amqp transport close.
+
+                    // notify any error to exception Dispatcher.
+                    if (error != null)
+                    {
+                        NMSException nmse = ExceptionSupport.GetException(error, "Connection {0} Closed.", name);
+                        self.OnException(nmse);
+                    }
+
+                    // shutdown connection facilities.
+                    if (self.IsStarted)
+                    {
+                        self.Shutdown();
+                    }
+                    MessageFactory<ConnectionInfo>.Unregister(self);
+                }
+                else if (self.state.CompareAndSet(ConnectionState.CLOSING, ConnectionState.CLOSED))
+                {
+                    // application close.
+                    MessageFactory<ConnectionInfo>.Unregister(self);
+                }
+                self.latch?.countDown();
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore network errors.
+                Tracer.DebugFormat("Caught Exception during Amqp Connection close for NMS Connection{0}. Exception {1}",
+                    name != null ? (" " + name) : "", ex);
+            }
+        }
+
+        private void Disconnect()
+        {
+            if(this.state.CompareAndSet(ConnectionState.CONNECTED, ConnectionState.CLOSING) && this.impl!=null)
+            {
+                Tracer.InfoFormat("Sending Close Request On Connection {0}.", ClientId);
+                try
+                {
+                    if (!this.impl.IsClosed)
+                    {
+                        this.impl.Close(TimeSpan.FromMilliseconds(connInfo.closeTimeout), null);
+                    }
+                }
+                catch (AmqpException amqpEx)
+                {
+                    throw ExceptionSupport.Wrap(amqpEx, "Error Closing Amqp Connection " + ClientId);
+                }
+                catch (TimeoutException tmoutEx)
+                {
+                    throw ExceptionSupport.GetTimeoutException(this.impl, "Timeout waiting for Amqp Connection {0} Close response. Message : {1}", ClientId, tmoutEx.Message);
+                }
+                finally
+                {
+                    if (this.state.CompareAndSet(ConnectionState.CLOSING, ConnectionState.CLOSED))
+                    {
+                        // connection cleanup.
+                        MessageFactory<ConnectionInfo>.Unregister(this);
+                        this.impl = null;
+                    }
+                    
+                }
+            }
+        }
+        
+        protected DispatchExecutor ExceptionExecutor
+        {
+            get
+            {
+                if(exceptionExecutor == null && !IsClosed)
+                {
+                    exceptionExecutor = new DispatchExecutor(true);
+                    exceptionExecutor.Start();
+                }
+                return exceptionExecutor;
+            }
+        }
+
+        internal void OnException(Exception ex)
+        {
+            Apache.NMS.ExceptionListener listener = this.ExceptionListener;
+            if(listener != null)
+            {
+                ExceptionNotification en = new ExceptionNotification(this, ex);
+                this.ExceptionExecutor.Enqueue(en);
+            }
+        }
+
+        protected void DispatchException(Exception ex)
+        {
+            Apache.NMS.ExceptionListener listener = this.ExceptionListener;
+            if (listener != null)
+            {
+                // Wrap does nothing if this is already a NMS exception, otherwise
+                // wrap it appropriately.
+                listener(ExceptionSupport.Wrap(ex));
+            }
+            else
+            {
+                Tracer.WarnFormat("Received Async exception. Type {0} Message {1}", ex.GetType().Name, ex.Message);
+                Tracer.DebugFormat("Async Exception Stack {0}", ex);
+            }
+        }
+
+        private class ExceptionNotification : DispatchEvent
+        {
+            private readonly Connection connection;
+            private readonly Exception exception;
+            public ExceptionNotification(Connection owner, Exception ex)
+            {
+                connection = owner;
+                exception = ex;
+                Callback = this.Nofify;
             }
 
-            disposed = true;
-        }
+            public override void OnFailure(Exception e)
+            {
+                base.OnFailure(e);
+                connection.DispatchException(e);
+            }
 
+            private void Nofify()
+            {
+                connection.DispatchException(exception);
+            }
+
+        }
+        
+        #endregion
+
+        #region IConnection methods
+
+        AcknowledgementMode acknowledgementMode = AcknowledgementMode.AutoAcknowledge;
         /// <summary>
-        /// Get/or set the broker Uri.
+        /// Sets the <see cref="Apache.NMS.AcknowledgementMode"/> for the <see cref="Apache.NMS.ISession"/> 
+        /// objects created by the connection.
         /// </summary>
-        public Uri BrokerUri
-        {
-            get { return brokerUri; }
-            set { brokerUri = value; }
-        }
-
-        /// <summary>
-        /// The default timeout for network requests.
-        /// </summary>
-        public TimeSpan RequestTimeout
-        {
-            get { return NMSConstants.defaultRequestTimeout; }
-            set { }
-        }
-
         public AcknowledgementMode AcknowledgementMode
         {
             get { return acknowledgementMode; }
             set { acknowledgementMode = value; }
         }
-
-        public IMessageConverter MessageConverter
-        {
-            get { return messageConverter; }
-            set { messageConverter = value; }
-        }
-
+        
+        /// <summary>
+        /// See <see cref="Apache.NMS.IConnection.ClientId"/>.
+        /// </summary>
         public string ClientId
         {
-            get { return clientId; }
+            get { return connInfo.clientId; }
             set
             {
-                ThrowIfConnected("ClientId");
-                clientId = value;
+                if (this.clientIdCanSet.Value)
+                {
+                    if (value != null && value.Length > 0)
+                    {
+                        connInfo.clientId = value;
+                        try
+                        {
+                            this.Connect();
+                        }
+                        catch (NMSException nms)
+                        {
+                            NMSException ex = nms;
+                            if (nms.Message.Contains("invalid-field:container-id"))
+                            {
+                                ex = new InvalidClientIDException(nms.Message);
+                            }
+                            throw ex;
+                        }
+                    }
+                }
+                else
+                {
+                    throw new InvalidClientIDException("Client Id can not be set after connection is Started.");
+                }
             }
         }
 
         /// <summary>
-        /// Get/or set the redelivery policy for this connection.
+        /// Throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public ConsumerTransformerDelegate ConsumerTransformer
+        {
+            get => throw new NotImplementedException();
+            set => throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public ProducerTransformerDelegate ProducerTransformer
+        {
+            get => throw new NotImplementedException();
+            set => throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// AMQP Provider access to remote connection properties. 
+        /// This is used by <see cref="ConnectionProviderUtilities.GetRemotePeerConnectionProperties(Apache.NMS.IConnection)"/>.
+        /// </summary>
+        public StringDictionary RemotePeerProperties
+        {
+            get { return PropertyUtil.Clone(this.Info.RemotePeerProperies); }
+        }
+
+        /// <summary>
+        /// See <see cref="Apache.NMS.IConnection.MetaData"/>.
+        /// </summary>
+        public IConnectionMetaData MetaData
+        {
+            get
+            {
+                return ConnectionMetaData.Version;
+            }
+        }
+
+        /// <summary>
+        /// See <see cref="Apache.NMS.IConnection.RedeliveryPolicy"/>.
         /// </summary>
         public IRedeliveryPolicy RedeliveryPolicy
         {
             get { return this.redeliveryPolicy; }
             set
             {
-                ThrowIfConnected("RedeliveryPolicy");
-                this.redeliveryPolicy = value;
-            }
-        }
-
-        private ConsumerTransformerDelegate consumerTransformer;
-        public ConsumerTransformerDelegate ConsumerTransformer
-        {
-            get { return this.consumerTransformer; }
-            set
-            {
-                ThrowIfConnected("ConsumerTransformer");
-                this.consumerTransformer = value;
-            }
-        }
-
-        private ProducerTransformerDelegate producerTransformer;
-        public ProducerTransformerDelegate ProducerTransformer
-        {
-            get { return this.producerTransformer; }
-            set
-            {
-                ThrowIfConnected("ProducerTransformer");
-                this.producerTransformer = value;
+                if (value != null)
+                {
+                    this.redeliveryPolicy = value;
+                }
             }
         }
 
         /// <summary>
-        /// Gets the Meta Data for the NMS Connection instance.
+        /// See <see cref="Apache.NMS.IConnection.RequestTimeout"/>.
         /// </summary>
-        public IConnectionMetaData MetaData
+        public TimeSpan RequestTimeout
         {
-            get { return this.metaData ?? (this.metaData = new ConnectionMetaData()); }
+            get
+            {
+                return TimeSpan.FromMilliseconds(this.connInfo.requestTimeout);
+            }
+
+            set
+            {
+                connInfo.requestTimeout = Convert.ToInt64(value.TotalMilliseconds);
+            }
         }
 
         /// <summary>
-        /// A delegate that can receive transport level exceptions.
+        /// Not Implemented, throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public event ConnectionInterruptedListener ConnectionInterruptedListener
+        {
+            add => throw new NotImplementedException("AMQP Provider does not implement ConnectionInterruptedListener events.");
+            remove => throw new NotImplementedException("AMQP Provider does not implement ConnectionInterruptedListener events.");
+        }
+
+        /// <summary>
+        /// Not Implemented, throws <see cref="NotImplementedException"/>.
+        /// </summary>
+        public event ConnectionResumedListener ConnectionResumedListener
+        {
+            add => throw new NotImplementedException("AMQP Provider does not implement ConnectionResumedListener events.");
+            remove => throw new NotImplementedException("AMQP Provider does not implement ConnectionResumedListener events.");
+        }
+
+        /// <summary>
+        /// See <see cref="Apache.NMS.IConnection.ExceptionListener"/>.
         /// </summary>
         public event ExceptionListener ExceptionListener;
 
         /// <summary>
-        /// An asynchronous listener that is notified when a Fault tolerant connection
-        /// has been interrupted.
+        /// Creates a <see cref="Apache.NMS.ISession"/> with 
+        /// the connection <see cref="Apache.NMS.IConnection.AcknowledgementMode"/>.
         /// </summary>
-        public event ConnectionInterruptedListener ConnectionInterruptedListener;
-
-        /// <summary>
-        /// An asynchronous listener that is notified when a Fault tolerant connection
-        /// has been resumed.
-        /// </summary>
-        public event ConnectionResumedListener ConnectionResumedListener;
-
-        /// <summary>
-        /// Check and ensure that the connection object is connected.  
-        /// New connections are established for the first time.
-        /// Subsequent calls verify that connection is connected and is not closed or closing.
-        /// This function returns only if connection is successfully opened else
-        /// a ConnectionClosedException is thrown.
-        /// </summary>
-        internal void CheckConnected()
+        /// <returns>An <see cref="Apache.NMS.ISession"/> provider instance.</returns>
+        public Apache.NMS.ISession CreateSession()
         {
-            if (closed.Value || closing.Value)
-            {
-                throw new ConnectionClosedException();
-            }
-            if (connected.Value)
-            {
-                return;
-            }
-            DateTime timeoutTime = DateTime.Now + this.RequestTimeout;
-            int waitCount = 1;
-
-            while (!connected.Value && !closed.Value && !closing.Value)
-            {
-                if (Monitor.TryEnter(connectedLock))
-                {
-                    try // strictly for Monitor unlock
-                    {
-                        // Create and open the Qpid connection
-                        try
-                        {
-                            // TODO: embellish the brokerUri with other connection options
-                            // Allocate a Qpid connection
-                            if (qpidConnection == null)
-                            {
-                                Tracer.DebugFormat("Amqp: create qpid connection to: {0}", this.BrokerUri.ToString());
-                                qpidConnection =
-                                    new Org.Apache.Qpid.Messaging.Connection(
-                                        brokerUri.ToString(),
-                                        ConstructConnectionOptionsString(connectionProperties));
-                            }
-
-                            // Open the connection
-                            if (!qpidConnection.IsOpen)
-                            {
-                                qpidConnection.Open();
-                            }
-
-                            connected.Value = true;
-                        }
-                        catch (Org.Apache.Qpid.Messaging.QpidException e)
-                        {
-                            Tracer.DebugFormat("Amqp: create qpid connection to: {0} failed with {1}", 
-                                this.BrokerUri.ToString(), e.Message);
-                            throw new ConnectionClosedException(e.Message);
-                        }
-                    }
-                    finally
-                    {
-                        Monitor.Exit(connectedLock);
-                    }
-                }
-
-                if (connected.Value || closed.Value || closing.Value
-                    || (DateTime.Now > timeoutTime && this.RequestTimeout != InfiniteTimeSpan))
-                {
-                    break;
-                }
-
-                // Back off from being overly aggressive.  Having too many threads
-                // aggressively trying to connect to a down broker pegs the CPU.
-                Thread.Sleep(5 * (waitCount++));
-            }
-
-            if (!connected.Value)
-            {
-                throw new ConnectionClosedException();
-            }
+            return CreateSession(acknowledgementMode);
         }
 
+        /// <summary>
+        /// Creates a <see cref="Apache.NMS.ISession"/> with the given <see cref="Apache.NMS.AcknowledgementMode"/> parameter.
+        /// <para>
+        /// Throws <see cref="NotImplementedException"/> for the <see cref="Apache.NMS.AcknowledgementMode.Transactional"/>.
+        /// </para>
+        /// </summary>
+        /// <param name="acknowledgementMode"></param>
+        /// <returns></returns>
+        public Apache.NMS.ISession CreateSession(AcknowledgementMode acknowledgementMode)
+        {
+            this.CheckIfClosed();
+            this.Connect();
+            Session ses = new Session(this);
+            ses.AcknowledgementMode = acknowledgementMode;
+            try
+            {
+                ses.Begin();
+            }
+            catch(NMSException) { throw; }
+            catch(Exception ex)
+            {
+                throw ExceptionSupport.Wrap(ex, "Failed to establish amqp Session.");
+            }
+
+            if(!this.sessions.TryAdd(ses.Id, ses))
+            {
+                Tracer.ErrorFormat("Failed to add Session {0}.", ses.Id);
+            }
+            Tracer.InfoFormat("Created Session {0} on connection {1}.", ses.Id, this.ClientId);
+            return ses;
+        }
 
         /// <summary>
-        /// Check and ensure that the connection object is disconnected
-        /// Open connections are closed and this closes related sessions, senders, and receivers.
-        /// Closed connections may be restarted with subsequent calls to Start().
+        /// Destroys all temporary destinations for the connection. 
+        /// <para>
+        /// Throws <see cref="IllegalStateException"/> should any Temporary Topic or Temporary Queue in 
+        /// the connection have an active consumer using it.
+        /// </para>
         /// </summary>
-        internal void CheckDisconnected()
-        {
-            if (closed.Value || closing.Value)
-            {
-                throw new ConnectionClosedException();
-            }
-            if (!connected.Value)
-            {
-                return;
-            }
-            while (connected.Value && !closed.Value && !closing.Value)
-            {
-                if (Monitor.TryEnter(connectedLock))
-                {
-                    try
-                    {
-                        // Close the connection
-                        if (qpidConnection.IsOpen)
-                        {
-                            qpidConnection.Close();
-                        }
-
-                        connected.Value = false;
-                        break;
-                    }
-                    catch (Org.Apache.Qpid.Messaging.QpidException e)
-                    {
-                        throw new NMSException("AMQP Connection close failed : " + e.Message);
-                    }
-                    finally
-                    {
-                        Monitor.Exit(connectedLock);
-                    }
-                }
-            }
-
-            if (connected.Value)
-            {
-                throw new NMSException("Failed to close AMQP Connection");
-            }
-        }
-
-        public void Close()
-        {
-            if (!this.closed.Value)
-            {
-                this.Stop();
-            }
-
-            lock (connectedLock)
-            {
-                if (this.closed.Value)
-                {
-                    return;
-                }
-
-                try
-                {
-                    Tracer.InfoFormat("Connection[]: Closing Connection Now.");
-                    this.closing.Value = true;
-
-                    lock (sessions.SyncRoot)
-                    {
-                        foreach (Session session in sessions)
-                        {
-                            session.Shutdown();
-                        }
-                    }
-                    sessions.Clear();
-
-                }
-                catch (Exception ex)
-                {
-                    Tracer.ErrorFormat("Connection[]: Error during connection close: {0}", ex);
-                }
-                finally
-                {
-                    this.closed.Value = true;
-                    this.connected.Value = false;
-                    this.closing.Value = false;
-                }
-            }
-        }
-
         public void PurgeTempDestinations()
         {
+            foreach(TemporaryDestination temp in temporaryLinks.Keys.ToArray())
+            {
+                this.DestroyTemporaryDestination(temp);
+            }
+        }
+
+        /// <summary>
+        /// See <see cref="Apache.NMS.IConnection.Close"/>.
+        /// </summary>
+        public void Close()
+        {
+            Dispose(true);
+            if (this.IsClosed)
+            {
+                GC.SuppressFinalize(this);
+            }
         }
 
         #endregion
 
-        #region ConnectionProperties Methods
+        #region IDisposable Methods
 
-        /// <summary>
-        /// Connection connectionProperties acceessor
-        /// </summary>
-        /// <remarks>This factory does not check for legal property names. Users
-        /// my specify anything they want. Propery name processing happens when
-        /// connections are created and started.</remarks>
-        public StringDictionary ConnectionProperties
+
+        protected virtual void Dispose(bool disposing)
         {
-            get { return connectionProperties; }
+            if (IsClosed) return;
+            Tracer.DebugFormat("Closing of Connection {0}", ClientId);
+            if (disposing)
+            {   
+                // full shutdown
+                if (this.closing.CompareAndSet(false, true))
+                {
+                    NMS.AMQP.Session[] connectionSessions = GetSessions();
+                    foreach (NMS.AMQP.Session s in connectionSessions)
+                    {
+                        try
+                        {
+                            s.CheckOnDispatchThread();
+                        }
+                        catch
+                        {
+                            this.closing.Value = false;
+                            throw;
+                        }
+                    }
+
+                    this.Stop();
+
+                    this.temporaryLinks.Close();
+
+                    try
+                    {
+                        this.Disconnect();
+                    }
+                    catch (Exception ex)
+                    {
+                        // log network errors
+                        NMSException nmse = ExceptionSupport.Wrap(ex, "Amqp Connection close failure for NMS Connection {0}", this.Id);
+                        Tracer.DebugFormat("Caught Exception while closing Amqp Connection {0}. Exception {1}", this.Id, nmse);
+                    }
+                    finally
+                    {
+                        sessions?.Clear();
+                        sessions = null;
+                        if (this.state.Value.Equals(ConnectionState.CLOSED))
+                        {
+                            if (this.exceptionExecutor != null)
+                            {
+                                this.exceptionExecutor.Close();
+                                this.exceptionExecutor = null;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                this.Close();
+            }
+            catch (Exception ex)
+            {
+                Tracer.DebugFormat("Caught Exception while Disposing of NMS Connection {0}. Exception {1}", this.ClientId, ex);
+            }
+        }
+
+        #endregion
+
+        #region NMSResource Methods
+
+        public override bool IsStarted { get { return !mode.Value.Equals(Resource.Mode.Stopped); } }
+
+        protected override void ThrowIfClosed()
+        {
+            this.CheckIfClosed();
+        }
+
+        protected override void StartResource()
+        {
+            this.Connect();
+
+            if (!IsConnected)
+            {
+                throw new NMSConnectionException("Connection Failed to connect to Client.");
+            }
+
+            //start sessions here
+            foreach (Session s in GetSessions())
+            {
+                s.Start();
+            }
+            
+        }
+
+        protected override void StopResource()
+        {
+            if ( this.impl != null && !this.impl.IsClosed)
+            {
+                // stop all sessions here.
+                foreach (Session s in GetSessions())
+                {
+                    s.Stop();
+                }
+            }
+        }
+
+        #endregion
+
+        public override string ToString()
+        {
+            return "Connection:\nConnection Info:"+connInfo.ToString();
+        }
+
+        
+    }
+
+    #region Connection Provider Utilities
+
+    /// <summary>
+    /// This give access to provider specific functions and capabilities for a provider connection.
+    /// </summary>
+    public static class ConnectionProviderUtilities
+    {
+        public static bool IsAMQPConnection(Apache.NMS.IConnection connection)
+        {
+            return connection != null && connection is NMS.AMQP.Connection;
+        }
+
+        public static StringDictionary GetRemotePeerConnectionProperties(Apache.NMS.IConnection connection)
+        {
+            if (connection == null)
+            {
+                return null;
+            }
+            else if (connection is NMS.AMQP.Connection)
+            {
+                return (connection as NMS.AMQP.Connection).RemotePeerProperties;
+            }
+            return null;
+        }
+    }
+
+    #endregion
+
+    #region Connection Information inner Class
+
+    internal class ConnectionInfo : ResourceInfo
+    {
+        static ConnectionInfo()
+        {
+            Amqp.ConnectionFactory defaultCF = new Amqp.ConnectionFactory();
+            AmqpSettings defaultAMQPSettings = defaultCF.AMQP;
+            
+            DEFAULT_CHANNEL_MAX = defaultAMQPSettings.MaxSessionsPerConnection;
+            DEFAULT_MAX_FRAME_SIZE = defaultAMQPSettings.MaxFrameSize;
+            DEFAULT_IDLE_TIMEOUT = defaultAMQPSettings.IdleTimeout;
+            
+            DEFAULT_REQUEST_TIMEOUT = Convert.ToInt64(NMSConstants.defaultRequestTimeout.TotalMilliseconds);
+
+        }
+        public const long INFINITE = -1;
+        public const long DEFAULT_CONNECT_TIMEOUT = 15000;
+        public const int DEFAULT_CLOSE_TIMEOUT = 15000;
+        public static readonly long DEFAULT_REQUEST_TIMEOUT;
+        public static readonly long DEFAULT_IDLE_TIMEOUT;
+
+        public static readonly ushort DEFAULT_CHANNEL_MAX;
+        public static readonly int DEFAULT_MAX_FRAME_SIZE;
+
+        public ConnectionInfo() : this(null) { }
+        public ConnectionInfo(Id clientId) : base(clientId)
+        {
+            if (clientId != null)
+                this.clientId = clientId.ToString();
+        }
+
+        private Id ClientId = null;
+
+        public override Id Id
+        {
+            get
+            {
+                if (base.Id == null)
+                {
+                    if (ClientId == null && clientId != null)
+                    {
+                        ClientId = new Id(clientId);
+                    }
+                    return ClientId;
+                }
+                else
+                {
+                    return base.Id;
+                }
+            }
+        }
+
+        internal Id ResourceId
+        {
             set
             {
-                ThrowIfConnected("ConnectionProperties");
-                connectionProperties = value;
+                if(ClientId == null && value != null)
+                {
+                    ClientId = value;
+                    clientId = ClientId.ToString();
+                }
+                
             }
         }
 
-        /// <summary>
-        /// Test existence of named property
-        /// </summary>
-        /// <param name="name">The name of the connection property to test.</param>
-        /// <returns>Boolean indicating if property exists in setting dictionary.</returns>
-        public bool ConnectionPropertyExists(string name)
+        internal Uri remoteHost { get; set; }
+        public string clientId { get; internal set; } = null;
+        public string username { get; set; } = null;
+        public string password { get; set; } = null;
+
+        public long requestTimeout { get; set; } = DEFAULT_REQUEST_TIMEOUT;
+        public long connectTimeout { get; set; } = DEFAULT_CONNECT_TIMEOUT;
+        public int closeTimeout { get; set; } = DEFAULT_CLOSE_TIMEOUT;
+        public long idleTimout { get; set; } = DEFAULT_IDLE_TIMEOUT;
+
+        public ushort channelMax { get; set; } = DEFAULT_CHANNEL_MAX;
+        public int maxFrameSize { get; set; } = DEFAULT_MAX_FRAME_SIZE;
+
+        public string TopicPrefix { get; internal set; } = null;
+
+        public string QueuePrefix { get; internal set; } = null;
+
+        public bool IsAnonymousRelay { get; internal set; } = false;
+
+        public bool IsDelayedDelivery { get; internal set; } = false;
+
+        public Message.Cloak.AMQPObjectEncodingType? EncodingType { get; internal set; } = null;
+
+
+        public IList<string> Capabilities { get { return new List<string>(capabilities); } }
+
+        public bool HasCapability(string capability)
         {
-            return connectionProperties.ContainsKey(name);
+            return capabilities.Contains(capability);
         }
 
-        /// <summary>
-        /// Get value of named property
-        /// </summary>
-        /// <param name="name">The name of the connection property to get.</param>
-        /// <returns>string value of property.</returns>
-        /// <remarks>Throws if requested property does not exist.</remarks>
-        public string GetConnectionProperty(string name)
+        public void AddCapability(string capability)
         {
-            if (connectionProperties.ContainsKey(name))
-            {
-                return connectionProperties[name];
-            }
-            else
-            {
-                throw new NMSException("Amqp connection property '" + name + "' does not exist");
-            }
+            if (capability != null && capability.Length > 0)
+                capabilities.Add(capability);
         }
 
-        /// <summary>
-        /// Set value of named property
-        /// </summary>
-        /// <param name="name">The name of the connection property to set.</param>
-        /// <param name="value">The value of the connection property.</param>
-        /// <returns>void</returns>
-        /// <remarks>Existing property values are overwritten. New property values
-        /// are added.</remarks>
-        public void SetConnectionProperty(string name, string value)
-        {
-            ThrowIfConnected("SetConnectionProperty:" + name);
-            if (connectionProperties.ContainsKey(name))
-            {
-                connectionProperties[name] = value;
-            }
-            else
-            {
-                connectionProperties.Add(name, value);
-            }
-        }
-        #endregion
+        public StringDictionary RemotePeerProperies { get => remoteConnectionProperties; }
 
-        #region AMQP Connection Utilities
+        private StringDictionary remoteConnectionProperties = new StringDictionary();
+        private List<string> capabilities = new List<string>();
 
-        private void ThrowIfConnected(string propName)
-        {
-            if (connected.Value)
-            {
-                throw new NMSException("Can not change connection property while Connection is connected: " + propName);
-            }
-        }
-
-        public void HandleException(Exception e)
-        {
-            if (ExceptionListener != null && !this.closed.Value)
-            {
-                ExceptionListener(e);
-            }
-            else
-            {
-                Tracer.Error(e);
-            }
-        }
-
-
-        public int GetNextSessionId()
-        {
-            return Interlocked.Increment(ref sessionCounter);
-        }
-
-        public Org.Apache.Qpid.Messaging.Session CreateQpidSession()
-        {
-            // TODO: Session name; transactional session
-            if (!connected.Value)
-            {
-                throw new ConnectionClosedException();
-            }
-            return qpidConnection.CreateSession();
-        }
-
-
-        /// <summary>
-        /// Convert specified connection properties string map into the
-        /// connection properties string to send to Qpid Messaging. 
-        /// </summary>
-        /// <returns>qpid connection properties string</returns>
-        /// <remarks>Mostly this is pass-through. Default to amqp1.0
-        /// in the absence of any protocol option.</remarks>
-        internal string ConstructConnectionOptionsString(StringDictionary cp)
+        public override string ToString()
         {
             string result = "";
-            // Construct qpid connection string
-            bool first = true;
-            result = "{";
-            foreach (DictionaryEntry de in cp)
+            result += "connInfo = [\n";
+            foreach (MemberInfo info in this.GetType().GetMembers())
             {
-                if (!first)
+                if (info is PropertyInfo)
                 {
-                    result += SEP_ARGS;
-                }
-                result += de.Key + SEP_NAME_VALUE.ToString() + de.Value;
-                first = false;
-            }
+                    PropertyInfo prop = info as PropertyInfo;
 
-            // protocol version munging
-            if (!cp.ContainsKey(PROTOCOL_OPTION))
-            {
-                // no protocol option - select 1.0
-                if (!first)
-                {
-                    result += SEP_ARGS;
-                }
-                result += PROTOCOL_OPTION + SEP_NAME_VALUE.ToString() + PROTOCOL_1_0;
-            }
+                    if (prop.GetGetMethod(true).IsPublic)
+                    {
+                        if (prop.GetGetMethod(true).ReturnParameter.ParameterType.IsEquivalentTo(typeof(List<string>)))
+                        {
+                            result += string.Format("{0} = {1},\n", prop.Name, PropertyUtil.ToString(prop.GetValue(this,null) as IList));
+                        }
+                        else
+                        {
+                            result += string.Format("{0} = {1},\n", prop.Name, prop.GetValue(this, null));
+                        }
 
-            result += "}";
+                    }
+                }
+            }
+            result = result.Substring(0, result.Length - 2) + "\n]";
             return result;
         }
 
-        #endregion
     }
+
+    #endregion
+
 }
