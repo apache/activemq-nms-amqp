@@ -30,7 +30,7 @@ namespace NMS.AMQP.Test.TestCase
     [TestFixture]
     class SecureConnectionTest : BaseTestCase
     {
-        protected const string TestSuiteClientCertificateFileName = "client.crt";
+        protected const string TestSuiteClientCertificateFileName = "config/cert/client.crt";
         protected const string ApplicationCallbackExceptionMessage = "Bad Application";
 
         protected IConnection Connection;
@@ -534,7 +534,7 @@ namespace NMS.AMQP.Test.TestCase
                 catch (Exception ex)
                 {
                     // failure to load should fail test.
-                    Assert.Fail("Could not load client certificate for from file {0}, cause of failure : {2}", clientCertFileName, ex.Message);
+                    Assert.Fail("Could not load client certificate for from file {0}, cause of failure : {1}", clientCertFileName, ex.Message);
                 }
 
                 Assert.NotNull(cert, "Failed to load client certificate {0}.", clientCertFileName);
@@ -684,7 +684,7 @@ namespace NMS.AMQP.Test.TestCase
                 {
                     // failure to load should fail test.
                     Assert.Fail(
-                        "Could not load client certificate for from file {0}, cause of failure : {2}", 
+                        "Could not load client certificate for from file {0}, cause of failure : {1}", 
                         clientCertificateFileName, 
                         ex.Message
                         );

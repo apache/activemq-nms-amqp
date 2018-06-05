@@ -19,7 +19,7 @@ NMS-AMQP uses [AmqpNetLite](https://github.com/Azure/amqpnetlite) as the underly
 NMS-AMQP should bridge the familiar NMS concepts to AMQP protocol concepts as described in the document [amqp-bindmap-jms-v1.0-wd07.pdf](https://www.oasis-open.org/committees/download.php/59981/amqp-bindmap-jms-v1.0-wd07.pdf).
 So in general most of the top level classes that implement the Apache.NMS interface _Connection, Session, MessageProducer,_ etc  create, manage, and destroy the amqpnetlite equivalent object _Connection, Session, Link,_ etc.
 
-### Building
+### Building With Visual Studio 2017
 There are multiple projects: NMS-AMQP, NMS-AMQP.Test, and HelloWorld. All projects use the new csproj format available in Visual Studio 2017.
 NMS-AMQP is the library which implements The Apache.NMS Interface using AmqpNetLite.
 NMS-AMQP.Test produces an NUnit dll for unit testing.
@@ -28,12 +28,20 @@ HelloWorld is a sample application using the NMS library which can send messages
 To build, launch Visual Studio 2017 with the nms-amqp.sln file and build the solution.
 Build artifacts will be under `<root_folder>\<project_folder>\bin\$(Configuration)\$(TargetFramework)`.
 
+### Building With DotNet SDK
 Alternatively, to build without Visual Studio 2017 the project can be built using [.NET Core sdk tool](https://www.microsoft.com/net/download/windows), version 2.1.+.
 Execute the dotnet sdk command to build all projects :
 ```
 C:\<root_folder>>dotnet build nms-amqp.sln 
 ```
-Note The .NetFramework target must be install for the dotnet sdk tool build the project with the tool.
+__Note__ The .Net Framework SDK must be downloaded and installed to build the solution.  This means that the solution can only be built on a Windows platform.  The solution, nms-amqp.sln and the all the soure in this project is compatible with .NET Core.  The project files, _*.csproj_, can be modified to include the appropriate 'netcoreapp2.0'  or 'netstandard2.0' Framework in the target <TargetFrames> element. However as the NMS API does not have a .NET Core build, the dependecny will produce the following warning:
+ 
+```
+NMS-AMQP.csproj : warning NU1701: Package 'Apache.NMS 1.7.1' was restored using '.NETFramework,Version=v4.6.1' instead of the project target framework '.NETStandard,Version=v2.0'. This package may not be fully compatible with your project.
+```
+The resulting DLL will __not__ run.
+
+When a .NET Standard build of the NMS API is available, this project is ready to go.
 
 ### Testing
 Tests use the NUnit Framework.  The tests include both unit and system tests (require a broker).  The test configuration is read from 'TestSuite.config' in the current directory.  For convenience the build copies 'test/TestSuite.config' to the 'bin' directory.
@@ -44,12 +52,25 @@ To run the unit tests use the nunit3-console.exe under the `<nuget_packages_loca
 ```
 C:\Users\me\nms-amqp\test\bin\Debug\net452> nunit3-console.exe NMS.AMQP.Test.dll
 ```
+#### Configuring ActiveMQ
+
+The distributed 'TestSuite.config' expects to connect using a plain text socket to the broker at 127.0.0.1:5672.  Secure connections are configured at 127.0.0.1:5671.  More information on secure connections can be found in _test/config/cert/ReadMe.md_.
+
+
+Instructions
 
 #### VS2017 Test Explorer
 Visual Studio 2017 will also run nunit tests with the built-in TestExplorer tool. If you wish to run tests inside VS2017 (useful for debugging) then you must configure _Test->Test Settings->Select Test Settings File_.  The *Test Settings File* is _test/config/Adapter.runsettings_.  
 
 The file _Adapter.runsettings_ must be modified to reflect your local directory 
 structure.
+
+#### dotnet test 
+
+If building with the dotnet sdk,  From the top level directory simply enter _dotnet test_ to build and run all the tests.  Individual tests can be run with:
+```
+dotnet test filter=_Test Name_
+```
 
 ### Amqp Provider NMS Feature Support
 
