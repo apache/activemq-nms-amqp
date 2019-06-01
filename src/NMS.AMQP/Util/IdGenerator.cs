@@ -28,7 +28,7 @@ namespace Apache.NMS.AMQP.Util
 {
     #region Id Class
 
-    class Id : IComparable
+    public class Id : IComparable
     {
         public static readonly Id EMPTY = new Id();
         protected const int DEFAULT_MAX_CAPACITY = 1;
@@ -505,7 +505,7 @@ namespace Apache.NMS.AMQP.Util
 
 #region IdGenerator Class
 
-    class IdGenerator
+    public class IdGenerator
     {
         public const string ID_COMPONENT_DELIMETER = ":";
         protected static readonly string DEFAULT_PREFIX = "ID";

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,7 +32,6 @@ namespace Apache.NMS.AMQP.Util.Types.Map
     /// </summary>
     public abstract class PrimitiveMapBase : IPrimitiveMap
     {
-        
         #region Abstract IPrimativeMap Methods
 
         public abstract int Count { get; }
@@ -52,10 +52,7 @@ namespace Apache.NMS.AMQP.Util.Types.Map
 
         public object this[string key]
         {
-            get
-            {
-                return GetObjectProperty(key);
-            }
+            get { return GetObjectProperty(key); }
 
             set
             {
@@ -64,98 +61,84 @@ namespace Apache.NMS.AMQP.Util.Types.Map
             }
         }
 
-
         public bool GetBool(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(bool));
-            return (bool)value;
+            return (bool) value;
         }
 
         public byte GetByte(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(byte));
-            return (byte)value;
+            return (byte) value;
         }
 
-        public byte[] GetBytes(string key)
-        {
-            object value = GetObjectProperty(key);
-            if (value != null && value is byte[])
-            {
-                throw new NMSException("Property: " + key + " is not byte[] but is: " + value);
-            }
-            return (byte[])value;
-        }
+        public byte[] GetBytes(string key) => GetComplexType<byte[]>(key);
 
         public char GetChar(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(char));
-            return (char)value;
+            return (char) value;
         }
 
-        public IDictionary GetDictionary(string key)
-        {
-            object value = GetObjectProperty(key);
-            if (value != null && value is IDictionary)
-            {
-                throw new NMSException("Property: " + key + " is not IDictionary but is: " + value);
-            }
-            return (IDictionary)value;
-        }
+        public IDictionary GetDictionary(string key) => GetComplexType<IDictionary>(key);
 
         public double GetDouble(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(double));
-            return (double)value;
+            return (double) value;
         }
 
         public float GetFloat(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(float));
-            return (float)value;
+            return (float) value;
         }
 
         public int GetInt(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(int));
-            return (int)value;
+            return (int) value;
         }
 
-        public IList GetList(string key)
+        public IList GetList(string key) => GetComplexType<IList>(key);
+
+        private T GetComplexType<T>(string key) where T : class
         {
             object value = GetObjectProperty(key);
-            if (value != null && value is IList)
-            {
-                throw new NMSException("Property: " + key + " is not IList but is: " + value);
-            }
-            return (IList)value;
+            if (value is null)
+                return null;
+            if (value is T complexValue)
+                return complexValue;
+
+            throw new NMSException($"Property: {key} is not {typeof(T).FullName} but is: {value}");
         }
 
         public long GetLong(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(long));
-            return (long)value;
+            return (long) value;
         }
 
         public short GetShort(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(short));
-            return (short)value;
+            return (short) value;
         }
 
         public string GetString(string key)
         {
             object value = GetObjectProperty(key);
             CheckValueType(value, typeof(string));
-            return (string)value;
+            return (string) value;
         }
 
         public void SetBool(string key, bool value)
@@ -252,9 +235,9 @@ namespace Apache.NMS.AMQP.Util.Types.Map
                 Type type = value.GetType();
 
                 if (type.IsInstanceOfType(typeof(Object)) ||
-                   (!type.IsPrimitive && !type.IsValueType && !type.IsAssignableFrom(typeof(string))) ||
-                   (!ConversionSupport.IsNMSType(value))
-                   )
+                    (!type.IsPrimitive && !type.IsValueType && !type.IsAssignableFrom(typeof(string))) ||
+                    (!ConversionSupport.IsNMSType(value))
+                )
                 {
                     throw new NMSException("Invalid type: " + type.Name + " for value: " + value);
                 }
@@ -273,16 +256,21 @@ namespace Apache.NMS.AMQP.Util.Types.Map
             {
                 foreach (string key in this.Keys)
                 {
-                    if (!first) { result += ", "; }
+                    if (!first)
+                    {
+                        result += ", ";
+                    }
+
                     first = false;
                     object value = GetObjectProperty(key);
                     result = key + "=" + value;
                 }
             }
+
             result += "}";
             return result;
         }
 
-        #endregion 
+        #endregion
     }
 }
