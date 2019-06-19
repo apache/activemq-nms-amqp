@@ -83,7 +83,8 @@ namespace Apache.NMS.AMQP.Test.Util
                 // Load config file path using test parameters.
                 // Should the test parameters not be set load the 
                 // config file with the default name in the current application directory.
-                string configFilePath = NUnit.Framework.TestContext.Parameters.Get(Parameters.TS_PATH) ?? "";
+                string configFilePath = NUnit.Framework.TestContext.Parameters.Get(Parameters.TS_PATH) ?? NUnit.Framework.TestContext.CurrentContext.TestDirectory;
+
                 string configFileName = 
                     NUnit.Framework.TestContext.Parameters.Get(Parameters.TS_FILENAME) ?? Configuration.CONFIG_FILENAME;
                 string filename = null;

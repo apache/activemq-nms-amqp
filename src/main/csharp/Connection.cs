@@ -436,7 +436,9 @@ namespace Apache.NMS.AMQP
                 }
                 
                 Open openFrame = CreateOpenFrame(this.connInfo);
-                
+
+                this.latch = new CountDownLatch(1);
+
                 Task<Amqp.Connection> fconn = this.implCreate(addr, openFrame, this.OpenResponse);
                 // wait until the Open request is sent
                 this.impl = TaskUtil.Wait(fconn, connInfo.connectTimeout);
@@ -457,7 +459,6 @@ namespace Apache.NMS.AMQP
 
                 this.impl.Closed += OnInternalClosed;
                 this.impl.AddClosedCallback(OnInternalClosed);
-                this.latch = new CountDownLatch(1);
 
                 ConnectionState finishedState = ConnectionState.UNKNOWN;
                 // Wait for Open response 
