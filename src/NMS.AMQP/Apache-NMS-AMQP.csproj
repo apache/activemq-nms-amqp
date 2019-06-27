@@ -16,19 +16,15 @@ with the License.  You may obtain a copy of the License at
   under the License.
   -->
 <Project Sdk="Microsoft.NET.Sdk">
-  <!--<Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />-->
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{0D8CF699-9702-4EC6-8719-C2968D32F09A}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <RootNamespace>Apache.NMS.AMQP</RootNamespace>
     <AssemblyName>Apache.NMS.AMQP</AssemblyName>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
-    <FileAlignment>512</FileAlignment>
-    <OutputPath>bin\$(Configuration)\</OutputPath>
+  </PropertyGroup>
 
+  <PropertyGroup>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>Apache.NMS.AMQP</PackageId>
     <Version>1.0.0</Version>
@@ -43,19 +39,8 @@ with the License.  You may obtain a copy of the License at
     <RepositoryUrl>https://github.com/apache/activemq-nms-amqp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>apache;activemq;nms;amqp;net;messaging</PackageTags>
-
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
-    <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
-    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
-    <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
-    <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
-    <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
-    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
-
   </PropertyGroup>
+
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
@@ -72,33 +57,11 @@ with the License.  You may obtain a copy of the License at
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-  </PropertyGroup>    
-    <ItemGroup>
-        <Compile Include="../src/main/csharp/**" />
-        <Compile Include="Properties\AssemblyInfo.cs" />
-    </ItemGroup>
-    <ItemGroup>
-      <EmbeddedResource Remove="Backup\**" />
-      <EmbeddedResource Remove="HelloWorld\**" />
-      <EmbeddedResource Remove="src\test\**" />
-      <None Remove="Backup\**" />
-      <None Remove="HelloWorld\**" />
-      <None Remove="src\test\**" />
-    </ItemGroup>
-    <ItemGroup>
-      <None Remove=".gitattributes" />
-      <None Remove=".gitignore" />
-      <None Remove="UpgradeLog.htm" />
-    </ItemGroup>
+  </PropertyGroup>
 
   <ItemGroup>
     <!-- AMQPNetLite.Core is .NET Standard 1.3 package -->
     <PackageReference Include="AMQPNetLite.Core" Version="2.1.7" />
     <PackageReference Include="Apache.NMS" Version="1.8.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Update="App.config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 </Project>
