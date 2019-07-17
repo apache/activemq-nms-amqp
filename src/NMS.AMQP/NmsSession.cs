@@ -47,17 +47,23 @@ namespace Apache.NMS.AMQP
             AcknowledgementMode = acknowledgementMode;
             SessionInfo = new SessionInfo(sessionId)
             {
-                ackMode = acknowledgementMode
+                AcknowledgementMode = acknowledgementMode
             };
             consumerIdGenerator = new NestedIdGenerator("ID:consumer", SessionInfo.Id, true);
             producerIdGenerator = new NestedIdGenerator("ID:producer", SessionInfo.Id, true);
+
+            if (AcknowledgementMode == AcknowledgementMode.Transactional)
+                TransactionContext = new NmsLocalTransactionContext(this);
+            else
+                TransactionContext = new NmsNoTxTransactionContext(this);
         }
 
         public bool IsStarted => started;
 
-        internal Task Begin()
+        internal async Task Begin()
         {
-            return Connection.CreateResource(SessionInfo);
+            await Connection.CreateResource(SessionInfo).ConfigureAwait(false);
+            await TransactionContext.Begin().ConfigureAwait(false);
         }
 
         public void Close()
@@ -261,12 +267,34 @@ namespace Apache.NMS.AMQP
 
         public void Commit()
         {
-            throw new NotImplementedException();
+            CheckClosed();
+
+            TransactionContext.Commit().ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         public void Rollback()
         {
-            throw new NotImplementedException();
+            CheckClosed();
+            
+            // Stop processing any new messages that arrive
+            try
+            {
+                foreach (NmsMessageConsumer consumer in consumers.Values)
+                {
+                    consumer.SuspendForRollback();
+                }
+            }
+            finally
+            {
+                TransactionContext.Rollback().ConfigureAwait(false).GetAwaiter().GetResult();    
+            }
+            
+            // Currently some consumers won't get suspended and some won't restart
+            // after a failed rollback.
+            foreach (NmsMessageConsumer consumer in consumers.Values)
+            {
+                consumer.ResumeAfterRollback();
+            }
         }
 
         private void CheckClosed()
@@ -280,13 +308,27 @@ namespace Apache.NMS.AMQP
         public ConsumerTransformerDelegate ConsumerTransformer { get; set; }
         public ProducerTransformerDelegate ProducerTransformer { get; set; }
         public TimeSpan RequestTimeout { get; set; }
-        public bool Transacted { get; }
+        public bool Transacted => AcknowledgementMode == AcknowledgementMode.Transactional;
         public AcknowledgementMode AcknowledgementMode { get; }
         public bool IsClosed => closed;
 
-        public event SessionTxEventDelegate TransactionStartedListener;
-        public event SessionTxEventDelegate TransactionCommittedListener;
-        public event SessionTxEventDelegate TransactionRolledBackListener;
+        internal INmsTransactionContext TransactionContext { get; }
+
+        public event SessionTxEventDelegate TransactionStartedListener
+        {
+            add => this.TransactionContext.TransactionStartedListener += value;
+            remove => this.TransactionContext.TransactionStartedListener -= value;
+        }
+        public event SessionTxEventDelegate TransactionCommittedListener
+        {
+            add => this.TransactionContext.TransactionCommittedListener += value;
+            remove => this.TransactionContext.TransactionCommittedListener -= value;            
+        }
+        public event SessionTxEventDelegate TransactionRolledBackListener
+        {
+            add => this.TransactionContext.TransactionRolledBackListener += value;
+            remove => this.TransactionContext.TransactionRolledBackListener -= value;      
+        }
 
         public void OnInboundMessage(InboundMessageDispatch envelope)
         {
@@ -303,7 +345,7 @@ namespace Apache.NMS.AMQP
 
         public void Acknowledge(AckType ackType, InboundMessageDispatch envelope)
         {
-            Connection.Acknowledge(envelope, ackType).ConfigureAwait(false).GetAwaiter().GetResult();
+            TransactionContext.Acknowledge(envelope, ackType).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         public void AcknowledgeIndividual(AckType ackType, InboundMessageDispatch envelope)
@@ -363,7 +405,7 @@ namespace Apache.NMS.AMQP
 
             bool sync = deliveryMode == MsgDeliveryMode.Persistent;
 
-            Connection.Send(new OutboundMessageDispatch
+            TransactionContext.Send(new OutboundMessageDispatch
             {
                 Message = outbound,
                 ProducerId = producer.Info.Id,
@@ -443,6 +485,8 @@ namespace Apache.NMS.AMQP
 
                     foreach (NmsMessageProducer producer in producers.Values.ToArray()) 
                         producer.Shutdown(exception);
+
+                    TransactionContext.Shutdown().ConfigureAwait(false).GetAwaiter().GetResult();
                 }
                 finally
                 {
@@ -520,6 +564,16 @@ namespace Apache.NMS.AMQP
             }
 
             return false;
+        }
+
+        public void OnConnectionInterrupted()
+        {
+            TransactionContext.OnConnectionInterrupted();
+
+            foreach (NmsMessageConsumer consumer in consumers.Values)
+            {
+                consumer.OnConnectionInterrupted();
+            }
         }
     }
 }

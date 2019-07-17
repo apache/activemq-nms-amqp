@@ -16,6 +16,7 @@
  */
 
 using System;
+using Apache.NMS.AMQP.Message;
 
 namespace Apache.NMS.AMQP
 {
@@ -27,5 +28,6 @@ namespace Apache.NMS.AMQP
         void OnConnectionFailure(NMSException exception);
         void OnConnectionInterrupted(Uri remoteUri);
         void OnProducerClosed(NmsMessageProducer messageProducer, Exception error);
+        void OnInboundMessage(NmsMessage message);
     }
 }

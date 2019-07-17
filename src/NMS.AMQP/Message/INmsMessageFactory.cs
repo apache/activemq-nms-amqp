@@ -15,8 +15,6 @@
  * limitations under the License.
  */
 
-using Apache.NMS.AMQP.Provider.Amqp.Message;
-
 namespace Apache.NMS.AMQP.Message
 {
     public interface INmsMessageFactory
