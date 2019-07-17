@@ -34,11 +34,14 @@ namespace Apache.NMS.AMQP.Provider
         Task CreateResource(ResourceInfo resourceInfo);
         Task DestroyResource(ResourceInfo resourceInfo);
         Task StartResource(ResourceInfo resourceInfo);
+        Task StopResource(ResourceInfo resourceInfo);
         Task Recover(Id sessionId);
         Task Acknowledge(Id sessionId, AckType ackType);
         Task Acknowledge(InboundMessageDispatch envelope, AckType ackType);
         INmsMessageFactory MessageFactory { get; }
         Task Send(OutboundMessageDispatch envelope);
         Task Unsubscribe(string name);
+        Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo);
+        Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo);
     }
 }

@@ -319,6 +319,21 @@ namespace Apache.NMS.AMQP.Provider.Failover
             return request.Task;
         }
 
+        public Task StopResource(ResourceInfo resourceInfo)
+        {
+            CheckClosed();
+
+            FailoverRequest request = new FailoverRequest(this, requestTimeout)
+            {
+                DoTask = activeProvider => activeProvider.StopResource(resourceInfo),
+                Name = nameof(StopResource)
+            };
+
+            request.Run();
+
+            return request.Task;
+        }
+
         public Task Recover(Id sessionId)
         {
             CheckClosed();
@@ -394,6 +409,38 @@ namespace Apache.NMS.AMQP.Provider.Failover
             {
                 DoTask = activeProvider => activeProvider.Unsubscribe(name),
                 Name = nameof(Unsubscribe)
+            };
+
+            request.Run();
+
+            return request.Task;
+        }
+
+        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        {
+            CheckClosed();
+
+            FailoverRequest request = new FailoverRequest(this, SendTimeout)
+            {
+                DoTask = activeProvider => activeProvider.Rollback(transactionInfo, nextTransactionInfo),
+                Name = nameof(Rollback),
+                SucceedsWhenOffline = true
+            };
+
+            request.Run();
+
+            return request.Task;
+        }
+
+        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        {
+            CheckClosed();
+
+            FailoverRequest request = new FailoverRequest(this, SendTimeout)
+            {
+                DoTask = activeProvider => activeProvider.Commit(transactionInfo, nextTransactionInfo),
+                Name = nameof(Commit),
+                FailureWhenOffline = true
             };
 
             request.Run();

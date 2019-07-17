@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Amqp;
 using Amqp.Framing;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Util;
@@ -29,43 +30,51 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 {
     public class AmqpSession
     {
-        protected readonly SessionInfo sessionInfo;
-        private global::Amqp.Session underlyingSession;
         private readonly ConcurrentDictionary<Id, AmqpConsumer> consumers = new ConcurrentDictionary<Id, AmqpConsumer>();
         private readonly ConcurrentDictionary<Id, AmqpProducer> producers = new ConcurrentDictionary<Id, AmqpProducer>();
+        protected readonly SessionInfo SessionInfo;
 
         public AmqpSession(AmqpConnection connection, SessionInfo sessionInfo)
         {
-            this.Connection = connection;
-            this.sessionInfo = sessionInfo;
+            Connection = connection;
+            SessionInfo = sessionInfo;
+
+            if (sessionInfo.IsTransacted)
+            {
+                TransactionContext = new AmqpTransactionContext(this);
+            }
         }
 
+        public AmqpTransactionContext TransactionContext { get; }
+
         public AmqpConnection Connection { get; }
-        public global::Amqp.Session UnderlyingSession => underlyingSession;
+        public Session UnderlyingSession { get; private set; }
 
         public IEnumerable<AmqpConsumer> Consumers => consumers.Values.ToArray();
+        public Id SessionId => SessionInfo.Id;
 
         public Task Start()
         {
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            if (sessionInfo.requestTimeout > 0)
+            if (SessionInfo.requestTimeout > 0)
             {
-                CancellationTokenSource ct = new CancellationTokenSource(TimeSpan.FromMilliseconds(sessionInfo.requestTimeout));
+                CancellationTokenSource ct = new CancellationTokenSource(TimeSpan.FromMilliseconds(SessionInfo.requestTimeout));
                 ct.Token.Register(() => tcs.TrySetCanceled(), false);
             }
-            
-            underlyingSession = new global::Amqp.Session(Connection.UnderlyingConnection, CreateBeginFrame(),
+
+            UnderlyingSession = new Session(Connection.UnderlyingConnection, CreateBeginFrame(),
                 (session, begin) =>
                 {
-                    sessionInfo.remoteChannel = begin.RemoteChannel;
+                    SessionInfo.remoteChannel = begin.RemoteChannel;
                     tcs.TrySetResult(true);
                 });
-            underlyingSession.AddClosedCallback((sender, error) =>
+            UnderlyingSession.AddClosedCallback((sender, error) => { tcs.TrySetException(ExceptionSupport.GetException(error)); });
+            UnderlyingSession.AddClosedCallback((sender, error) =>
             {
                 if (!tcs.TrySetException(ExceptionSupport.GetException(error)))
                 {
-                    Connection.RemoveSession(sessionInfo.Id);
+                    Connection.RemoveSession(SessionInfo.Id);
                 }
             });
             return tcs.Task;
@@ -73,8 +82,20 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         public void Close()
         {
-            underlyingSession.Close(TimeSpan.FromMilliseconds(sessionInfo.closeTimeout));
-            Connection.RemoveSession(sessionInfo.Id);
+            TimeSpan timeout = TimeSpan.FromMilliseconds(SessionInfo.closeTimeout);
+            TransactionContext?.Close(timeout);
+            UnderlyingSession.Close(timeout);
+            Connection.RemoveSession(SessionInfo.Id);
+        }
+
+        public Task BeginTransaction(TransactionInfo transactionInfo)
+        {
+            if (!SessionInfo.IsTransacted)
+            {
+                throw new IllegalStateException("Non-transacted Session cannot start a TX.");
+            }
+
+            return TransactionContext.Begin(transactionInfo);
         }
 
         private Begin CreateBeginFrame()
@@ -82,9 +103,9 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             return new Begin
             {
                 HandleMax = Connection.Provider.MaxHandle,
-                IncomingWindow = sessionInfo.incomingWindow,
-                OutgoingWindow = sessionInfo.outgoingWindow,
-                NextOutgoingId = sessionInfo.nextOutgoingId,
+                IncomingWindow = SessionInfo.incomingWindow,
+                OutgoingWindow = SessionInfo.outgoingWindow,
+                NextOutgoingId = SessionInfo.nextOutgoingId
             };
         }
 
@@ -133,8 +154,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         }
 
         /// <summary>
-        /// Perform re-send of all delivered but not yet acknowledged messages for all consumers
-        /// active in this Session.
+        ///     Perform re-send of all delivered but not yet acknowledged messages for all consumers
+        ///     active in this Session.
         /// </summary>
         public void Recover()
         {
@@ -147,6 +168,32 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public bool ContainsSubscriptionName(string subscriptionName)
         {
             return consumers.Values.Any(consumer => consumer.HasSubscription(subscriptionName));
+        }
+
+        /// <summary>
+        /// Roll back the currently running Transaction
+        /// </summary>
+        /// <param name="transactionInfo">The TransactionInfo describing the transaction being rolled back.</param>
+        /// <param name="nextTransactionInfo">The JmsTransactionInfo describing the transaction that should be started immediately.</param>
+        /// <exception cref="IllegalStateException"></exception>
+        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        {
+            if (!SessionInfo.IsTransacted)
+            {
+                throw new IllegalStateException("Non-transacted Session cannot rollback a TX.");
+            }
+
+            return TransactionContext.Rollback(transactionInfo, nextTransactionInfo);
+        }
+
+        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        {
+            if (!SessionInfo.IsTransacted)
+            {
+                throw new IllegalStateException("Non-transacted Session cannot commit a TX.");
+            }
+            
+            return TransactionContext.Commit(transactionInfo, nextTransactionInfo);
         }
     }
 }

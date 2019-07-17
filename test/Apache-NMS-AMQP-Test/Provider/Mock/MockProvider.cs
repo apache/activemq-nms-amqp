@@ -94,6 +94,11 @@ namespace NMS.AMQP.Test.Provider.Mock
             return Task.CompletedTask;
         }
 
+        public Task StopResource(ResourceInfo resourceInfo)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task Recover(Id sessionId)
         {
             Stats.RecordRecoverCalls();
@@ -117,6 +122,16 @@ namespace NMS.AMQP.Test.Provider.Mock
         }
 
         public Task Unsubscribe(string name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
         {
             throw new NotImplementedException();
         }

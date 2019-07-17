@@ -34,12 +34,12 @@ namespace Apache.NMS.AMQP.Meta
         
         public string sessionId { get { return Id.ToString(); } }
 
-        public AcknowledgementMode ackMode { get; set; }
+        public AcknowledgementMode AcknowledgementMode { get; set; }
         public ushort remoteChannel { get; internal set; }
         public uint nextOutgoingId { get; internal set; }
         public uint incomingWindow { get; set; } = DEFAULT_INCOMING_WINDOW;
         public uint outgoingWindow { get; set; } = DEFAULT_OUTGOING_WINDOW;
-        public bool isTransacted { get => false;  set { } }
+        public bool IsTransacted => AcknowledgementMode == AcknowledgementMode.Transactional;
         public long requestTimeout { get; set; }
         public int closeTimeout { get; set; }
         public long sendTimeout { get; set; }

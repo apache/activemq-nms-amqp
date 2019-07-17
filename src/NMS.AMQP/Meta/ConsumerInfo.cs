@@ -27,8 +27,6 @@ namespace Apache.NMS.AMQP.Meta
 
         private int? credit = null;
 
-        internal ConsumerInfo(Id id) : base(id) { }
-
         internal ConsumerInfo(Id id, Id sessionId) : base(id)
         {
             SessionId = sessionId;

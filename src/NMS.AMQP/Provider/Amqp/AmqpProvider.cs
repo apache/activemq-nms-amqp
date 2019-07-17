@@ -29,7 +29,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
     public class AmqpProvider : IProvider
     {
         public static readonly uint DEFAULT_MAX_HANDLE = 1024;
-        
+
         private readonly ITransportContext transport;
         private ConnectionInfo connectionInfo;
         private AmqpConnection connection;
@@ -87,17 +87,16 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     AmqpSession session = connection.GetSession(consumerInfo.SessionId);
                     return session.CreateConsumer(consumerInfo);
                 }
-
                 case ProducerInfo producerInfo:
                 {
                     AmqpSession session = connection.GetSession(producerInfo.SessionId);
                     return session.CreateProducer(producerInfo);
                 }
-
                 case NmsTemporaryDestination temporaryDestination:
-                {
-                     return connection.CreateTemporaryDestination(temporaryDestination);
-                }
+                    return connection.CreateTemporaryDestination(temporaryDestination);
+                case TransactionInfo transactionInfo:
+                    var amqpSession = connection.GetSession(transactionInfo.SessionId);
+                    return amqpSession.BeginTransaction(transactionInfo);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(resourceInfo), "Not supported resource type.");
             }
@@ -113,7 +112,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     session.Close();
                     return Task.CompletedTask;
                 }
-
                 case ConsumerInfo consumerInfo:
                 {
                     AmqpSession session = connection.GetSession(consumerInfo.SessionId);
@@ -122,7 +120,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     session.RemoveConsumer(consumerInfo.Id);
                     return Task.CompletedTask;
                 }
-
                 case ProducerInfo producerInfo:
                 {
                     AmqpSession session = connection.GetSession(producerInfo.SessionId);
@@ -139,10 +136,9 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         amqpTemporaryDestination.Close();
                         connection.RemoveTemporaryDestination(temporaryDestination.Id);
                     }
-                    
                     else
                         Tracer.Debug($"Could not find temporary destination {temporaryDestination.Id} to delete.");
-                    
+
                     return Task.CompletedTask;
                 }
                 default:
@@ -158,6 +154,20 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     AmqpSession session = connection.GetSession(consumerInfo.SessionId);
                     AmqpConsumer amqpConsumer = session.GetConsumer(consumerInfo.Id);
                     amqpConsumer.Start();
+                    return Task.CompletedTask;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(resourceInfo), "Not supported resource type.");
+            }
+        }
+
+        public Task StopResource(ResourceInfo resourceInfo)
+        {
+            switch (resourceInfo)
+            {
+                case ConsumerInfo consumerInfo:
+                    AmqpSession session = connection.GetSession(consumerInfo.SessionId);
+                    AmqpConsumer amqpConsumer = session.GetConsumer(consumerInfo.Id);
+                    amqpConsumer.Stop();
                     return Task.CompletedTask;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(resourceInfo), "Not supported resource type.");
@@ -204,6 +214,18 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public Task Unsubscribe(string subscriptionName)
         {
             return connection.Unsubscribe(subscriptionName);
+        }
+
+        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        {
+            var session = connection.GetSession(transactionInfo.SessionId);
+            return session.Rollback(transactionInfo, nextTransactionInfo);
+        }
+
+        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        {
+            var session = connection.GetSession(transactionInfo.SessionId);
+            return session.Commit(transactionInfo, nextTransactionInfo);
         }
 
         public void FireResourceClosed(ResourceInfo resourceInfo, Exception error)
