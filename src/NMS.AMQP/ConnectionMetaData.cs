@@ -70,7 +70,7 @@ namespace Apache.NMS.AMQP
         private readonly int NMSMinor;
         private ConnectionMetaData()
         {
-            Assembly assembly = Assembly.GetAssembly(typeof(ConnectionFactory));
+            Assembly assembly = Assembly.GetAssembly(typeof(NmsConnectionFactory));
             AssemblyVersion = assembly.GetName().Version.ToString();
 
             ProviderName = assembly.GetName().Name;

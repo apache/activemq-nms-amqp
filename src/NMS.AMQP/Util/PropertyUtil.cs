@@ -14,7 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using Apache.NMS;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -22,15 +21,11 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
-using System.Security.Authentication;
-
-using Apache.NMS.AMQP.Transport.Secure;
 using Apache.NMS.AMQP.Transport;
 
 namespace Apache.NMS.AMQP.Util
 {
-    class PropertyUtil
+    public class PropertyUtil
     {
         private const string PROPERTY_TERM_SEPARATOR = ".";
         public const string PROPERTY_PREFIX = "NMS" + PROPERTY_TERM_SEPARATOR;
@@ -60,7 +55,7 @@ namespace Apache.NMS.AMQP.Util
             Dictionary<string, PropertyInfo> props = GetPropertiesForClass(obj);
             foreach (string rawkey in properties.Keys)
             {
-                string key = removePrefix(propertyPrefix, rawkey);
+                string key = RemovePrefix(propertyPrefix, rawkey);
                 Tracer.DebugFormat("Searching for Property: \"{0}\"", key);
                 if (props.ContainsKey(key))
                 {
@@ -115,7 +110,7 @@ namespace Apache.NMS.AMQP.Util
             return null;
         }
 
-        private static string removePrefix(string prefix, string propertyName)
+        private static string RemovePrefix(string prefix, string propertyName)
         {
             if (propertyName.StartsWith(prefix, StringComparison.CurrentCultureIgnoreCase) && prefix.Length > 0)
             {
@@ -250,7 +245,7 @@ namespace Apache.NMS.AMQP.Util
 
             foreach (string rawkey in one.Keys)
             {
-                string key = removePrefix(onePre, rawkey);
+                string key = RemovePrefix(onePre, rawkey);
                 string otherkey = (otherPre + key).ToLower();
                 string mergekey = (mPre + key).ToLower();
                 if (!result.ContainsKey(mergekey))
@@ -266,7 +261,7 @@ namespace Apache.NMS.AMQP.Util
 
             foreach (string rawkey in otherKeys)
             {
-                string key = removePrefix(otherPre, rawkey);
+                string key = RemovePrefix(otherPre, rawkey);
                 result.Add(mPre + key, other[rawkey]);
             }
 
@@ -335,9 +330,27 @@ namespace Apache.NMS.AMQP.Util
             dict.CopyTo(clone.ToArray(), 0);
             return clone;
         }
-    }
 
-#region NMS Resource Property Interceptor classes StringDictionary based
+        public static StringDictionary FilterProperties(StringDictionary properties, string optionPrefix)
+        {
+            if (properties == null)
+            {
+                throw new ArgumentNullException(nameof(properties), "The given properties object was null.");
+            }
+
+            StringDictionary filtered = new StringDictionary();
+            foreach (string entry in properties.Keys)
+            {
+                if (entry.StartsWith(optionPrefix))
+                {
+                    string name = entry.Substring(optionPrefix.Length);
+                    filtered.Add(name, properties[entry]);
+                }
+            }
+
+            return filtered;
+        }
+    }
 
 #region abstract Property Interceptor classes
 
@@ -575,14 +588,6 @@ namespace Apache.NMS.AMQP.Util
 
     }
 
-    internal abstract class NMSResourcePropertyInterceptor<T, I> : PropertyInterceptor<T> where I : ResourceInfo where T : NMSResource<I>
-    {
-        protected NMSResourcePropertyInterceptor(T instance, StringDictionary properties, IDictionary<string, Interceptor> interceptors) : base(instance, properties, interceptors)
-        {
-
-        }
-    }
-
     #region RelfectionPropertyInterceptor
 
     internal abstract class ReflectionPropertyInterceptor<T> : PropertyInterceptor<T> where T : class
@@ -768,7 +773,7 @@ namespace Apache.NMS.AMQP.Util
 
     internal class SecureTransportPropertyInterceptor : TransportPropertyInterceptor
     {
-        internal const string SSL_PROTOCOLS_PROPERTY = ConnectionFactory.TransportPropertyPrefix + "SSLProtocol";
+        internal const string SSL_PROTOCOLS_PROPERTY = "transport." + "SSLProtocol";
         
         private static bool ValidateProtocolString(string protocolString, out string cleanProtocols)
         {
@@ -794,7 +799,7 @@ namespace Apache.NMS.AMQP.Util
                 {
                     Getter = (context, key) =>
                     {
-                        return (context as IProviderSecureTransportContext).SSLProtocol;
+                        return (context as ISecureTransportContext).SSLProtocol;
                     },
                     Setter = (context, key, value) =>
                     {
@@ -805,7 +810,7 @@ namespace Apache.NMS.AMQP.Util
                         }
                         else
                         {
-                            (context as IProviderSecureTransportContext).SSLProtocol = cleanValue;
+                            (context as ISecureTransportContext).SSLProtocol = cleanValue;
                         }
                     },
                     Exists = (context) => 
@@ -814,7 +819,7 @@ namespace Apache.NMS.AMQP.Util
                     },
                     Reset = (context) =>
                     {
-                        (context as IProviderSecureTransportContext).SSLProtocol = null;
+                        (context as ISecureTransportContext).SSLProtocol = null;
                     }
                 }
 
@@ -822,7 +827,7 @@ namespace Apache.NMS.AMQP.Util
         };
         
         
-        public SecureTransportPropertyInterceptor(IProviderSecureTransportContext context, StringDictionary props ) : base(context, props)
+        public SecureTransportPropertyInterceptor(ISecureTransportContext context, StringDictionary props ) : base(context, props)
         {
 
 
@@ -840,19 +845,19 @@ namespace Apache.NMS.AMQP.Util
 
     }
     
-    internal class TransportPropertyInterceptor : ReflectionPropertyInterceptor<IProviderTransportContext>
+    internal class TransportPropertyInterceptor : ReflectionPropertyInterceptor<ITransportContext>
     {
         protected static Dictionary<string, Interceptor> transportContextInterceptors = new Dictionary<string, Interceptor>()
         {
 
         };
         
-        public TransportPropertyInterceptor(IProviderTransportContext c, StringDictionary transportProperties) : base(c, transportProperties, transportContextInterceptors)
+        public TransportPropertyInterceptor(ITransportContext c, StringDictionary transportProperties) : base(c, transportProperties, transportContextInterceptors)
         {
         
         }
 
-        protected override string PropertyPrefix => ConnectionFactory.TransportPropertyPrefix;
+        protected override string PropertyPrefix => "transport.";
 
         protected override bool CanReflect(PropertyInfo reflectedProperty)
         {
@@ -862,433 +867,4 @@ namespace Apache.NMS.AMQP.Util
     }
 
 #endregion
-
-#region ConnectionFactory Property Interceptor Class
-
-    internal class ConnectionFactoryPropertyInterceptor : PropertyInterceptor<ConnectionFactory>
-    {
-
-#region Ignore Case Comparer
-        private class IgnoreCaseComparer : IEqualityComparer
-        {
-            public new bool Equals(object x, object y)
-            {
-                if(x==null || y == null)
-                {
-                    return x == null && y == null;
-                }
-                else if(!(x is string) || !(y is string))
-                {
-                    return false;
-                }
-                else
-                {
-                    string a = x as string;
-                    string b = y as string;
-                    return a.Equals(b, StringComparison.InvariantCultureIgnoreCase);
-                }
-
-            }
-
-            public int GetHashCode(object obj)
-            {
-                return obj.GetHashCode();
-            }
-        }
-
-#endregion
-
-        private readonly static IgnoreCaseComparer ComparerInstance = new IgnoreCaseComparer();
-        
-        private static Amqp.ConnectionFactory.SslSettings GetSSLSettings(Amqp.IConnectionFactory cf)
-        {
-            // TODO Create Provider AMQP Implementation hook to access Amqp.IConnectionFactory implementation.
-            return ((Amqp.ConnectionFactory)cf).SSL;
-        }
-
-        private static bool IsSecureConfiguration(ConnectionFactory cf)
-        {
-            return cf.Context != null && cf.Context is IProviderSecureTransportContext;
-        }
-
-#region Interceptors
-
-        protected static Dictionary<string, Interceptor> connFactoryInterceptors = new Dictionary<string, Interceptor>()
-        {
-            // TODO Add connection porperty interceptors. eg for username, password, requesttimeout, etc.
-            {
-                ConnectionFactory.CLIENT_ID_PROP,
-                new Interceptor()
-                {
-                    Getter = (cf, key) =>
-                    {
-                        return cf.ClientId;
-                    },
-                    Setter = (cf, key, value) =>
-                    {
-                        cf.ClientId = value;
-                    },
-                    Exists = (cf) =>
-                    {
-                        return !cf.IsClientIdSet;
-                    },
-                    Reset = (cf) =>
-                    {
-                        cf.ClientId = null;
-                    }
-                }
-            }
-        };
-
-#endregion
-
-        public ConnectionFactoryPropertyInterceptor(ConnectionFactory factory, StringDictionary properties) : base(factory, properties, connFactoryInterceptors)
-        {
-
-        }
-    }
-
-#endregion
-
-#region Connnection Property Interceptor Class
-
-    public class ConnectionPropertyConstants
-    {
-        public static readonly string REQUEST_TIMEOUT = PropertyUtil.CreateProperty("RequestTimeout", "Connection");
-        
-    }
-
-    internal class ConnectionPropertyInterceptor : NMSResourcePropertyInterceptor<Connection, ConnectionInfo>
-    {
-        // TODO add more properties.
-        protected static Dictionary<string, Interceptor> connInterceptors = new Dictionary<string, Interceptor>()
-        {
-            {
-                ConnectionPropertyConstants.REQUEST_TIMEOUT,
-                new Interceptor
-                {
-                    Setter = (c, key, value)=>
-                    {
-                        c.RequestTimeout = TimeSpan.FromMilliseconds(Convert.ToInt64(value));
-                    },
-                    Getter = (c, key) => { return Convert.ToInt64(c.RequestTimeout.TotalMilliseconds).ToString(); }
-                }
-            },
-        };
-
-        public ConnectionPropertyInterceptor(Connection connection, StringDictionary properties) : base(connection, properties, connInterceptors)
-        {
-
-        }
-    }
-
-#endregion
-
-#region Session Property Interceptor Class
-    //TODO Implement
-#endregion
-
-#region Producer Property Interceptor Class
-    //TODO Implement
-#endregion
-
-#region Consumer Property Interceptor Class
-    //TODO Implement
-#endregion
-
-#endregion
-
-#region NMS object Property Interceptor classes IPrimitiveMap based
-
-#region Abstract Property Interceptor Class
-    internal abstract class NMSPropertyInterceptor<T> : Types.Map.PrimitiveMapBase, IPrimitiveMap
-    {
-
-#region Generic delegates and Interceptor struct
-
-        protected delegate void ApplyProperty(T instance, object value);
-        protected delegate object GetProperty(T instance);
-        protected delegate void ClearProperty(T instance);
-        protected delegate bool CheckProperty(T instance);
-
-        // The Interceptor struct is a container of operation delegates 
-        // to be used on a specific property of instance T.
-        protected struct Interceptor
-        {
-            public ApplyProperty Setter;
-            public GetProperty Getter;
-            public ClearProperty Reset;
-            public CheckProperty Exists;
-        }
-
-#endregion
-
-        private readonly object SyncLock;
-        private readonly IPrimitiveMap properties;
-        private readonly IDictionary<string, Interceptor> interceptors;
-        private readonly T instance;
-        protected NMSPropertyInterceptor(T instance, IPrimitiveMap properties, IDictionary<string, Interceptor> interceptors) : base()
-        {
-            this.properties = properties ?? new Apache.NMS.Util.PrimitiveMap();
-            
-            this.instance = instance;
-            if (this.properties is Types.Map.PrimitiveMapBase)
-            {
-                SyncLock = (this.properties as Types.Map.PrimitiveMapBase).SyncRoot;
-            }
-            else
-            {
-                SyncLock = new object();
-            }
-
-            this.interceptors = new Dictionary<string, Interceptor>();
-            foreach(string key in interceptors.Keys)
-            {
-                AddInterceptor(key, interceptors[key]);
-            }
-        }
-
-#region Property Interceptor Methods
-
-        protected T Instance { get { return instance; } }
-
-        protected void AddInterceptor(string key, Interceptor interceptor)
-        {
-            bool updated = false;
-            if(!interceptors.ContainsKey(key))
-                this.interceptors.Add(key, interceptor);
-            else
-            {
-                // this allows subs classes to override base classes.
-                this.interceptors[key] = interceptor;
-                updated = true;
-            }
-            if (properties.Contains(key) || updated)
-            {
-                SetProperty(key, properties[key]);
-                properties.Remove(key);
-            }
-                
-        }
-
-        protected void SetProperty(string key, object value)
-        {
-            if (interceptors.ContainsKey(key))
-            {
-                interceptors[key].Setter(instance, value);
-            }
-            else
-            {
-                properties[key] = value;
-            }
-        }
-
-        protected object GetValue(string key)
-        {
-            object value = null;
-            if (interceptors.ContainsKey(key))
-            {
-                if(interceptors[key].Exists(instance))
-                    value = interceptors[key].Getter(instance);
-            }
-            else
-            {
-                value = properties[key];
-            }
-            return value;
-        }
-
-#endregion
-
-#region PrimitiveMapBase abstract override methods
-
-        internal override object SyncRoot { get { return SyncLock; } }
-
-        public override bool Contains(object key)
-        {
-            bool found = properties.Contains(key);
-            if (!found && interceptors.ContainsKey(key.ToString()))
-            {
-                string keystring = key.ToString();
-                found = interceptors[keystring].Exists(instance);
-            }
-            return found;
-        }
-
-        public override void Clear()
-        {
-            properties.Clear();
-            foreach(string key in interceptors.Keys)
-            {
-                interceptors[key].Reset(instance);
-            }
-        }
-
-        protected int InterceptorCount
-        {
-            get
-            {
-                int count = 0;
-                foreach(string key in interceptors.Keys)
-                {
-                    Interceptor i = interceptors[key];
-                    if(i.Exists(instance))
-                    {
-                        count++;
-                    }
-                }
-                return count;
-            }
-        }
-
-        public override int Count => this.properties.Count + InterceptorCount;
-
-        public override void Remove(object key)
-        {
-            if(properties.Contains(key))
-                properties.Remove(key);
-            else if(interceptors.ContainsKey(key.ToString()))
-            {
-                interceptors[key.ToString()].Reset(instance);
-            }
-        }
-
-        public override ICollection Keys
-        {
-            get
-            {
-                ISet<string> keys = new HashSet<string>();
-                foreach (string key in interceptors.Keys)
-                {
-                    Interceptor i = interceptors[key];
-                    if (i.Exists(instance))
-                    {
-                        keys.Add(key);
-                    }
-                }
-                foreach(string key in properties.Keys)
-                {
-                    keys.Add(key);
-                }
-                
-                return keys.ToList();
-            }
-        }
-
-        public override ICollection Values
-        {
-            get
-            {
-                ISet<object> values = new HashSet<object>();
-                foreach (string key in interceptors.Keys)
-                {
-                    Interceptor i = interceptors[key];
-                    if (i.Exists(instance))
-                    {
-                        values.Add(i.Getter(instance));
-                    }
-                }
-                foreach (object value in properties.Values)
-                {
-                    values.Add(value);
-                }
-
-                return values.ToList();
-            }
-        }
- 
-        protected override void SetObjectProperty(string key, object value)
-        {
-            SetProperty(key, value);
-        }
- 
-        protected override object GetObjectProperty(string key)
-        {
-            return GetValue(key);
-        }
-#endregion
-
-    }
-#endregion
-
-#region Message Property Interceptor Class
-    internal class NMSMessagePropertyInterceptor : NMSPropertyInterceptor<Message.Message>
-    {
-        protected static readonly Dictionary<string, Interceptor> messageInterceptors = new Dictionary<string, Interceptor>()
-        {
-            {
-                Message.Message.MESSAGE_VENDOR_ACK_PROP,
-                new Interceptor
-                {
-                    Setter = (m, value) => 
-                    {
-                        if(m.GetMessageCloak().AckHandler == null && m.GetMessageCloak().IsReceived)
-                        {
-                            throw new NMSException("Session Acknowledgement mode does not allow setting " + Message.Message.MESSAGE_VENDOR_ACK_PROP);
-                        }
-                        int ackType = -1;
-                        try
-                        {
-                            ackType = Types.ConversionSupport.ConvertNMSType<int>(value);
-                        }
-                        catch (Types.ConversionSupport.NMSTypeConversionException ce)
-                        {
-                            throw ExceptionSupport.Wrap(ce, "Property {0} cannot be set from a {1}", Message.Message.MESSAGE_VENDOR_ACK_PROP, value?.GetType()?.Name);
-                        }
-                        if (ackType != -1)
-                            m.GetMessageCloak().AckHandler.AcknowledgementType = (Message.AckType)ackType;
-
-                    },
-                    Getter = (m) => 
-                    {
-                        object acktype = null;
-                        if(m.GetMessageCloak().AckHandler != null)
-                        {
-                            acktype = m.GetMessageCloak().AckHandler.AcknowledgementType;
-                        }
-                        return acktype;
-                    },
-                    Exists = (m) =>
-                    {
-                        Message.Cloak.IMessageCloak cloak = m.GetMessageCloak();
-                        if (cloak.AckHandler != null)
-                        {
-                            return cloak.AckHandler.IsAckTypeSet;
-                        }
-                        return false;
-                    },
-                    Reset = (m) =>
-                    {
-                        Message.Cloak.IMessageCloak cloak = m.GetMessageCloak();
-                        if (cloak.AckHandler != null)
-                        {
-                            cloak.AckHandler.ClearAckType();
-                        }
-                    }
-
-                }
-            },
-        };
-
-
-        public NMSMessagePropertyInterceptor(Message.Message instance, IPrimitiveMap properties) : base (instance, properties, messageInterceptors)
-        {
-
-        }
-        public override string ToString()
-        {
-            string result = base.ToString();
-            foreach (string key in Keys)
-            {
-                result += "\n" + key.ToString() + ": " + GetObjectProperty(key).ToString();
-            }
-            return result;
-        }
-
-    }//*/
-
-#endregion
-
-#endregion
-
 }

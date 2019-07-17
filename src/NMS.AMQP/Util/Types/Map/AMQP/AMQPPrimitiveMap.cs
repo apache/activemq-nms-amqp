@@ -95,10 +95,7 @@ namespace Apache.NMS.AMQP.Util.Types.Map.AMQP
             }
         }
 
-        protected override object GetObjectProperty(string key)
-        {
-            return this.properties[key];
-        }
+        protected override object GetObjectProperty(string key) => properties[key];
 
         protected override void SetObjectProperty(string key, object value)
         {

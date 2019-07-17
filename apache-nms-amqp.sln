@@ -1,12 +1,12 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26730.10
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28922.388
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Apache-NMS-AMQP", "src\NMS.AMQP\Apache-NMS-AMQP.csproj", "{0D8CF699-9702-4EC6-8719-C2968D32F09A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HelloWorld", "src\HelloWorld\HelloWorld.csproj", "{A56349BE-ED66-4E18-B5FE-E3EA069D2ADD}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Apache-NMS-AMQP-Test", "test\Apache-NMS-AMQP-Test.csproj", "{DF402917-D85D-421C-A7E2-DC3DF371B9CB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Apache-NMS-AMQP-Test", "test\Apache-NMS-AMQP-Test\Apache-NMS-AMQP-Test.csproj", "{DF402917-D85D-421C-A7E2-DC3DF371B9CB}"
 	ProjectSection(ProjectDependencies) = postProject
 		{0D8CF699-9702-4EC6-8719-C2968D32F09A} = {0D8CF699-9702-4EC6-8719-C2968D32F09A}
 	EndProjectSection

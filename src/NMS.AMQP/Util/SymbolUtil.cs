@@ -27,7 +27,7 @@ namespace Apache.NMS.AMQP.Util
     /// <summary>
     /// Utility class for Amqp.Symbol handling from Strings and Constants.
     /// </summary>
-    class SymbolUtil
+    public class SymbolUtil
     {
         
         // Open Frame Property Symbols
@@ -70,7 +70,7 @@ namespace Apache.NMS.AMQP.Util
         // Message Content-Type Symbols
         public static readonly Symbol OCTET_STREAM_CONTENT_TYPE = new Symbol(MessageSupport.OCTET_STREAM_CONTENT_TYPE);
         public static readonly Symbol SERIALIZED_JAVA_OBJECT_CONTENT_TYPE = new Symbol(MessageSupport.SERIALIZED_JAVA_OBJECT_CONTENT_TYPE);
-
+        public static readonly Symbol SERIALIZED_DOTNET_OBJECT_CONTENT_TYPE = new Symbol(MessageSupport.SERIALIZED_DOTNET_OBJECT_CONTENT_TYPE);
 
         public static bool FieldsHasSymbol(Fields fields, Symbol symbol)
         {

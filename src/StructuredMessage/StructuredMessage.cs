@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Specialized;
 using Apache.NMS;
+using Apache.NMS.AMQP;
 using CommandLine;
 
 namespace StructuredMessage
@@ -62,20 +63,6 @@ namespace StructuredMessage
             Uri providerUri = new Uri(ip);
             Console.WriteLine("scheme: {0}", providerUri.Scheme);
 
-            StringDictionary properties = new StringDictionary();
-            if (opts.username != null)
-            {
-                properties["NMS.username"] = opts.username;
-            }
-            if (opts.password != null)
-            {
-                properties["NMS.password"] = opts.password;
-            }
-            if (opts.clientId != null)
-            {
-                properties["NMS.clientId"] = opts.clientId;
-            }
-            properties["NMS.sendtimeout"] = opts.connTimeout+"";
             IConnection conn = null;
             if (opts.topic == null && opts.queue == null)
             {
@@ -84,8 +71,24 @@ namespace StructuredMessage
             }
             try
             {
-                Apache.NMS.AMQP.NMSConnectionFactory providerFactory = new Apache.NMS.AMQP.NMSConnectionFactory(providerUri, properties);  
-                IConnectionFactory factory = providerFactory.ConnectionFactory;
+                NmsConnectionFactory factory = new NmsConnectionFactory(ip);
+                if (opts.username != null)
+                {
+                    factory.UserName = opts.username;
+                }
+                if (opts.password != null)
+                {
+                    factory.Password = opts.password;
+                }
+                if (opts.clientId != null)
+                {
+                    factory.ClientId = opts.clientId;
+                }
+
+                if (opts.connTimeout != default)
+                {
+                    factory.SendTimeout = opts.connTimeout;
+                }
 
                 Console.WriteLine("Creating Connection...");
                 conn = factory.CreateConnection();
