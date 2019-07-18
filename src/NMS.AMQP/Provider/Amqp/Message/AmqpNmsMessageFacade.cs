@@ -436,6 +436,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             target.destination = destination;
             target.replyTo = replyTo;
 
+            // Workaround for https://github.com/Azure/amqpnetlite/pull/364
+            if (Message.BodySection is AmqpValue value)
+            {
+                var _ = value.Value;
+            }
+
             ByteBuffer buffer = Message.Encode();
             target.Message = global::Amqp.Message.Decode(buffer);
             target.InitializeHeader();
