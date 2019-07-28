@@ -16,222 +16,244 @@
  */
 
 using System;
-using System.Linq;
-using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Amqp.Framing;
 using Apache.NMS;
 using Apache.NMS.AMQP;
 using Apache.NMS.AMQP.Message;
-using Apache.NMS.AMQP.Provider.Amqp.Message;
+using Apache.NMS.AMQP.Util;
 using Moq;
 using NMS.AMQP.Test.TestAmqp;
+using NMS.AMQP.Test.TestAmqp.BasicTypes;
 using NUnit.Framework;
-using Test.Amqp;
 
 namespace NMS.AMQP.Test.Integration
 {
     [TestFixture]
-    public class ConsumerIntegrationTest
+    public class ConsumerIntegrationTest : IntegrationTestFixture
     {
-        private static readonly string User = "USER";
-        private static readonly string Password = "PASSWORD";
-        private static readonly string Address = "amqp://127.0.0.1:5672";
-        private static readonly IPEndPoint IPEndPoint = new IPEndPoint(IPAddress.Any, 5672);
-
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestCloseConsumer()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                TestLinkProcessor testLinkProcessor = new TestLinkProcessor();
-                testAmqpPeer.RegisterLinkProcessor(testLinkProcessor);
+                IConnection connection = EstablishConnection(testPeer);
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow();
 
-                testAmqpPeer.Open();
-                IConnection connection = EstablishConnection();
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-
                 IQueue queue = session.GetQueue("myQueue");
                 IMessageConsumer consumer = session.CreateConsumer(queue);
 
-                Assert.NotNull(testLinkProcessor.Consumer);
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
                 consumer.Close();
-                Assert.That(() => testLinkProcessor.Consumer, Is.Null.After(500));
-                session.Close();
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestRemotelyCloseConsumer()
         {
             Mock<INmsConnectionListener> mockConnectionListener = new Mock<INmsConnectionListener>();
-            bool exceptionFired = false;
+            string errorMessage = "buba";
 
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                TestLinkProcessor testLinkProcessor = new TestLinkProcessor();
-                testAmqpPeer.RegisterLinkProcessor(testLinkProcessor);
-                testAmqpPeer.Open();
+                ManualResetEvent consumerClosed = new ManualResetEvent(false);
+                ManualResetEvent exceptionFired = new ManualResetEvent(false);
 
-                NmsConnection connection = (NmsConnection) EstablishConnection();
-                connection.Start();
+                mockConnectionListener
+                    .Setup(listener => listener.OnConsumerClosed(It.IsAny<IMessageConsumer>(), It.IsAny<Exception>()))
+                    .Callback(() => consumerClosed.Set());
+
+                NmsConnection connection = (NmsConnection) EstablishConnection(testPeer);
                 connection.AddConnectionListener(mockConnectionListener.Object);
-                connection.ExceptionListener += exception => { exceptionFired = true; };
+                connection.ExceptionListener += exception => { exceptionFired.Set(); };
 
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                IQueue queue = session.GetQueue("myQueue");
 
                 // Create a consumer, then remotely end it afterwards.
-                IMessageConsumer consumer = session.CreateConsumer(queue);
-                testLinkProcessor.CloseConsumer();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow();
+                testPeer.RemotelyDetachLastOpenedLinkOnLastOpenedSession(expectDetachResponse: true, closed: true, errorType: AmqpError.RESOURCE_DELETED, errorMessage: errorMessage);
 
-                Assert.That(() => exceptionFired, Is.False.After(200), "Exception listener shouldn't fire with no MessageListener");
-                // Verify the consumer gets marked closed
-                mockConnectionListener.Verify(listener => listener.OnConsumerClosed(It.Is<IMessageConsumer>(x => x == consumer), It.IsAny<Exception>()), Times.Once, "consumer never closed.");
-
-                session.Close();
-                connection.Close();
-            }
-        }
-
-        [Test, Timeout(2000)]
-        public void TestRemotelyCloseConsumerWithMessageListenerFiresExceptionListener()
-        {
-            Mock<INmsConnectionListener> mockConnectionListener = new Mock<INmsConnectionListener>();
-            bool exceptionFired = false;
-
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
-            {
-                var testLinkProcessor = new TestLinkProcessor();
-                testAmqpPeer.RegisterLinkProcessor(testLinkProcessor);
-                testAmqpPeer.Open();
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
-                connection.Start();
-                connection.AddConnectionListener(mockConnectionListener.Object);
-                connection.ExceptionListener += exception => { exceptionFired = true; };
-
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue queue = session.GetQueue("myQueue");
-
-                // Create a consumer, then remotely end it afterwards.
                 IMessageConsumer consumer = session.CreateConsumer(queue);
-                consumer.Listener += message => { };
-
-                testLinkProcessor.CloseConsumerWithError();
-
-                Assert.That(() => exceptionFired, Is.True.After(200));
 
                 // Verify the consumer gets marked closed
-                mockConnectionListener.Verify(listener => listener.OnConsumerClosed(It.Is<IMessageConsumer>(x => x == consumer), It.IsAny<Exception>()), Times.Once, "consumer never closed.");
+                testPeer.WaitForAllMatchersToComplete(1000);
+
+                Assert.True(consumerClosed.WaitOne(2000), "Consumer closed callback didn't trigger");
+                Assert.False(exceptionFired.WaitOne(20), "Exception listener shouldn't fire with no MessageListener");
 
                 // Try closing it explicitly, should effectively no-op in client.
                 // The test peer will throw during close if it sends anything.
                 consumer.Close();
-                session.Close();
-                connection.Close();
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
+        public void TestRemotelyCloseConsumerWithMessageListenerFiresExceptionListener()
+        {
+            Mock<INmsConnectionListener> mockConnectionListener = new Mock<INmsConnectionListener>();
+            string errorMessage = "buba";
+
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                ManualResetEvent consumerClosed = new ManualResetEvent(false);
+                ManualResetEvent exceptionFired = new ManualResetEvent(false);
+
+                mockConnectionListener
+                    .Setup(listener => listener.OnConsumerClosed(It.IsAny<IMessageConsumer>(), It.IsAny<Exception>()))
+                    .Callback(() => consumerClosed.Set());
+
+                NmsConnection connection = (NmsConnection) EstablishConnection(testPeer);
+                connection.AddConnectionListener(mockConnectionListener.Object);
+                connection.ExceptionListener += exception => { exceptionFired.Set(); };
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+
+                // Create a consumer, then remotely end it afterwards.
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow();
+                testPeer.RemotelyDetachLastOpenedLinkOnLastOpenedSession(expectDetachResponse: true, closed: true, errorType: AmqpError.RESOURCE_DELETED, errorMessage: errorMessage, 10);
+
+                IQueue queue = session.GetQueue("myQueue");
+                IMessageConsumer consumer = session.CreateConsumer(queue);
+
+                consumer.Listener += message => { };
+
+                // Verify the consumer gets marked closed
+                testPeer.WaitForAllMatchersToComplete(1000);
+
+                Assert.True(consumerClosed.WaitOne(2000), "Consumer closed callback didn't trigger");
+                Assert.True(exceptionFired.WaitOne(2000), "Exception listener should have fired with a MessageListener");
+
+                // Try closing it explicitly, should effectively no-op in client.
+                // The test peer will throw during close if it sends anything.
+                consumer.Close();
+            }
+        }
+
+        [Test, Timeout(20_000)]
         public void TestReceiveMessageWithReceiveZeroTimeout()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = null } }, count: 1);
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
+
                 IMessageConsumer consumer = session.CreateConsumer(queue);
                 IMessage message = consumer.Receive();
                 Assert.NotNull(message, "A message should have been received");
 
-                session.Close();
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(10000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestExceptionInOnMessageReleasesInAutoAckMode()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = null } }, count: 1);
+                testPeer.ExpectDispositionThatIsReleasedAndSettled();
+
                 IMessageConsumer consumer = session.CreateConsumer(queue);
                 consumer.Listener += message => throw new Exception();
 
-                Assert.That(() => testAmqpPeer.ReleasedMessages.Count(), Is.EqualTo(1).After(2000, 100));
+                testPeer.WaitForAllMatchersToComplete(2000);
 
-                session.Close();
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(10000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestCloseDurableTopicSubscriberDetachesWithCloseFalse()
         {
-            using (var testListener = new TestListener(IPEndPoint))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testListener.Open();
-                Amqp.Types.List result = null;
-                ManualResetEvent manualResetEvent = new ManualResetEvent(false);
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
 
-                testListener.RegisterTarget(TestPoint.Detach, (stream, channel, fields) =>
-                {
-                    TestListener.FRM(stream, 0x16UL, 0, channel, fields[0], false);
-                    result = fields;
-                    manualResetEvent.Set();
-                    return TestOutcome.Stop;
-                });
-
-                IConnection connection = EstablishConnection();
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
 
                 string topicName = "myTopic";
                 string subscriptionName = "mySubscription";
                 ITopic topic = session.GetTopic(topicName);
+
+                testPeer.ExpectDurableSubscriberAttach(topicName, subscriptionName);
+                testPeer.ExpectLinkFlow();
+
                 IMessageConsumer durableConsumer = session.CreateDurableConsumer(topic, subscriptionName, null, false);
+
+                testPeer.ExpectDetach(expectClosed: false, sendResponse: true, replyClosed: false);
                 durableConsumer.Close();
 
-                manualResetEvent.WaitOne(TimeSpan.FromMilliseconds(100));
+                testPeer.ExpectClose();
+                connection.Close();
 
-                // Assert that closed field is set to false
-                Assert.IsFalse((bool) result[1]);
+                testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
 
-
-        [Test, Timeout(2000), Ignore("It doesn't work for now as we do not have access to messages buffered by amqplite")]
-        public void TestCloseDurableSubscriberWithUnackedAnUnconsumedPrefetchedMessages()
+        // TODO: To be fixed
+        [Test, Timeout(20_000), Ignore("Ignore")]
+        public void TestCloseDurableSubscriberWithUnackedAndUnconsumedPrefetchedMessages()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+
                 string topicName = "myTopic";
-                testAmqpPeer.Open();
-
-                IConnection connection = EstablishConnection();
-                ISession session = connection.CreateSession(AcknowledgementMode.ClientAcknowledge);
-
                 string subscriptionName = "mySubscription";
                 ITopic topic = session.GetTopic(topicName);
 
-
+                int messageCount = 5;
                 // Create a consumer and fill the prefetch with some messages,
                 // which we will consume some of but ack none of.
-                for (int i = 0; i < 5; i++)
-                {
-                    testAmqpPeer.SendMessage(topicName, "test" + i);
-                }
+                testPeer.ExpectDurableSubscriberAttach(topicName, subscriptionName);
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), count: messageCount);
 
                 IMessageConsumer durableConsumer = session.CreateDurableConsumer(topic, subscriptionName, null, false);
 
@@ -244,22 +266,40 @@ namespace NMS.AMQP.Test.Integration
                     Assert.IsInstanceOf<NmsTextMessage>(receivedMessage);
                 }
 
-                Assert.NotNull(receivedMessage);
-                receivedMessage.Acknowledge();
-                durableConsumer.Close();
-
                 // Expect the messages that were not delivered to be released.
-                Assert.AreEqual(2, testAmqpPeer.ReleasedMessages.Count());
+                for (int i = 1; i <= consumeCount; i++)
+                {
+                    testPeer.ExpectDispositionThatIsAcceptedAndSettled();
+                }
+
+                receivedMessage.Acknowledge();
+
+                testPeer.ExpectDetach(expectClosed: false, sendResponse: true, replyClosed: false);
+
+                for (int i = consumeCount + 1; i <= messageCount; i++)
+                {
+                    testPeer.ExpectDispositionThatIsReleasedAndSettled();
+                }
+
+                testPeer.ExpectEnd();
+
+                durableConsumer.Close();
+                session.Close();
+
+                testPeer.ExpectClose();
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestConsumerReceiveThrowsIfConnectionLost()
         {
             DoTestConsumerReceiveThrowsIfConnectionLost(false);
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestConsumerTimedReceiveThrowsIfConnectionLost()
         {
             DoTestConsumerReceiveThrowsIfConnectionLost(true);
@@ -267,37 +307,31 @@ namespace NMS.AMQP.Test.Integration
 
         private void DoTestConsumerReceiveThrowsIfConnectionLost(bool useTimeout)
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            ManualResetEvent consumerReady = new ManualResetEvent(false);
+
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                string topicName = "myTopic";
-                testAmqpPeer.Open();
-                ManualResetEvent disconnected = new ManualResetEvent(false);
+                IConnection connection = EstablishConnection(testPeer);
 
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                testPeer.ExpectBegin();
 
-                Mock<INmsConnectionListener> connectionListener = new Mock<INmsConnectionListener>();
-
-                connectionListener
-                    .Setup(listener => listener.OnConnectionFailure(It.IsAny<NMSException>()))
-                    .Callback(() => { disconnected.Set(); });
-
-                connection.AddConnectionListener(connectionListener.Object);
-
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                IQueue queue = session.GetQueue("queue");
                 connection.Start();
-                ISession session = connection.CreateSession(AcknowledgementMode.ClientAcknowledge);
-                ITopic topic = session.GetTopic(topicName);
-                testAmqpPeer.SendMessage(topicName, "test");
-                IMessageConsumer consumer = session.CreateConsumer(topic);
 
-                testAmqpPeer.Close();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow();
+                testPeer.RunAfterLastHandler(() => { consumerReady.WaitOne(2000); });
+                testPeer.RemotelyCloseConnection(expectCloseResponse: true);
 
-                Assert.True(disconnected.WaitOne(), "Connection should be disconnected");
+                IMessageConsumer consumer = session.CreateConsumer(queue);
+                consumerReady.Set();
 
                 try
                 {
                     if (useTimeout)
                     {
-                        consumer.Receive(TimeSpan.FromMilliseconds(1000));
+                        consumer.Receive(TimeSpan.FromMilliseconds(10_0000));
                     }
                     else
                     {
@@ -311,21 +345,19 @@ namespace NMS.AMQP.Test.Integration
                 {
                     // Expected
                 }
+
+                testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestConsumerReceiveNoWaitThrowsIfConnectionLost()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            ManualResetEvent disconnected = new ManualResetEvent(false);
+
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                string topicName = "myTopic";
-                testAmqpPeer.Open();
-
-                ManualResetEvent disconnected = new ManualResetEvent(false);
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
-
+                NmsConnection connection = (NmsConnection) EstablishConnection(testPeer);
                 Mock<INmsConnectionListener> connectionListener = new Mock<INmsConnectionListener>();
 
                 connectionListener
@@ -335,12 +367,17 @@ namespace NMS.AMQP.Test.Integration
                 connection.AddConnectionListener(connectionListener.Object);
 
                 connection.Start();
-                ISession session = connection.CreateSession(AcknowledgementMode.ClientAcknowledge);
-                ITopic topic = session.GetTopic(topicName);
-                testAmqpPeer.SendMessage(topicName, "test");
-                IMessageConsumer consumer = session.CreateConsumer(topic);
 
-                testAmqpPeer.Close();
+                testPeer.ExpectBegin();
+
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                IQueue queue = session.GetQueue("queue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow();
+                testPeer.RemotelyCloseConnection(expectCloseResponse: true);
+
+                IMessageConsumer consumer = session.CreateConsumer(queue);
 
                 Assert.True(disconnected.WaitOne(), "Connection should be disconnected");
 
@@ -356,138 +393,157 @@ namespace NMS.AMQP.Test.Integration
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestSetMessageListenerAfterStartAndSend()
         {
             int messageCount = 4;
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            CountdownEvent latch = new CountdownEvent(messageCount);
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), messageCount);
+
+                IMessageConsumer consumer = session.CreateConsumer(destination);
+
                 for (int i = 0; i < messageCount; i++)
                 {
-                    testAmqpPeer.SendMessage("myQueue", "test" + i);
+                    testPeer.ExpectDispositionThatIsAcceptedAndSettled();
                 }
 
-                NmsConnection connection = (NmsConnection) EstablishConnection();
-                connection.Start();
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                IQueue queue = session.GetQueue("myQueue");
-                IMessageConsumer consumer = session.CreateConsumer(queue);
+                consumer.Listener += message => latch.Signal();
 
-                consumer.Listener += message => { };
+                Assert.True(latch.Wait(4000), "Messages not received within given timeout. Count remaining: " + latch.CurrentCount);
 
-                Assert.That(() => testAmqpPeer.AcceptedMessages.Count(), Is.EqualTo(messageCount).After(2000, 100));
+                testPeer.WaitForAllMatchersToComplete(2000);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
 
                 consumer.Close();
-                session.Close();
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestNoReceivedMessagesWhenConnectionNotStarted()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.SendMessage("myQueue", "test");
+                IConnection connection = EstablishConnection(testPeer);
 
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                IQueue queue = session.GetQueue("myQueue");
-                IMessageConsumer consumer = session.CreateConsumer(queue);
+                IQueue destination = session.GetQueue("myQueue");
 
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), count: 3);
+
+                IMessageConsumer consumer = session.CreateConsumer(destination);
+
+                // Wait for a message to arrive then try and receive it, which should not happen
+                // since the connection is not started.
                 Assert.Null(consumer.Receive(TimeSpan.FromMilliseconds(100)));
 
-                consumer.Close();
-                session.Close();
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestNoReceivedNoWaitMessagesWhenConnectionNotStarted()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.SendMessage("myQueue", "test");
+                IConnection connection = EstablishConnection(testPeer);
 
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                IQueue queue = session.GetQueue("myQueue");
-                IMessageConsumer consumer = session.CreateConsumer(queue);
+                IQueue destination = session.GetQueue("myQueue");
 
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), count: 3);
+
+                IMessageConsumer consumer = session.CreateConsumer(destination);
+
+                // Wait for a message to arrive then try and receive it, which should not happen
+                // since the connection is not started.
                 Assert.Null(consumer.ReceiveNoWait());
 
-                consumer.Close();
-                session.Close();
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestSyncReceiveFailsWhenListenerSet()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                testAmqpPeer.Open();
+                IConnection connection = EstablishConnection(testPeer);
 
-                NmsConnection connection = (NmsConnection) EstablishConnection();
-                connection.Start();
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                IQueue queue = session.GetQueue("myQueue");
-                IMessageConsumer consumer = session.CreateConsumer(queue);
+                IQueue destination = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow();
+
+                IMessageConsumer consumer = session.CreateConsumer(destination);
 
                 consumer.Listener += message => { };
 
-                try
-                {
-                    consumer.Receive();
-                    Assert.Fail("Should have thrown an exception.");
-                }
-                catch (NMSException)
-                {
-                }
+                Assert.Catch<NMSException>(() => consumer.Receive(), "Should have thrown an exception.");
+                Assert.Catch<NMSException>(() => consumer.Receive(TimeSpan.FromMilliseconds(1000)), "Should have thrown an exception.");
+                Assert.Catch<NMSException>(() => consumer.ReceiveNoWait(), "Should have thrown an exception.");
 
-                try
-                {
-                    consumer.Receive(TimeSpan.FromMilliseconds(1000));
-                    Assert.Fail("Should have thrown an exception.");
-                }
-                catch (NMSException)
-                {
-                }
-
-                try
-                {
-                    consumer.ReceiveNoWait();
-                    Assert.Fail("Should have thrown an exception.");
-                }
-                catch (NMSException)
-                {
-                }
-
-                consumer.Close();
-                session.Close();
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestCreateProducerInOnMessage()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                testAmqpPeer.Open();
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
                 IQueue outbound = session.GetQueue("ForwardDest");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), 1);
+
+                testPeer.ExpectSenderAttach();
+                testPeer.ExpectTransfer(messageMatcher: Assert.NotNull);
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
 
                 consumer.Listener += message =>
@@ -497,26 +553,37 @@ namespace NMS.AMQP.Test.Integration
                     producer.Close();
                 };
 
-                consumer.Close();
-                session.Close();
+                testPeer.WaitForAllMatchersToComplete(10_000);
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestMessageListenerCallsConnectionCloseThrowsIllegalStateException()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), 1);
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
 
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
+
+                ManualResetEvent latch = new ManualResetEvent(false);
                 Exception exception = null;
                 consumer.Listener += message =>
                 {
@@ -528,29 +595,48 @@ namespace NMS.AMQP.Test.Integration
                     {
                         exception = e;
                     }
+
+                    latch.Set();
                 };
 
-                Assert.That(() => exception, Is.Not.Null.After(5000, 100));
+                Assert.True(latch.WaitOne(4000), "Messages not received within given timeout.");
+                Assert.IsNotNull(exception);
+                Assert.IsInstanceOf<IllegalStateException>(exception);
+
+                testPeer.WaitForAllMatchersToComplete(2000);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
                 consumer.Close();
-                session.Close();
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestMessageListenerCallsConnectionStopThrowsIllegalStateException()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), 1);
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
 
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
+
+                ManualResetEvent latch = new ManualResetEvent(false);
                 Exception exception = null;
                 consumer.Listener += message =>
                 {
@@ -562,29 +648,48 @@ namespace NMS.AMQP.Test.Integration
                     {
                         exception = e;
                     }
+
+                    latch.Set();
                 };
 
-                Assert.That(() => exception, Is.Not.Null.After(5000, 100));
+                Assert.True(latch.WaitOne(3000), "Messages not received within given timeout.");
+                Assert.IsNotNull(exception);
+                Assert.IsInstanceOf<IllegalStateException>(exception);
+
+                testPeer.WaitForAllMatchersToComplete(2000);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
                 consumer.Close();
-                session.Close();
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestMessageListenerCallsSessionCloseThrowsIllegalStateException()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), 1);
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
 
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
+
+                ManualResetEvent latch = new ManualResetEvent(false);
                 Exception exception = null;
                 consumer.Listener += message =>
                 {
@@ -596,32 +701,54 @@ namespace NMS.AMQP.Test.Integration
                     {
                         exception = e;
                     }
+
+                    latch.Set();
                 };
 
-                Assert.That(() => exception, Is.Not.Null.After(5000, 100));
+                Assert.True(latch.WaitOne(3000), "Messages not received within given timeout.");
+                Assert.IsNotNull(exception);
+                Assert.IsInstanceOf<IllegalStateException>(exception);
+
+                testPeer.WaitForAllMatchersToComplete(2000);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
                 consumer.Close();
-                session.Close();
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test, Timeout(2000)]
+        // TODO: To be fixed
+        [Test, Timeout(20_000), Ignore("Ignore")]
         public void TestMessageListenerClosesItsConsumer()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            var latch = new ManualResetEvent(false);
+            var exceptionListenerFired = new ManualResetEvent(false);
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                TestLinkProcessor testLinkProcessor = new TestLinkProcessor();
-                testAmqpPeer.RegisterLinkProcessor(testLinkProcessor);
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                connection.ExceptionListener += _ => exceptionListenerFired.Set();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), 1);
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
 
-                ManualResetEvent latch = new ManualResetEvent(false);
+                testPeer.ExpectLinkFlow(drain: true, sendDrainFlowResponse: true, creditMatcher: credit => Assert.AreEqual(99, credit)); // Not sure if expected credit is right
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+
                 Exception exception = null;
                 consumer.Listener += message =>
                 {
@@ -636,36 +763,53 @@ namespace NMS.AMQP.Test.Integration
                     }
                 };
 
-                Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(1000)));
-                Assert.That(() => testLinkProcessor.Consumer, Is.Null.After(1000, 50));
-                consumer.Close();
-                session.Close();
+                Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(1000)), "Process not completed within given timeout");
+                Assert.IsNull(exception, "No error expected during close");
+
+                testPeer.WaitForAllMatchersToComplete(2000);
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                Assert.False(exceptionListenerFired.WaitOne(20), "Exception listener shouldn't have fired");
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestRecoverOrderingWithAsyncConsumer()
         {
+            ManualResetEvent latch = new ManualResetEvent(false);
+            Exception asyncError = null;
+
             int recoverCount = 5;
             int messageCount = 8;
+            int testPayloadLength = 255;
+            string payload = Encoding.UTF8.GetString(new byte[testPayloadLength]);
 
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                TestLinkProcessor testLinkProcessor = new TestLinkProcessor();
-                testAmqpPeer.RegisterLinkProcessor(testLinkProcessor);
-
-                for (int i = 0; i < messageCount; i++)
-                {
-                    testAmqpPeer.SendMessage("myQueue", i.ToString());
-                }
-
-                ManualResetEvent latch = new ManualResetEvent(false);
-                IConnection connection = EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.ClientAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(
+                    message: new Amqp.Message() { BodySection = new AmqpValue() { Value = payload } },
+                    count: messageCount,
+                    drain: false,
+                    nextIncomingId: 1,
+                    addMessageNumberProperty: true,
+                    sendDrainFlowResponse: false,
+                    sendSettled: false,
+                    creditMatcher: credit => Assert.Greater(credit, messageCount)
+                );
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
 
                 bool complete = false;
@@ -678,178 +822,201 @@ namespace NMS.AMQP.Test.Integration
                         return;
                     }
 
-                    int actualIndex = int.Parse((message as ITextMessage).Text);
-                    Assert.AreEqual(expectedIndex, actualIndex);
-
-                    // don't ack the message until we receive it X times
-                    if (messageSeen < recoverCount)
+                    try
                     {
-                        session.Recover();
-                        messageSeen++;
-                    }
-                    else
-                    {
-                        messageSeen = 0;
-                        expectedIndex++;
+                        int actualIndex = message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER);
+                        Assert.AreEqual(expectedIndex, actualIndex, "Received Message Out Of Order");
 
-                        message.Acknowledge();
-
-                        if (expectedIndex == messageCount)
+                        // don't ack the message until we receive it X times
+                        if (messageSeen < recoverCount)
                         {
-                            complete = true;
-                            latch.Set();
+                            session.Recover();
+                            messageSeen++;
                         }
+                        else
+                        {
+                            messageSeen = 0;
+                            expectedIndex++;
+
+                            // Have the peer expect the accept the disposition (1-based, hence pre-incremented).
+                            testPeer.ExpectDisposition(settled: true,
+                                stateMatcher: state => Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code
+                                ));
+
+                            message.Acknowledge();
+
+                            if (expectedIndex == messageCount)
+                            {
+                                complete = true;
+                                latch.Set();
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        complete = true;
+                        asyncError = e;
+                        latch.Set();
                     }
                 };
 
+                Assert.True(latch.WaitOne(TimeSpan.FromSeconds(15)), "Messages not received within given timeout.");
+                Assert.IsNull(asyncError, "Unexpected exception");
 
-                consumer.Close();
-                session.Close();
+                testPeer.WaitForAllMatchersToComplete(2000);
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestConsumerCloseWaitsForAsyncDeliveryToComplete()
         {
             ManualResetEvent latch = new ManualResetEvent(false);
 
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                IConnection connection = EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
 
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), count: 1);
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
+
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
 
                 consumer.Listener += _ =>
                 {
                     latch.Set();
-                    Task.Delay(TimeSpan.FromMilliseconds(1200)).GetAwaiter().GetResult();
+                    Task.Delay(TimeSpan.FromMilliseconds(100)).GetAwaiter().GetResult();
                 };
 
-                Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(30000)), "Messages not received within given timeout.");
+                Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(3000)), "Messages not received within given timeout.");
 
-                Task delay = Task.Delay(TimeSpan.FromMilliseconds(1000));
-                Task closeTask = Task.Run(() => consumer.Close());
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                consumer.Close();
 
-                Task resultTask = Task.WhenAny(delay, closeTask).GetAwaiter().GetResult();
+                testPeer.WaitForAllMatchersToComplete(2000);
 
-                Assert.AreEqual(delay, resultTask, "Consumer was closed before callback returned.");
-
-                // make sure that consumer was closed
-                closeTask.GetAwaiter().GetResult();
-
-                session.Close();
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestSessionCloseWaitsForAsyncDeliveryToComplete()
         {
             ManualResetEvent latch = new ManualResetEvent(false);
 
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                IConnection connection = EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
 
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), count: 1);
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
+
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
 
                 consumer.Listener += _ =>
                 {
                     latch.Set();
-                    Task.Delay(TimeSpan.FromMilliseconds(1200)).GetAwaiter().GetResult();
+                    Task.Delay(TimeSpan.FromMilliseconds(100)).GetAwaiter().GetResult();
                 };
 
-                Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(30000)), "Messages not received within given timeout.");
+                Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(3000)), "Messages not received within given timeout.");
 
-                Task delay = Task.Delay(TimeSpan.FromMilliseconds(1000));
-                Task closeTask = Task.Run(() => session.Close());
+                testPeer.ExpectEnd();
+                session.Close();
 
-                Task resultTask = Task.WhenAny(delay, closeTask).GetAwaiter().GetResult();
+                testPeer.WaitForAllMatchersToComplete(2000);
 
-                Assert.AreEqual(delay, resultTask, "Consumer was closed before callback returned.");
-
-                // make sure that consumer was closed
-                closeTask.GetAwaiter().GetResult();
-
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestConnectionCloseWaitsForAsyncDeliveryToComplete()
         {
             ManualResetEvent latch = new ManualResetEvent(false);
 
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                testAmqpPeer.SendMessage("myQueue", "test");
-
-                IConnection connection = EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
 
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
+                connection.Start();
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), count: 1);
+
                 IMessageConsumer consumer = session.CreateConsumer(destination);
+
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
 
                 consumer.Listener += _ =>
                 {
                     latch.Set();
-                    Task.Delay(TimeSpan.FromMilliseconds(1200)).GetAwaiter().GetResult();
+                    Task.Delay(TimeSpan.FromMilliseconds(100)).GetAwaiter().GetResult();
                 };
 
-                Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(30000)), "Messages not received within given timeout.");
+                Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(3000)), "Messages not received within given timeout.");
 
-                Task delay = Task.Delay(TimeSpan.FromMilliseconds(1000));
-                Task closeTask = Task.Run(() => connection.Close());
+                testPeer.ExpectClose();
+                connection.Close();
 
-                Task resultTask = Task.WhenAny(delay, closeTask).GetAwaiter().GetResult();
-
-                Assert.AreEqual(delay, resultTask, "Consumer was closed before callback returned.");
-
-                // make sure that consumer was closed
-                closeTask.GetAwaiter().GetResult();
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestRecoveredMessageShouldNotBeMutated()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                string originalPayload = "testMessage";
-                
-                testAmqpPeer.Open();
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                testAmqpPeer.SendMessage("myQueue", originalPayload);
-
-                NmsConnection connection = (NmsConnection) EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession(AcknowledgementMode.ClientAcknowledge);
                 IQueue destination = session.GetQueue("myQueue");
-                IMessageConsumer consumer = session.CreateConsumer(destination);
+                string originalPayload = "testMessage";
 
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message { BodySection = new AmqpValue() { Value = originalPayload } }, count: 1);
+
+                IMessageConsumer consumer = session.CreateConsumer(destination);
                 NmsTextMessage message = consumer.Receive() as NmsTextMessage;
                 Assert.NotNull(message);
                 message.IsReadOnlyBody = false;
                 message.Text = message.Text + "Received";
-                
                 session.Recover();
 
                 ITextMessage recoveredMessage = consumer.Receive() as ITextMessage;
@@ -858,16 +1025,11 @@ namespace NMS.AMQP.Test.Integration
                 Assert.AreEqual(originalPayload, recoveredMessage.Text);
                 Assert.AreNotSame(message, recoveredMessage);
 
-                consumer.Close();
-                session.Close();
+                testPeer.ExpectClose();
                 connection.Close();
-            }
-        }
 
-        private IConnection EstablishConnection()
-        {
-            NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-            return factory.CreateConnection(User, Password);
+                testPeer.WaitForAllMatchersToComplete(2000);
+            }
         }
     }
 }

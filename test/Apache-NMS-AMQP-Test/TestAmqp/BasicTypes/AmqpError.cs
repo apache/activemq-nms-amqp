@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,18 +15,15 @@
  * limitations under the License.
  */
 
-using System;
-using Amqp.Listener;
+using Amqp.Types;
 
-namespace NMS.AMQP.Test.TestAmqp
+namespace NMS.AMQP.Test.TestAmqp.BasicTypes
 {
-    public class TestRequestProcessor : IRequestProcessor
+    public static class AmqpError
     {
-        public void Process(RequestContext requestContext)
-        {
-            Console.WriteLine(requestContext);
-        }
-
-        public int Credit { get; } = 10;
+        public static readonly Symbol NOT_FOUND = new Symbol("amqp:not-found");
+        public static readonly Symbol NOT_ALLOWED = new Symbol("amqp:not-allowed");
+        public static readonly Symbol RESOURCE_LIMIT_EXCEEDED = new Symbol("amqp:resource-limit-exceeded");
+        public static readonly Symbol RESOURCE_DELETED = new Symbol("amqp:resource-deleted");
     }
 }

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,25 +15,11 @@
  * limitations under the License.
  */
 
-using System;
-using Amqp.Listener;
-
-namespace NMS.AMQP.Test.TestAmqp
+namespace NMS.AMQP.Test.TestAmqp.BasicTypes
 {
-    public class TestMessageProcessor : IMessageProcessor
+    public static class AmqpHeader
     {
-        private readonly Action<MessageContext> handler;
-
-        public TestMessageProcessor(Action<MessageContext> handler)
-        {
-            this.handler = handler;
-        }
-
-        public void Process(MessageContext messageContext)
-        {
-            handler(messageContext);
-        }
-
-        public int Credit { get; } = 100;
+        public static readonly byte[] HEADER = new byte[] { 65, 77, 81, 80, 0, 1, 0, 0 };
+        public static readonly byte[] SASL_HEADER = new byte[] { 65, 77, 81, 80, 3, 1, 0, 0 };
     }
 }

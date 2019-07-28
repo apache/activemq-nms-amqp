@@ -16,9 +16,11 @@
  */
 
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
+using Amqp.Types;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Util;
 
@@ -26,18 +28,18 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 {
     public class AmqpConnectionSession : AmqpSession
     {
+        private readonly bool hasClientId;
+
         public AmqpConnectionSession(AmqpConnection connection, SessionInfo sessionInfo) : base(connection, sessionInfo)
         {
+            this.hasClientId = connection.Info.IsExplicitClientId;
         }
 
         public async Task Unsubscribe(string subscriptionName)
         {
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            ReceiverLink receiverLink = new ReceiverLink(UnderlyingSession, subscriptionName, new Attach
-            {
-                LinkName = subscriptionName
-            }, (link, attach) =>
+            ReceiverLink receiverLink = new ReceiverLink(UnderlyingSession, subscriptionName, CreateAttach(subscriptionName), (link, attach) =>
             {
                 Tracer.InfoFormat("Attempting to close subscription {0}. Attach response {1}", subscriptionName, attach);
                 if (attach.Source is Source source)
@@ -55,10 +57,30 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 NMSException exception = ExceptionSupport.GetException(sender, failureMessage);
                 tcs.TrySetException(exception);
             });
-            
+
             await tcs.Task;
-            
+
             receiverLink.Close(TimeSpan.FromMilliseconds(SessionInfo.closeTimeout));
+        }
+
+        private Attach CreateAttach(string subscriptionName)
+        {
+            Attach attach = new Attach
+            {
+                LinkName = subscriptionName,
+                Target = new Target(),
+                SndSettleMode = SenderSettleMode.Unsettled,
+                RcvSettleMode = ReceiverSettleMode.First,
+            };
+
+            if (!this.hasClientId)
+            {
+                // We are trying to unsubscribe a 'global' shared subs using a 'null source lookup', add link
+                // desired capabilities as hints to the peer to consider this when trying to attach the link.
+                attach.DesiredCapabilities = new Symbol[] { SymbolUtil.SHARED, SymbolUtil.GLOBAL };
+            }
+
+            return attach;
         }
     }
 }

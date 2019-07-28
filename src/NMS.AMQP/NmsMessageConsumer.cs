@@ -177,7 +177,10 @@ namespace Apache.NMS.AMQP
         {
             if (closed)
             {
-                throw new IllegalStateException("The MessageConsumer is closed");
+                if (failureCause == null)
+                    throw new IllegalStateException("The MessageConsumer is closed");
+                else
+                    throw new IllegalStateException("The MessageConsumer was closed due to an unrecoverable error.", failureCause);
             }
         }
 
