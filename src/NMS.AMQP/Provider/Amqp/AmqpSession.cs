@@ -63,7 +63,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 });
             underlyingSession.AddClosedCallback((sender, error) =>
             {
-                tcs.TrySetException(ExceptionSupport.GetException(error));
+                if (!tcs.TrySetException(ExceptionSupport.GetException(error)))
+                {
+                    Connection.RemoveSession(sessionInfo.Id);
+                }
             });
             return tcs.Task;
         }
@@ -123,7 +126,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             consumers.TryRemove(consumerId, out _);
         }
-        
+
         public void RemoveProducer(Id producerId)
         {
             producers.TryRemove(producerId, out _);
