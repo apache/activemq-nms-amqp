@@ -73,6 +73,7 @@ namespace NMS.AMQP.Test.Message.Facade
         public IDestination NMSReplyTo { get; set; }
         public DateTime NMSTimestamp { get; set; }
         public string NMSType { get; set; }
+        public string GroupId { get; set; }
         public DateTime Expiration { get; set; }
         public sbyte JmsMsgType { get; }
         public INmsMessageFacade Copy()

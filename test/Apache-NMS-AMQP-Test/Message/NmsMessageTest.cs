@@ -395,6 +395,16 @@ namespace NMS.AMQP.Test.Message
             Assert.Throws<MessageFormatException>(() => msg.Properties.GetFloat(name));
             Assert.Throws<MessageFormatException>(() => msg.Properties.GetDouble(name));
         }
+
+        [Test]
+        public void TestSetAndGetGroupId()
+        {
+            NmsMessage msg = factory.CreateMessage();
+            
+            msg.Properties.SetString("NMSGroupId", "testGroupId");
+            
+            Assert.AreEqual(msg.Facade.GroupId, "testGroupId");
+        }
         
         // TODO: Test conversion for other properties
 

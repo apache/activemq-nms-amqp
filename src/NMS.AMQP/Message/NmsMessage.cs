@@ -94,6 +94,12 @@ namespace Apache.NMS.AMQP.Message
             get => Facade.NMSType;
             set => Facade.NMSType = value;
         }
+        
+        public string NMSGroupId
+        {
+            get => Facade.GroupId;
+            set => Facade.GroupId = value;
+        }
 
         public NmsAcknowledgeCallback NmsAcknowledgeCallback { get; set; }
 
