@@ -36,6 +36,7 @@ namespace Apache.NMS.AMQP.Message.Facade
         IDestination NMSReplyTo { get; set; }
         DateTime NMSTimestamp { get; set; }
         string NMSType { get; set; }
+        string GroupId { get; set; }
         DateTime Expiration { get; set; }
         sbyte JmsMsgType { get; }
         INmsMessageFacade Copy();
