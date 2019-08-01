@@ -446,23 +446,32 @@ namespace Apache.NMS.AMQP
 
         private void CreateNmsConnection()
         {
-            if (connected.CompareAndSet(false, true))
+            if (connected || closed)
             {
-                try
-                {
-                    provider.Connect(ConnectionInfo).ConfigureAwait(false).GetAwaiter().GetResult();
-                }
-                catch (Exception e)
+                return;
+            }
+
+            lock (syncRoot)
+            {
+                if (!closed && connected.CompareAndSet(false, true))
                 {
                     try
                     {
-                        provider.Close();
+                        provider.Connect(ConnectionInfo).ConfigureAwait(false).GetAwaiter().GetResult();
+                    
                     }
-                    catch
+                    catch (Exception e)
                     {
-                    }
+                        try
+                        {
+                            provider.Close();
+                        }
+                        catch
+                        {
+                        }
 
-                    throw NMSExceptionSupport.Create(e);
+                        throw NMSExceptionSupport.Create(e);
+                    }
                 }
             }
         }
