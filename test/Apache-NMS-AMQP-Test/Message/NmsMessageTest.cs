@@ -401,9 +401,19 @@ namespace NMS.AMQP.Test.Message
         {
             NmsMessage msg = factory.CreateMessage();
             
-            msg.Properties.SetString("NMSGroupId", "testGroupId");
+            msg.Properties.SetString("NMSXGroupId", "testGroupId");
             
             Assert.AreEqual(msg.Facade.GroupId, "testGroupId");
+        }
+        
+        [Test]
+        public void TestSetAndGetGroupSequence()
+        {
+            NmsMessage msg = factory.CreateMessage();
+            
+            msg.Properties.SetInt("NMSXGroupSeq", 10);            
+            
+            Assert.AreEqual(msg.Facade.GroupSequence, 10);
         }
         
         // TODO: Test conversion for other properties
