@@ -30,7 +30,6 @@ namespace Apache.NMS.AMQP.Message.Facade
         string NMSCorrelationID { get; set; }
         IDestination NMSDestination { get; set; }
         TimeSpan NMSTimeToLive { get; set; }
-        MsgDeliveryMode NMSDeliveryMode { get; set; }
         MsgPriority NMSPriority { get; set; }
         bool NMSRedelivered { get; set; }
         IDestination NMSReplyTo { get; set; }
@@ -40,6 +39,12 @@ namespace Apache.NMS.AMQP.Message.Facade
         uint GroupSequence { get; set; }
         DateTime Expiration { get; set; }
         sbyte JmsMsgType { get; }
+        
+        /// <summary>
+        /// True if this message is tagged as being persistent
+        /// </summary>
+        bool IsPersistent { get; set; }
+        
         INmsMessageFacade Copy();
     }
 }

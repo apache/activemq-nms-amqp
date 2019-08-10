@@ -158,8 +158,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             get => amqpTimeToLiveOverride ?? TimeSpan.FromMilliseconds(Header.Ttl);
             set => amqpTimeToLiveOverride = value;
         }
-
-        public MsgDeliveryMode NMSDeliveryMode { get; set; }
+        
+        public bool IsPersistent
+        {
+            get => Message.Header.Durable;
+            set => Message.Header.Durable = value;
+        }
 
         public MsgPriority NMSPriority
         {

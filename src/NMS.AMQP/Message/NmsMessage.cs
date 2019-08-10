@@ -61,8 +61,22 @@ namespace Apache.NMS.AMQP.Message
 
         public MsgDeliveryMode NMSDeliveryMode
         {
-            get => Facade.NMSDeliveryMode;
-            set => Facade.NMSDeliveryMode = value;
+            get => Facade.IsPersistent ? MsgDeliveryMode.Persistent : MsgDeliveryMode.NonPersistent;
+            set
+            {
+                CheckReadOnly();
+                switch (value)
+                {
+                    case MsgDeliveryMode.Persistent:
+                        Facade.IsPersistent = true;
+                        break;
+                    case MsgDeliveryMode.NonPersistent:
+                        Facade.IsPersistent = false;
+                        break;
+                    default:
+                        throw new NMSException($"Invalid DeliveryMode specified: {value}");
+                }
+            }
         }
 
         public MsgPriority NMSPriority

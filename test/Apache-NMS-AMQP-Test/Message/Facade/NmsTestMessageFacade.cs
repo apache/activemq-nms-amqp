@@ -67,7 +67,6 @@ namespace NMS.AMQP.Test.Message.Facade
         public string NMSCorrelationID { get; set; }
         public IDestination NMSDestination { get; set; }
         public TimeSpan NMSTimeToLive { get; set; }
-        public MsgDeliveryMode NMSDeliveryMode { get; set; }
         public MsgPriority NMSPriority { get; set; }
         public bool NMSRedelivered { get; set; }
         public IDestination NMSReplyTo { get; set; }
@@ -77,6 +76,8 @@ namespace NMS.AMQP.Test.Message.Facade
         public uint GroupSequence { get; set; }
         public DateTime Expiration { get; set; }
         public sbyte JmsMsgType { get; }
+        public bool IsPersistent { get; set; }
+
         public INmsMessageFacade Copy()
         {
             return null;
