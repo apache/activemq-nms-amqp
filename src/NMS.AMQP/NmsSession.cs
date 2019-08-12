@@ -298,7 +298,7 @@ namespace Apache.NMS.AMQP
 
         public void Acknowledge(AckType ackType)
         {
-            Connection.Acknowledge(SessionInfo.Id, ackType);
+            Connection.Acknowledge(SessionInfo.Id, ackType).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         public void Acknowledge(AckType ackType, InboundMessageDispatch envelope)
@@ -313,7 +313,7 @@ namespace Apache.NMS.AMQP
                 throw new IllegalStateException("Message acknowledge called inside a transacted Session");
             }
 
-            Connection.Acknowledge(envelope, ackType);
+            Connection.Acknowledge(envelope, ackType).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         public void Send(NmsMessageProducer producer, IDestination destination, IMessage original, MsgDeliveryMode deliveryMode,

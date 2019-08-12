@@ -458,7 +458,6 @@ namespace Apache.NMS.AMQP
                     try
                     {
                         provider.Connect(ConnectionInfo).ConfigureAwait(false).GetAwaiter().GetResult();
-                    
                     }
                     catch (Exception e)
                     {
@@ -496,9 +495,9 @@ namespace Apache.NMS.AMQP
             connectionListeners.Add(listener);
         }
 
-        public void Acknowledge(Id sessionId, AckType ackType)
+        internal Task Acknowledge(Id sessionId, AckType ackType)
         {
-            provider.Acknowledge(sessionId, ackType);
+            return provider.Acknowledge(sessionId, ackType);
         }
 
         internal Task Acknowledge(InboundMessageDispatch envelope, AckType ackType)
