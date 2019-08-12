@@ -398,8 +398,9 @@ namespace Apache.NMS.AMQP
 
             if (hasTTL)
                 outbound.Facade.Expiration = timeStamp + timeToLive;
-            else
-                outbound.Facade.Expiration = DateTime.MinValue;
+            // TODO: Reset Expiration when https://github.com/Azure/amqpnetlite/commit/13009980e40aedcb6310f8fa796fbee53be8a389 merged
+            // else
+            //     outbound.Facade.Expiration = DateTime.MinValue;
 
             outbound.OnSend(timeToLive);
 
