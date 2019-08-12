@@ -1330,7 +1330,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             source.NMSMessageId = "ID:TEST-MESSAGEID";
             source.NMSPriority = MsgPriority.High;
             source.RedeliveryCount = 12;
-            source.NMSDeliveryMode = MsgDeliveryMode.Persistent;
+            source.IsPersistent = true;
             source.NMSTimestamp = DateTime.UtcNow;
             source.NMSTimeToLive = TimeSpan.FromDays(1);
             source.UserId = "Cookie-Monster";
@@ -1349,7 +1349,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             Assert.AreEqual(source.NMSMessageId, copy.NMSMessageId);
             Assert.AreEqual(source.NMSPriority, copy.NMSPriority);
             Assert.AreEqual(source.RedeliveryCount, copy.RedeliveryCount);
-            Assert.AreEqual(source.NMSDeliveryMode, copy.NMSDeliveryMode);
+            Assert.AreEqual(source.IsPersistent, copy.IsPersistent);
             Assert.AreEqual(source.UserId, copy.UserId);
             Assert.AreEqual(source.NMSTimeToLive, copy.NMSTimeToLive);
             Assert.IsTrue(Math.Abs((copy.Expiration - source.Expiration).TotalMilliseconds) < 1);
