@@ -70,6 +70,8 @@ namespace Apache.NMS.AMQP.Meta
         public ushort channelMax { get; set; } = DEFAULT_CHANNEL_MAX;
         public int maxFrameSize { get; set; } = DEFAULT_MAX_FRAME_SIZE;
 
+        public bool LocalMessageExpiry { get; set; }
+
         public string TopicPrefix { get; internal set; } = null;
 
         public string QueuePrefix { get; internal set; } = null;

@@ -100,6 +100,11 @@ namespace Apache.NMS.AMQP
         }
 
         /// <summary>
+        /// Enables local message expiry for all MessageConsumers under the connection. Default is true.
+        /// </summary>
+        public bool LocalMessageExpiry { get; set; } = true;
+
+        /// <summary>
         /// User name value used to authenticate the connection
         /// </summary>
         public string UserName { get; set; }
@@ -217,7 +222,8 @@ namespace Apache.NMS.AMQP
                 password = password,
                 remoteHost = BrokerUri,
                 requestTimeout = RequestTimeout,
-                SendTimeout = SendTimeout
+                SendTimeout = SendTimeout,
+                LocalMessageExpiry = LocalMessageExpiry
             };
 
             bool userSpecifiedClientId = ClientId != null;

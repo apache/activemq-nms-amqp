@@ -47,6 +47,7 @@ namespace Apache.NMS.AMQP.Meta
         public bool HasSelector => !string.IsNullOrEmpty(Selector);
         public bool IsDurable { get; set; }
         public bool IsBrowser { get; set; }
+        public bool LocalMessageExpiry { get; set; }
         public IDestination Destination { get; set; }
     }
 }

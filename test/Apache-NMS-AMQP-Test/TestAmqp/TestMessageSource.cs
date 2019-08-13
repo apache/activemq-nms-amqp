@@ -61,6 +61,11 @@ namespace NMS.AMQP.Test.TestAmqp
         public void SendMessage(string payload)
         {
             Amqp.Message message = new Amqp.Message(payload) { Properties = new Properties { MessageId = Guid.NewGuid().ToString() } };
+            SendMessage(message);
+        }
+
+        public void SendMessage(Amqp.Message message)
+        {
             lock (messages)
             {
                 this.messages.Enqueue(message);

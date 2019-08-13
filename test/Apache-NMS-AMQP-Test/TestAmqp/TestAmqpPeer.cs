@@ -60,14 +60,20 @@ namespace NMS.AMQP.Test.TestAmqp
 
         public void SendMessage(string address, string payload)
         {
+            Amqp.Message message = new Amqp.Message(payload) { Properties = new Amqp.Framing.Properties { MessageId = Guid.NewGuid().ToString() } };
+            SendMessage(address, message);
+        }
+
+        public void SendMessage(string address, Amqp.Message message)
+        {
             if (messageSources.TryGetValue(address, out var messageSource))
             {
-                messageSource.SendMessage(payload);
+                messageSource.SendMessage(message);
             }
             else
             {
                 messageSource = new TestMessageSource();
-                messageSource.SendMessage(payload);
+                messageSource.SendMessage(message);
                 containerHost.RegisterMessageSource(address, messageSource);
                 messageSources.Add(address, messageSource);
             }

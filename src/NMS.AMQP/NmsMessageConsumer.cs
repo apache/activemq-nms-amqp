@@ -49,13 +49,14 @@ namespace Apache.NMS.AMQP
             {
                 session.Connection.CheckConsumeFromTemporaryDestination((NmsTemporaryDestination) destination);
             }
-            
+
             Info = new ConsumerInfo(consumerId, Session.SessionInfo.Id)
             {
                 Destination = destination,
                 Selector = selector,
                 NoLocal = noLocal,
-                SubscriptionName = name
+                SubscriptionName = name,
+                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry
             };
             deliveryTask = new MessageDeliveryTask(this);
 
@@ -265,7 +266,7 @@ namespace Apache.NMS.AMQP
         private bool IsMessageExpired(InboundMessageDispatch envelope)
         {
             NmsMessage message = envelope.Message;
-            return message.IsExpired();
+            return Info.LocalMessageExpiry && message.IsExpired();
         }
 
         private bool IsRedeliveryExceeded(InboundMessageDispatch envelope)
