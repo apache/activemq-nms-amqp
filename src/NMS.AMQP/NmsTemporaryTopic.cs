@@ -35,5 +35,36 @@ namespace Apache.NMS.AMQP
         {
             Dispose();
         }
+
+        protected bool Equals(NmsTemporaryTopic other)
+        {
+            return TopicName == other.TopicName && DestinationType == other.DestinationType && IsTopic == other.IsTopic && IsQueue == other.IsQueue && IsTemporary == other.IsTemporary;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != this.GetType()) return false;
+            return Equals((NmsTemporaryTopic) obj);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                var hashCode = (int) DestinationType;
+                hashCode = (hashCode * 397) ^ (TopicName != null ? TopicName.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ IsTopic.GetHashCode();
+                hashCode = (hashCode * 397) ^ IsQueue.GetHashCode();
+                hashCode = (hashCode * 397) ^ IsTemporary.GetHashCode();
+                return hashCode;
+            }
+        }
+
+        public override string ToString()
+        {
+            return $"{nameof(TopicName)}: {TopicName}";
+        }
     }
 }

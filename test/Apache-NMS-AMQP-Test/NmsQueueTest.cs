@@ -43,5 +43,26 @@ namespace NMS.AMQP.Test
             NmsQueue queue = new NmsQueue("myQueue");
             Assert.False(queue.IsTemporary, "should not be temporary");
         }
+        
+        [Test]
+        public void TestTwoQueuesWithTheSameNamesAreEqual()
+        {
+            NmsQueue nmsQueue1 = new NmsQueue("myQueue");
+            NmsQueue nmsQueue2 = new NmsQueue("myQueue");
+
+            Assert.AreEqual(nmsQueue1, nmsQueue2);
+            Assert.AreNotSame(nmsQueue1, nmsQueue2);
+            Assert.AreEqual(nmsQueue1.GetHashCode(), nmsQueue2.GetHashCode());
+        }
+        
+        [Test]
+        public void TestTwoQueuesWithDifferentNamesAreNotEqual()
+        {
+            NmsQueue nmsQueue1 = new NmsQueue("myQueue");
+            NmsQueue nmsQueue2 = new NmsQueue("myQueue2");
+
+            Assert.AreNotEqual(nmsQueue1, nmsQueue2);
+            Assert.AreNotEqual(nmsQueue1.GetHashCode(), nmsQueue2.GetHashCode());
+        }
     }
 }
