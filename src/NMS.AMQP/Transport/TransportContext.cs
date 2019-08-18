@@ -20,6 +20,8 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
+using Amqp.Handler;
+using Apache.NMS.AMQP.Provider.Amqp;
 using Apache.NMS.AMQP.Util;
 
 namespace Apache.NMS.AMQP.Transport
@@ -38,7 +40,7 @@ namespace Apache.NMS.AMQP.Transport
         internal TransportContext()
         {
             connectionBuilder = new Amqp.ConnectionFactory();
-            connectionBuilder.SASL.Profile = Amqp.Sasl.SaslProfile.Anonymous;
+            connectionBuilder.SASL.Profile = Amqp.Sasl.SaslProfile.Anonymous;            
         }
 
         static TransportContext()
@@ -156,9 +158,9 @@ namespace Apache.NMS.AMQP.Transport
             return copy;
         }
 
-        public virtual Task<Amqp.Connection> CreateAsync(Address address, Open open = null, OnOpened onOpened = null)
+        public virtual Task<Connection> CreateAsync(Address address, IHandler handler)
         {
-            return connectionBuilder.CreateAsync(address, open, onOpened);
+            return connectionBuilder.CreateAsync(address, handler);    
         }
 
         protected virtual void CopyInto(TransportContext copy)

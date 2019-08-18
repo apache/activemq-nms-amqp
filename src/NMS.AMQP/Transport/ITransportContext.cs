@@ -18,6 +18,7 @@
 using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
+using Amqp.Handler;
 
 namespace Apache.NMS.AMQP.Transport
 {
@@ -37,6 +38,6 @@ namespace Apache.NMS.AMQP.Transport
 
         ITransportContext Copy();
 
-        Task<Amqp.Connection> CreateAsync(Address address, Open open = null, OnOpened onOpened = null);
+        Task<Connection> CreateAsync(Address address, IHandler handler);
     }
 }

@@ -44,9 +44,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public AmqpProvider Provider { get; }
         private readonly ITransportContext transport;
         private readonly Uri remoteUri;
-        private global::Amqp.Connection underlyingConnection;
+        private Connection underlyingConnection;
         private readonly AmqpMessageFactory messageFactory;
         private AmqpConnectionSession connectionSession;
+        private TaskCompletionSource<bool> tsc;
 
         public AmqpConnection(AmqpProvider provider, ITransportContext transport, ConnectionInfo info)
         {
@@ -68,39 +69,39 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         internal async Task Start()
         {
             Address address = UriUtil.ToAddress(remoteUri, Info.username, Info.password);
-            underlyingConnection = await transport.CreateAsync(address, CreateOpenFrame(Info), OnOpened);
+            this.tsc = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            underlyingConnection = await transport.CreateAsync(address, new AmqpHandler(this)).ConfigureAwait(false);
             underlyingConnection.AddClosedCallback(Provider.OnInternalClosed);
+            
+            // Wait for connection to be opened
+            await tsc.Task;
 
             // Create a Session for this connection that is used for Temporary Destinations
             // and perhaps later on management and advisory monitoring.
-
             // TODO: change the way how connection session id is obtained
             SessionInfo sessionInfo = new SessionInfo(Info.Id);
             sessionInfo.AcknowledgementMode = AcknowledgementMode.AutoAcknowledge;
 
             connectionSession = new AmqpConnectionSession(this, sessionInfo);
-            await connectionSession.Start();
+            await connectionSession.Start().ConfigureAwait(false);
         }
 
-        private Open CreateOpenFrame(ConnectionInfo connInfo)
+        internal void OnLocalOpen(Open open)
         {
-            return new Open
+            open.ContainerId = Info.ClientId;
+            open.ChannelMax = Info.channelMax;
+            open.MaxFrameSize = Convert.ToUInt32(Info.maxFrameSize);
+            open.HostName = remoteUri.Host;
+            open.IdleTimeOut = Convert.ToUInt32(Info.idleTimout);
+            open.DesiredCapabilities = new[]
             {
-                ContainerId = connInfo.ClientId,
-                ChannelMax = connInfo.channelMax,
-                MaxFrameSize = Convert.ToUInt32(connInfo.maxFrameSize),
-                HostName = remoteUri.Host,
-                IdleTimeOut = Convert.ToUInt32(connInfo.idleTimout),
-                DesiredCapabilities = new[]
-                {
-                    SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER,
-                    SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY,
-                    SymbolUtil.OPEN_CAPABILITY_ANONYMOUS_RELAY
-                }
+                SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER,
+                SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY,
+                SymbolUtil.OPEN_CAPABILITY_ANONYMOUS_RELAY
             };
         }
 
-        private void OnOpened(global::Amqp.IConnection connection, Open open)
+        internal void OnRemoteOpened(Open open)
         {
             if (SymbolUtil.CheckAndCompareFields(open.Properties, SymbolUtil.CONNECTION_ESTABLISH_FAILED, SymbolUtil.BOOLEAN_TRUE))
             {
@@ -121,6 +122,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     Info.QueuePrefix = queuePrefix;
                 }
 
+                this.tsc.SetResult(true);
                 Provider.FireConnectionEstablished();
             }
         }
@@ -172,7 +174,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             return temporaryDestinations.TryGetValue(destination.Id, out AmqpTemporaryDestination amqpTemporaryDestination) ? amqpTemporaryDestination : null;
         }
-        
+
         public void RemoveTemporaryDestination(Id destinationId)
         {
             temporaryDestinations.TryRemove(destinationId, out _);

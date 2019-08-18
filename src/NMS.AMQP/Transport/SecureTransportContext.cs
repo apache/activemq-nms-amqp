@@ -24,6 +24,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
+using Amqp.Handler;
 using Apache.NMS.AMQP.Util;
 
 namespace Apache.NMS.AMQP.Transport
@@ -228,7 +229,7 @@ namespace Apache.NMS.AMQP.Transport
 
         #region IProviderSecureTransportContext Methods
 
-        public override Task<Amqp.Connection> CreateAsync(Address address, Open open = null, OnOpened onOpened = null)
+        public override Task<Amqp.Connection> CreateAsync(Address address, IHandler handler)
         {
             // Load local certificates
             this.connectionBuilder.SSL.ClientCertificates.AddRange(LoadClientCertificates());
@@ -242,7 +243,7 @@ namespace Apache.NMS.AMQP.Transport
                 throw new NMSSecurityException(string.Format("Invalid SSL Protocol {0} selected from system supported protocols {1}", this.SSLProtocol, PropertyUtil.ToString(SupportedProtocols)));
             }
             
-            return base.CreateAsync(address, open, onOpened);
+            return base.CreateAsync(address, handler);
         }
 
         #endregion

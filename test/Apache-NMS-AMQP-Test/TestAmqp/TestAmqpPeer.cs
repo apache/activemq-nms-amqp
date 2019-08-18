@@ -675,12 +675,14 @@ namespace NMS.AMQP.Test.TestAmqp
             bool sendResponseDisposition,
             DeliveryState responseState,
             bool responseSettled,
-            int dispositionDelay = 0
+            int dispositionDelay = 0,
+            bool batchable = false
         )
         {
             var transferMatcher = new FrameMatcher<Transfer>()
                 .WithAssertion(transfer => Assert.AreEqual(settled, transfer.Settled))
                 .WithAssertion(transfer => stateMatcher(transfer.State))
+                .WithAssertion(transfer => Assert.AreEqual(batchable, transfer.Batchable))
                 .WithAssertion(messageMatcher);
 
             if (sendResponseDisposition)
