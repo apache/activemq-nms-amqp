@@ -21,6 +21,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Apache.NMS;
 using Amqp.Framing;
+using Amqp.Transactions;
 using Amqp.Types;
 using Apache.NMS.AMQP.Message;
 
@@ -58,12 +59,15 @@ namespace Apache.NMS.AMQP.Util
         public static readonly AmqpValue NULL_AMQP_VALUE_BODY = new AmqpValue() {Value = null};
 
         // Amqp Message Outcome instances
-        public static readonly Amqp.Framing.Accepted ACCEPTED_INSTANCE = new Amqp.Framing.Accepted();
-        public static readonly Amqp.Framing.Released RELEASED_INSTANCE = new Amqp.Framing.Released();
-        public static readonly Amqp.Framing.Rejected REJECTED_INSTANCE = new Amqp.Framing.Rejected();
-        public static readonly Amqp.Framing.Modified MODIFIED_INSTANCE = new Amqp.Framing.Modified();
-        public static readonly Amqp.Framing.Modified MODIFIED_FAILED_INSTANCE = new Amqp.Framing.Modified() {DeliveryFailed = true};
+        public static readonly Accepted ACCEPTED_INSTANCE = new Accepted();
+        public static readonly Released RELEASED_INSTANCE = new Released();
+        public static readonly Rejected REJECTED_INSTANCE = new Rejected();
+        public static readonly Modified MODIFIED_INSTANCE = new Modified();
+        public static readonly Modified MODIFIED_FAILED_INSTANCE = new Modified() {DeliveryFailed = true};
         public static readonly AckType DEFAULT_ACK_TYPE = AckType.ACCEPTED;
+        
+        // Amqp Transactions Outcome instances 
+        public static readonly Declared DECLARED_INSTANCE = new Declared();
 
         public static byte GetValueForPriority(MsgPriority mp)
         {

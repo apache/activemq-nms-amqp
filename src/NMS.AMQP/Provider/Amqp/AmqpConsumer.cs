@@ -21,6 +21,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
+using Amqp.Transactions;
 using Amqp.Types;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
@@ -53,6 +54,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             messages = new LinkedList<InboundMessageDispatch>();
         }
+
+        public Id ConsumerId => this.info.Id;
 
         public Task Attach()
         {
@@ -129,7 +132,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 source.DistributionMode = SymbolUtil.ATTACH_DISTRIBUTION_MODE_COPY;
             }
 
-            source.Capabilities = new[] {SymbolUtil.GetTerminusCapabilitiesForDestination(info.Destination)};
+            source.Capabilities = new[] { SymbolUtil.GetTerminusCapabilitiesForDestination(info.Destination) };
 
             Map filters = new Map();
 
@@ -169,12 +172,16 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             link.Start(info.LinkCredit, OnMessage);
         }
 
+        public void Stop()
+        {
+            link.SetCredit(0, CreditMode.Drain);
+        }
+
         private void OnMessage(IReceiverLink receiver, global::Amqp.Message amqpMessage)
         {
             NmsMessage message;
             try
             {
-
                 message = AmqpCodec.DecodeMessage(this, amqpMessage).AsMessage();
             }
             catch (Exception e)
@@ -223,7 +230,16 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         envelope.IsDelivered = true;
                         break;
                     case AckType.ACCEPTED:
-                        link.Accept(message);
+                        AmqpTransactionContext transactionalState = session.TransactionContext;
+                        if (transactionalState != null)
+                        {
+                            link.Complete(message, transactionalState.GetTxnAcceptState());
+                            transactionalState.RegisterTxConsumer(this);
+                        }
+                        else
+                        {
+                            link.Accept(message);
+                        }
                         RemoveMessage(envelope);
                         break;
                     case AckType.RELEASED:
@@ -305,6 +321,15 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public bool HasSubscription(string subscriptionName)
         {
             return info.IsDurable && info.SubscriptionName.Equals(subscriptionName);
+        }
+
+        public void PostRollback()
+        {
+            var pendingMessages = GetMessages().Where(x => !x.IsDelivered);
+            foreach (InboundMessageDispatch message in pendingMessages)
+            {
+                Acknowledge(message, AckType.RELEASED);
+            }
         }
     }
 }

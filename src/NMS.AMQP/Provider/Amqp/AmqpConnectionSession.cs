@@ -58,7 +58,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             
             await tcs.Task;
             
-            receiverLink.Close(TimeSpan.FromMilliseconds(sessionInfo.closeTimeout));
+            receiverLink.Close(TimeSpan.FromMilliseconds(SessionInfo.closeTimeout));
         }
     }
 }

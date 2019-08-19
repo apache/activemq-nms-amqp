@@ -109,7 +109,7 @@ namespace Apache.NMS.AMQP
             {
                 lock (SyncRoot)
                 {
-                    Listener -= value;                    
+                    Listener -= value;
                 }
             }
         }
@@ -443,7 +443,53 @@ namespace Apache.NMS.AMQP
         {
             lock (SyncRoot)
             {
-                started.Set(false);                
+                started.Set(false);
+            }
+        }
+
+        public bool IsDestinationInUse(NmsTemporaryDestination destination)
+        {
+            return Equals(Info.Destination, destination);
+        }
+
+        public void OnConnectionInterrupted()
+        {
+            messageQueue.Clear();
+        }
+
+        public void SuspendForRollback()
+        {
+            Stop();
+
+            try
+            {
+                Session.Connection.StopResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                if (Session.TransactionContext.IsActiveInThisContext(Info.Id))
+                {
+                    messageQueue.Clear();
+                }
+            }
+        }
+
+        public void ResumeAfterRollback()
+        {
+            Start();
+            StartConsumerResource();
+        }
+
+        private void StartConsumerResource()
+        {
+            try
+            {
+                Session.Connection.StartResource(Info);
+            }
+            catch (NMSException ex)
+            {
+                Session.Remove(this);
+                throw;
             }
         }
 
@@ -460,11 +506,6 @@ namespace Apache.NMS.AMQP
             {
                 consumer.DeliverNextPending();
             }
-        }
-
-        public bool IsDestinationInUse(NmsTemporaryDestination destination)
-        {
-            return Equals(Info.Destination, destination);
         }
     }
 }

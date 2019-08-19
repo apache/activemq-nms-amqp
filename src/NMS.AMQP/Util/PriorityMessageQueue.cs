@@ -128,6 +128,18 @@ namespace Apache.NMS.AMQP.Util
                 return RemoveFirst();
             }
         }
+        
+        public void Clear()
+        {
+            lock (syncRoot)
+            {                
+                for (int i = (int) MsgPriority.Highest; i >= 0; i--)
+                {
+                    lists[i].Clear();
+                }
+                count = 0;
+            }
+        }
 
         public void Dispose()
         {

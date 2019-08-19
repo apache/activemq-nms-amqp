@@ -76,7 +76,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             // TODO: change the way how connection session id is obtained
             SessionInfo sessionInfo = new SessionInfo(info.Id);
-            sessionInfo.ackMode = AcknowledgementMode.AutoAcknowledge;
+            sessionInfo.AcknowledgementMode = AcknowledgementMode.AutoAcknowledge;
 
             connectionSession = new AmqpConnectionSession(this, sessionInfo);
             await connectionSession.Start();

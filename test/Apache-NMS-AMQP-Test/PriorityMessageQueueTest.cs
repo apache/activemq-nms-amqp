@@ -195,6 +195,23 @@ namespace NMS.AMQP.Test
             
         }
 
+        [Test]
+        public void TestClear()
+        {
+            PriorityMessageQueue queue = new PriorityMessageQueue();
+
+            IEnumerable<InboundMessageDispatch> messages = CreateFullRangePrioritySet();
+            foreach (InboundMessageDispatch envelope in messages)
+            {
+                queue.Enqueue(envelope);
+            }
+            
+            Assert.False(queue.IsEmpty);
+            queue.Clear();
+            Assert.True(queue.IsEmpty);
+            Assert.IsNull(queue.DequeueNoWait());
+        }
+
         private IEnumerable<InboundMessageDispatch> CreateFullRangePrioritySet()
         {
             for (int i = 0; i <= (int) MsgPriority.Highest; i++)

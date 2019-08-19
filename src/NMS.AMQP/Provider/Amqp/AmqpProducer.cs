@@ -115,10 +115,19 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
                 try
                 {
+                    
+                    var transactionalState = session.TransactionContext?.GetTxnEnrolledState();
+
                     if (envelope.SendAsync)
-                        SendAsync(message);
+                        SendAsync(message, transactionalState);
                     else
-                        SendSync(message);
+                    {
+                        // TODO: Should be unified after https://github.com/Azure/amqpnetlite/pull/374 is sorted out
+                        if (transactionalState != null)
+                            SendSync(message, transactionalState);
+                        else
+                            senderLink.Send(message, TimeSpan.FromMilliseconds(session.Connection.Provider.SendTimeout));
+                    }
                 }
                 catch (TimeoutException tex)
                 {
@@ -138,17 +147,17 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        private void SendAsync(global::Amqp.Message message)
+        private void SendAsync(global::Amqp.Message message, DeliveryState deliveryState)
         {
-            senderLink.Send(message, null, null, null);
+            senderLink.Send(message, deliveryState, null, null);
         }
 
-        private void SendSync(global::Amqp.Message message)
+        private void SendSync(global::Amqp.Message message, DeliveryState deliveryState)
         {
             ManualResetEvent manualResetEvent = new ManualResetEvent(false);
             Outcome outcome = null;
 
-            senderLink.Send(message, null, Callback, manualResetEvent);
+            senderLink.Send(message, deliveryState, Callback, manualResetEvent);
             if (!manualResetEvent.WaitOne((int) session.Connection.Provider.SendTimeout))
             {
                 throw new TimeoutException(Fx.Format(SRAmqp.AmqpTimeout, "send", session.Connection.Provider.SendTimeout, nameof(message)));

@@ -87,7 +87,7 @@ namespace Apache.NMS.AMQP
                 return;
 
             Shutdown();
-            session.Connection.DestroyResource(Info);
+            session.Connection.DestroyResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
         public IMessage CreateMessage()
