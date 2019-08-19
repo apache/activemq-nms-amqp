@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -16,39 +16,19 @@
  */
 
 using Apache.NMS.AMQP;
+using Apache.NMS.AMQP.Util;
 using NUnit.Framework;
 
 namespace NMS.AMQP.Test
 {
     [TestFixture]
-    public class NmsTopicTest
+    public class NmsTemporaryTopicTest
     {
         [Test]
-        public void TestIsQueue()
+        public void TestTwoTemporaryTopicsWithTheSameAddressesAreEqual()
         {
-            NmsTopic topic = new NmsTopic("myTopic");
-            Assert.False(topic.IsQueue, "should not be a queue");
-        }
-
-        [Test]
-        public void TestIsTopic()
-        {
-            NmsTopic topic = new NmsTopic("myTopic");
-            Assert.True(topic.IsTopic, "should be a topic");
-        }
-
-        [Test]
-        public void TestIsTemporary()
-        {
-            NmsTopic topic = new NmsTopic("myTopic");
-            Assert.False(topic.IsTemporary, "should not be temporary");
-        }
-
-        [Test]
-        public void TestTwoTopicsWithTheSameNamesAreEqual()
-        {
-            NmsTopic nmsTopic1 = new NmsTopic("myTopic");
-            NmsTopic nmsTopic2 = new NmsTopic("myTopic");
+            NmsTemporaryTopic nmsTopic1 = new NmsTemporaryTopic(new Id("test")) { Address = "myTopic" };
+            NmsTemporaryTopic nmsTopic2 = new NmsTemporaryTopic(new Id("test")) { Address = "myTopic" };
 
             Assert.AreEqual(nmsTopic1, nmsTopic2);
             Assert.AreNotSame(nmsTopic1, nmsTopic2);
@@ -56,10 +36,10 @@ namespace NMS.AMQP.Test
         }
         
         [Test]
-        public void TestTwoTopicsWithDifferentNamesNotAreEqual()
+        public void TestTwoTemporaryTopicsWithDifferentAddressesAreNotEqual()
         {
-            NmsTopic nmsTopic1 = new NmsTopic("myTopic");
-            NmsTopic nmsTopic2 = new NmsTopic("myTopic2");
+            NmsTemporaryTopic nmsTopic1 = new NmsTemporaryTopic(new Id("test")) { Address = "myTopic" };
+            NmsTemporaryTopic nmsTopic2 = new NmsTemporaryTopic(new Id("test")) { Address = "myTopic1" };
 
             Assert.AreNotEqual(nmsTopic1, nmsTopic2);
             Assert.AreNotEqual(nmsTopic1.GetHashCode(), nmsTopic2.GetHashCode());
