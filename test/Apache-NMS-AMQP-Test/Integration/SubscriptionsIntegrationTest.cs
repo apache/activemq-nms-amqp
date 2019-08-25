@@ -16,68 +16,58 @@
  */
 
 using System;
-using System.Net;
 using Apache.NMS;
-using Apache.NMS.AMQP;
+using NMS.AMQP.Test.TestAmqp;
 using NUnit.Framework;
-using Test.Amqp;
-using List = Amqp.Types.List;
 
 namespace NMS.AMQP.Test.Integration
 {
     [TestFixture]
-    public class SubscriptionsIntegrationTest
+    public class SubscriptionsIntegrationTest : IntegrationTestFixture
     {
-        private static readonly string User = "USER";
-        private static readonly string Password = "PASSWORD";
-        private static readonly string Address = "amqp://127.0.0.1:5672";
-        private static readonly IPEndPoint IPEndPoint = new IPEndPoint(IPAddress.Any, 5672);
-        
-        [Test]
-        public void TestUnsubscribeDurableSubWhileActiveThenInactive()
+        [Test, Timeout(20_000)]
+        public void TestUnsubscribeExclusiveDurableSubWhileActiveThenInactive()
         {
-            using (var testListener = new TestListener(IPEndPoint))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testListener.Open();
-                List result = null;
-                testListener.RegisterTarget(TestPoint.Detach, (stream, channel, fields) =>
-                {
-                    TestListener.FRM(stream, 0x16UL, 0, channel, fields[0], false);
-                    result = fields;
-                    return TestOutcome.Stop;
-                });
-                
-                IConnection connection = EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
 
+                String topicName = "myTopic";
                 ITopic dest = session.GetTopic("myTopic");
                 String subscriptionName = "mySubscription";
-
+                
+                // Attach the durable exclusive receiver
+                testPeer.ExpectDurableSubscriberAttach(topicName: topicName, subscriptionName: subscriptionName);
+                testPeer.ExpectLinkFlow();
+                
                 IMessageConsumer consumer = session.CreateDurableConsumer(dest, subscriptionName, null, false);
-                Assert.NotNull(consumer);
-
+                Assert.NotNull(consumer, "TopicSubscriber object was null");
+                
                 // Now try to unsubscribe, should fail
                 Assert.Catch<NMSException>(() => session.DeleteDurableConsumer(subscriptionName));
+                
+                // Now close the subscriber
+                testPeer.ExpectDetach(expectClosed: false, sendResponse: true, replyClosed: false);
                 
                 consumer.Close();
                 
                 // Try to unsubscribe again, should work now
+                testPeer.ExpectDurableSubUnsubscribeNullSourceLookup(failLookup: false, shared: false, subscriptionName: subscriptionName, topicName: topicName, hasClientId: true);
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                
                 session.DeleteDurableConsumer(subscriptionName);
                 
-                session.Close();
+                testPeer.WaitForAllMatchersToComplete(1000);
+                
+                testPeer.ExpectClose();
                 connection.Close();
                 
-                // Assert that closed field is set to true
-                Assert.IsTrue((bool) result[1]);
+                testPeer.WaitForAllMatchersToComplete(1000);
             }
-        }
-        
-        private IConnection EstablishConnection()
-        {
-            NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-            IConnection connection = factory.CreateConnection(User, Password);
-            connection.Start();
-            return connection;
         }
     }
 }

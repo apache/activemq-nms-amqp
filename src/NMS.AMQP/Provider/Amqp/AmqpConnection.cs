@@ -43,7 +43,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         public AmqpProvider Provider { get; }
         private readonly ITransportContext transport;
-        private readonly ConnectionInfo info;
         private readonly Uri remoteUri;
         private global::Amqp.Connection underlyingConnection;
         private readonly AmqpMessageFactory messageFactory;
@@ -54,28 +53,29 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             this.Provider = provider;
             this.transport = transport;
             this.remoteUri = provider.RemoteUri;
-            this.info = info;
+            this.Info = info;
             this.messageFactory = new AmqpMessageFactory(this);
         }
 
-        public global::Amqp.Connection UnderlyingConnection => underlyingConnection;
-        public string QueuePrefix => info.QueuePrefix;
-        public string TopicPrefix => info.TopicPrefix;
+        public Connection UnderlyingConnection => underlyingConnection;
+        public string QueuePrefix => Info.QueuePrefix;
+        public string TopicPrefix => Info.TopicPrefix;
         public bool ObjectMessageUsesAmqpTypes { get; set; } = false;
+        public ConnectionInfo Info { get; }
 
         public INmsMessageFactory MessageFactory => messageFactory;
 
         internal async Task Start()
         {
-            Address address = UriUtil.ToAddress(remoteUri, info.username, info.password);
-            underlyingConnection = await transport.CreateAsync(address, CreateOpenFrame(info), OnOpened);
+            Address address = UriUtil.ToAddress(remoteUri, Info.username, Info.password);
+            underlyingConnection = await transport.CreateAsync(address, CreateOpenFrame(Info), OnOpened);
             underlyingConnection.AddClosedCallback(Provider.OnInternalClosed);
 
             // Create a Session for this connection that is used for Temporary Destinations
             // and perhaps later on management and advisory monitoring.
 
             // TODO: change the way how connection session id is obtained
-            SessionInfo sessionInfo = new SessionInfo(info.Id);
+            SessionInfo sessionInfo = new SessionInfo(Info.Id);
             sessionInfo.AcknowledgementMode = AcknowledgementMode.AutoAcknowledge;
 
             connectionSession = new AmqpConnectionSession(this, sessionInfo);
@@ -105,20 +105,20 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             if (SymbolUtil.CheckAndCompareFields(open.Properties, SymbolUtil.CONNECTION_ESTABLISH_FAILED, SymbolUtil.BOOLEAN_TRUE))
             {
                 Tracer.InfoFormat("Open response contains {0} property the connection {1} will soon be closed.",
-                    SymbolUtil.CONNECTION_ESTABLISH_FAILED, info.Id);
+                    SymbolUtil.CONNECTION_ESTABLISH_FAILED, Info.Id);
             }
             else
             {
                 object value = SymbolUtil.GetFromFields(open.Properties, SymbolUtil.CONNECTION_PROPERTY_TOPIC_PREFIX);
                 if (value is string topicPrefix)
                 {
-                    info.TopicPrefix = topicPrefix;
+                    Info.TopicPrefix = topicPrefix;
                 }
 
                 value = SymbolUtil.GetFromFields(open.Properties, SymbolUtil.CONNECTION_PROPERTY_QUEUE_PREFIX);
                 if (value is string queuePrefix)
                 {
-                    info.QueuePrefix = queuePrefix;
+                    Info.QueuePrefix = queuePrefix;
                 }
 
                 Provider.FireConnectionEstablished();
@@ -134,13 +134,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         public void Close()
         {
-            connectionSession?.Close();
-
-            foreach (var session in sessions.Values.ToArray())
-            {
-                session.Close();
-            }
-
             try
             {
                 UnderlyingConnection?.Close();
@@ -148,8 +141,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             catch (Exception ex)
             {
                 // log network errors
-                NMSException nmse = ExceptionSupport.Wrap(ex, "Amqp Connection close failure for NMS Connection {0}", this.info.Id);
-                Tracer.DebugFormat("Caught Exception while closing Amqp Connection {0}. Exception {1}", this.info.Id, nmse);
+                NMSException nmse = ExceptionSupport.Wrap(ex, "Amqp Connection close failure for NMS Connection {0}", this.Info.Id);
+                Tracer.DebugFormat("Caught Exception while closing Amqp Connection {0}. Exception {1}", this.Info.Id, nmse);
             }
         }
 

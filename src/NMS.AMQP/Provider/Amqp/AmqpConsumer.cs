@@ -39,7 +39,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
     public class AmqpConsumer : IAmqpConsumer
     {
         private readonly ConsumerInfo info;
-        private ReceiverLink link;
+        private ReceiverLink receiverLink;
         private readonly LinkedList<InboundMessageDispatch> messages;
         private readonly object syncRoot = new object();
 
@@ -81,26 +81,42 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                                        + (destinationAddress.Length == 0 ? "" : (":" + destinationAddress));
             }
 
-            var taskCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            link = new ReceiverLink(session.UnderlyingSession, name, attach, (link1, attach1) => { taskCompletionSource.SetResult(true); });
-
-            link.AddClosedCallback((sender, error) =>
-            {
-                NMSException exception = ExceptionSupport.GetException(error, "Received Amqp link detach with Error for link {0}", info.Id);
-                if (!taskCompletionSource.TrySetException(exception))
-                {
-                    session.RemoveConsumer(info.Id);
-
-                    // If session is not closed it means that the link was remotely detached 
-                    if (!link.Session.IsClosed)
-                    {
-                        session.Connection.Provider.FireResourceClosed(info, exception);
-                    }
-                }
-            });
-            return taskCompletionSource.Task;
+            // TODO: Add timeout
+            var tsc = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            receiverLink = new ReceiverLink(session.UnderlyingSession, name, attach, HandleOpened(tsc));
+            receiverLink.AddClosedCallback(HandleClosed(tsc));
+            return tsc.Task;
         }
+
+        private OnAttached HandleOpened(TaskCompletionSource<bool> tsc) => (link, attach) =>
+        {
+            if (IsClosePending(attach))
+                return;
+
+            tsc.SetResult(true);
+        };
+
+        private static bool IsClosePending(Attach attach)
+        {
+            // When no link terminus was created, the peer will now detach/close us otherwise
+            // we need to validate the returned remote source prior to open completion.
+            return attach.Source == null;
+        }
+
+        private ClosedCallback HandleClosed(TaskCompletionSource<bool> tsc) => (sender, error) =>
+        {
+            NMSException exception = ExceptionSupport.GetException(error, "Received Amqp link detach with Error for link {0}", info.Id);
+            if (!tsc.TrySetException(exception))
+            {
+                session.RemoveConsumer(info.Id);
+
+                // If session is not closed it means that the link was remotely detached 
+                if (!receiverLink.Session.IsClosed)
+                {
+                    session.Connection.Provider.FireResourceClosed(info, exception);
+                }
+            }
+        };
 
         private Source CreateSource()
         {
@@ -169,12 +185,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         public void Start()
         {
-            link.Start(info.LinkCredit, OnMessage);
+            receiverLink.Start(info.LinkCredit, OnMessage);
         }
 
         public void Stop()
         {
-            link.SetCredit(0, CreditMode.Drain);
+            receiverLink.SetCredit(0, CreditMode.Drain);
         }
 
         private void OnMessage(IReceiverLink receiver, global::Amqp.Message amqpMessage)
@@ -189,7 +205,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 Tracer.Error($"Error on transform: {e.Message}");
 
                 // Mark message as undeliverable
-                link.Modify(amqpMessage, true, true);
+                receiverLink.Modify(amqpMessage, true, true);
                 return;
             }
 
@@ -233,21 +249,21 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         AmqpTransactionContext transactionalState = session.TransactionContext;
                         if (transactionalState != null)
                         {
-                            link.Complete(message, transactionalState.GetTxnAcceptState());
+                            receiverLink.Complete(message, transactionalState.GetTxnAcceptState());
                             transactionalState.RegisterTxConsumer(this);
                         }
                         else
                         {
-                            link.Accept(message);
+                            receiverLink.Accept(message);
                         }
                         RemoveMessage(envelope);
                         break;
                     case AckType.RELEASED:
-                        link.Release(message);
+                        receiverLink.Release(message);
                         RemoveMessage(envelope);
                         break;
                     case AckType.MODIFIED_FAILED_UNDELIVERABLE:
-                        link.Modify(message, true, true);
+                        receiverLink.Modify(message, true, true);
                         RemoveMessage(envelope);
                         break;
                     default:
@@ -289,11 +305,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             if (info.IsDurable)
             {
-                link?.Detach();
+                receiverLink?.Detach();
             }
             else
             {
-                link?.Close();
+                receiverLink?.Close();
             }
         }
 

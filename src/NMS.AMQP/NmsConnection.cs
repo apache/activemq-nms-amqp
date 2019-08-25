@@ -19,6 +19,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
@@ -41,6 +42,7 @@ namespace Apache.NMS.AMQP
         private IdGenerator temporaryTopicIdGenerator;
         private IdGenerator temporaryQueueIdGenerator;
         private NestedIdGenerator transactionIdGenerator;
+        private Exception failureCause;
         private readonly object syncRoot = new object();
 
         public NmsConnection(ConnectionInfo connectionInfo, IProvider provider)
@@ -167,7 +169,7 @@ namespace Apache.NMS.AMQP
         private void DoStop(bool checkClosed)
         {
             if (checkClosed)
-                CheckClosed();
+                CheckClosedOrFailed();
 
             CheckIsOnDeliveryThread();
 
@@ -187,7 +189,7 @@ namespace Apache.NMS.AMQP
 
         public ISession CreateSession(AcknowledgementMode acknowledgementMode)
         {
-            CheckClosed();
+            CheckClosedOrFailed();
             CreateNmsConnection();
 
             NmsSession session = new NmsSession(this, SessionIdGenerator.GenerateId(), acknowledgementMode)
@@ -322,9 +324,11 @@ namespace Apache.NMS.AMQP
 
         public void OnConnectionFailure(NMSException exception)
         {
+            Interlocked.CompareExchange(ref failureCause, exception, null);
+            
             OnAsyncException(exception);
 
-            if (closed.CompareAndSet(false, true))
+            if (!closed)
             {
                 try
                 {
@@ -444,11 +448,15 @@ namespace Apache.NMS.AMQP
                 listener.OnConnectionInterrupted(failedUri);
         }
 
-        private void CheckClosed()
+        private void CheckClosedOrFailed()
         {
             if (closed)
             {
                 throw new IllegalStateException("The Connection is closed");
+            }
+            if (failureCause != null)
+            {
+                throw new NMSConnectionException(failureCause.Message, failureCause);
             }
         }
 
@@ -575,7 +583,7 @@ namespace Apache.NMS.AMQP
 
         public void DeleteTemporaryDestination(NmsTemporaryDestination destination)
         {
-            CheckClosed();
+            CheckClosedOrFailed();
 
             try
             {
@@ -599,7 +607,7 @@ namespace Apache.NMS.AMQP
 
         public void Unsubscribe(string subscriptionName)
         {
-            CheckClosed();
+            CheckClosedOrFailed();
 
             provider.Unsubscribe(subscriptionName).ConfigureAwait(false).GetAwaiter().GetResult();
         }

@@ -18,6 +18,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
@@ -38,13 +39,15 @@ namespace Apache.NMS.AMQP
 
         public SessionInfo SessionInfo { get; }
         public NmsConnection Connection { get; }
-
+        
         private SessionDispatcher dispatcher;
+        private Exception failureCause;
+        private readonly AcknowledgementMode acknowledgementMode;
 
         public NmsSession(NmsConnection connection, Id sessionId, AcknowledgementMode acknowledgementMode)
         {
             Connection = connection;
-            AcknowledgementMode = acknowledgementMode;
+            this.acknowledgementMode = acknowledgementMode;
             SessionInfo = new SessionInfo(sessionId)
             {
                 AcknowledgementMode = acknowledgementMode
@@ -301,7 +304,10 @@ namespace Apache.NMS.AMQP
         {
             if (closed)
             {
-                throw new IllegalStateException("The Session is closed");
+                if (failureCause == null)
+                    throw new IllegalStateException("The Session is closed");
+                else
+                    throw new IllegalStateException("The Session was closed due to an unrecoverable error.", failureCause);
             }
         }
 
@@ -309,7 +315,15 @@ namespace Apache.NMS.AMQP
         public ProducerTransformerDelegate ProducerTransformer { get; set; }
         public TimeSpan RequestTimeout { get; set; }
         public bool Transacted => AcknowledgementMode == AcknowledgementMode.Transactional;
-        public AcknowledgementMode AcknowledgementMode { get; }
+
+        public AcknowledgementMode AcknowledgementMode
+        {
+            get
+            {
+                CheckClosed();
+                return acknowledgementMode;
+            }
+        }
         public bool IsClosed => closed;
 
         internal INmsTransactionContext TransactionContext { get; }
@@ -477,6 +491,7 @@ namespace Apache.NMS.AMQP
         {
             if (closed.CompareAndSet(false, true))
             {
+                failureCause = exception;
                 Stop();
                 
                 try

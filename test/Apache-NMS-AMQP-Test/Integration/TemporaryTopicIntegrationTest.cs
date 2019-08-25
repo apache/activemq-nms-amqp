@@ -16,98 +16,73 @@
  */
 
 using Apache.NMS;
-using Apache.NMS.AMQP;
 using NMS.AMQP.Test.TestAmqp;
 using NUnit.Framework;
 
 namespace NMS.AMQP.Test.Integration
 {
     [TestFixture]
-    public class TemporaryTopicIntegrationTest
+    public class TemporaryTopicIntegrationTest : IntegrationTestFixture
     {
-        private static readonly string User = "USER";
-        private static readonly string Password = "PASSWORD";
-        private static readonly string Address = "amqp://127.0.0.1:5672";
-        
-        [Test]
-        public void TestCreateTemporaryTopic()
-        {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
-            {
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                
-                testAmqpPeer.Open();
-                IConnection connection = EstablishConnection();
-                connection.Start();
 
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                ITemporaryTopic topic = session.CreateTemporaryTopic();
-
-                session.CreateConsumer(topic);
-
-                connection.Close();
-            }
-        }
-        
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestCantConsumeFromTemporaryTopicCreatedOnAnotherConnection()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                
-                testAmqpPeer.Open();
-                IConnection connection = EstablishConnection();
-                connection.Start();
+                IConnection connection = EstablishConnection(testPeer);
 
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+
+                string dynamicAddress = "myTempTopicAddress";
+                testPeer.ExpectTempTopicCreationAttach(dynamicAddress);
+
                 ITemporaryTopic topic = session.CreateTemporaryTopic();
 
-                IConnection connection2 = EstablishConnection();
+                IConnection connection2 = EstablishConnection(testPeer);
+                testPeer.ExpectBegin();
+
                 ISession session2 = connection2.CreateSession(AcknowledgementMode.AutoAcknowledge);
 
-                Assert.Catch<InvalidDestinationException>(() => session2.CreateConsumer(topic), "Should not be able to consumer from temporary topic from another connection");
-
-                session.CreateConsumer(topic);
-
-                connection.Close();
+                Assert.Catch<InvalidDestinationException>(() => session2.CreateConsumer(topic), "Should not be able to create consumer from temporary topic from another connection");
             }
         }
-        
-        [Test]
+
+        [Test, Timeout(20_000)]
         public void TestCantDeleteTemporaryQueueWithConsumers()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.RegisterLinkProcessor(new TestLinkProcessor());
-                
-                testAmqpPeer.Open();
-                IConnection connection = EstablishConnection();
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
 
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+
+                string dynamicAddress = "myTempTopicAddress";
+                testPeer.ExpectTempTopicCreationAttach(dynamicAddress);
+
                 ITemporaryTopic topic = session.CreateTemporaryTopic();
 
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow();
                 IMessageConsumer consumer = session.CreateConsumer(topic);
 
-                Assert.Catch<IllegalStateException>(() => topic.Delete(), "should not be able to delete temporary queue with active consumers");
-                
+                Assert.Catch<IllegalStateException>(() => topic.Delete(), "should not be able to delete temporary topic with active consumers");
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
                 consumer.Close();
-                
+
                 // Now it should be allowed
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
                 topic.Delete();
 
-                connection.Start();
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
-        }
-        
-        private IConnection EstablishConnection()
-        {
-            NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-            IConnection connection = factory.CreateConnection(User, Password);
-            connection.Start();
-            return connection;
         }
     }
 }

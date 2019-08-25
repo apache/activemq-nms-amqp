@@ -16,81 +16,71 @@
  */
 
 using System;
+using System.Threading;
 using Apache.NMS;
 using Apache.NMS.AMQP;
-using Apache.NMS.Util;
 using NMS.AMQP.Test.TestAmqp;
+using NMS.AMQP.Test.TestAmqp.BasicTypes;
 using NUnit.Framework;
 
 namespace NMS.AMQP.Test.Integration
 {
     [TestFixture]
-    public class ConnectionIntegrationTest
+    public class ConnectionIntegrationTest : IntegrationTestFixture
     {
-        private static readonly string User = "USER";
-        private static readonly string Password = "PASSWORD";
-        private static readonly string Address = "amqp://127.0.0.1:5672";
-
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestCreateAndCloseConnection()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-                IConnection connection = factory.CreateConnection(User, Password);
-                connection.Start();
+                IConnection connection = EstablishConnection(testPeer);
+                testPeer.ExpectClose();
                 connection.Close();
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestCreateAutoAckSession()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-                IConnection connection = factory.CreateConnection(User, Password);
-                connection.Start();
+                IConnection connection = EstablishConnection(testPeer);
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 Assert.NotNull(session, "Session should not be null");
+                testPeer.ExpectClose();
                 Assert.AreEqual(AcknowledgementMode.AutoAcknowledge, session.AcknowledgementMode);
                 connection.Close();
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestCreateAutoAckSessionByDefault()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-                IConnection connection = factory.CreateConnection(User, Password);
-                connection.Start();
+                IConnection connection = EstablishConnection(testPeer);
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession();
                 Assert.NotNull(session, "Session should not be null");
                 Assert.AreEqual(AcknowledgementMode.AutoAcknowledge, session.AcknowledgementMode);
+                testPeer.ExpectClose();
                 connection.Close();
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestRemotelyCloseConnectionDuringSessionCreation()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            string errorMessage = "buba";
+
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-                IConnection connection = factory.CreateConnection(User, Password);
+                IConnection connection = EstablishConnection(testPeer);
 
-                // We need to set request timeout because there may be a deadlock when we try to 
-                // create amqplite session before underlying connection changes its state do disconnected
-                connection.RequestTimeout = TimeSpan.FromMilliseconds(1000);
-
-                // Explicitly close the connection with an error
-                testAmqpPeer.Close();
+                // Expect the begin, then explicitly close the connection with an error
+                testPeer.ExpectBegin(sendResponse: false);
+                testPeer.RemotelyCloseConnection(expectCloseResponse: true, errorCondition: AmqpError.NOT_ALLOWED, errorMessage: errorMessage);
 
                 try
                 {
@@ -99,82 +89,94 @@ namespace NMS.AMQP.Test.Integration
                 }
                 catch (NMSException e)
                 {
-                    Console.WriteLine(e);
+                    Assert.True(e.Message.Contains(errorMessage));
                 }
 
                 connection.Close();
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestRemotelyEndConnectionListenerInvoked()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-                IConnection connection = factory.CreateConnection(User, Password);
+                ManualResetEvent done = new ManualResetEvent(false);
 
-                bool done = false;
-                connection.ExceptionListener += exception => { done = true; };
+                // Don't set a ClientId, so that the underlying AMQP connection isn't established yet
+                IConnection connection = EstablishConnection(testPeer: testPeer, setClientId: false);
+
+                // Tell the test peer to close the connection when executing its last handler
+                testPeer.RemotelyCloseConnection(expectCloseResponse: true);
+
+                connection.ExceptionListener += exception => done.Set();
+
+                // Trigger the underlying AMQP connection
                 connection.Start();
 
-                // Explicitly close the connection with an error
-                testAmqpPeer.Close();
+                Assert.IsTrue(done.WaitOne(TimeSpan.FromSeconds(5)), "Connection should report failure");
 
-                Assert.That(() => done, Is.True.After(1000));
+                connection.Close();
             }
         }
 
-        [Test, Timeout(2000)]
+        [Test, Timeout(20_000)]
         public void TestRemotelyEndConnectionWithSessionWithConsumer()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            string errorMessage = "buba";
+
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-                IConnection connection = factory.CreateConnection(User, Password);
-                connection.Start();
+                IConnection connection = EstablishConnection(testPeer);
 
+                testPeer.ExpectBegin();
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+
+                // Create a consumer, then remotely end the connection afterwards.
+                testPeer.ExpectReceiverAttach();
+ 
+                testPeer.ExpectLinkFlow();
+                testPeer.RemotelyCloseConnection(expectCloseResponse: true, errorCondition: AmqpError.RESOURCE_LIMIT_EXCEEDED, errorMessage: errorMessage);
+
                 IQueue queue = session.GetQueue("myQueue");
-                var consumer = session.CreateConsumer(queue);
+                IMessageConsumer consumer = session.CreateConsumer(queue);
 
-                // Explicitly close the connection with an error
-                testAmqpPeer.Close();
-
-                Assert.That(() => ((NmsConnection) connection).IsConnected, Is.False.After(200, 50), "Connection never closed");
-                Assert.That(() => ((NmsConnection) connection).IsClosed, Is.True.After(200, 50), "Connection never closed");
+                Assert.That(() => ((NmsConnection) connection).IsConnected, Is.False.After(10_000, 100), "Connection never closes.");
 
                 try
                 {
                     connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                     Assert.Fail("Expected ISE to be thrown due to being closed");
                 }
-                catch (IllegalStateException)
+                catch (NMSConnectionException e)
                 {
+                    Assert.True(e.ToString().Contains(AmqpError.RESOURCE_LIMIT_EXCEEDED));
+                    Assert.True(e.ToString().Contains(errorMessage));
                 }
 
                 // Verify the session is now marked closed
                 try
                 {
-                    session.CreateConsumer(queue);
+                    var _ = session.AcknowledgementMode;
                     Assert.Fail("Expected ISE to be thrown due to being closed");
                 }
-                catch (IllegalStateException)
+                catch (IllegalStateException e)
                 {
+                    Assert.True(e.ToString().Contains(AmqpError.RESOURCE_LIMIT_EXCEEDED));
+                    Assert.True(e.ToString().Contains(errorMessage));
                 }
 
                 // Verify the consumer is now marked closed
                 try
                 {
                     consumer.Listener += message => { };
-                    Assert.Fail("Expected ISE to be thrown due to being closed");
                 }
-                catch (IllegalStateException)
+                catch (IllegalStateException e)
                 {
+                    Assert.True(e.ToString().Contains(AmqpError.RESOURCE_LIMIT_EXCEEDED));
+                    Assert.True(e.ToString().Contains(errorMessage));
                 }
-
+                
                 // Try closing them explicitly, should effectively no-op in client.
                 // The test peer will throw during close if it sends anything.
                 consumer.Close();
@@ -183,65 +185,52 @@ namespace NMS.AMQP.Test.Integration
             }
         }
 
-        [Test]
+        [Test, Timeout(20_000)]
         public void TestConnectionStartStop()
         {
-            using (TestAmqpPeer testAmqpPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                testAmqpPeer.Open();
-                testAmqpPeer.RegisterMessageSource("myQueue");
-                
-                NmsConnectionFactory factory = new NmsConnectionFactory(Address);
-                IConnection connection = factory.CreateConnection(User, Password);
+                int msgCount = 10;
 
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.ClientAcknowledge);
+
                 IQueue queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithNullContent(), count: msgCount);
+                
                 var consumer = session.CreateConsumer(queue);
 
-                CountDownLatch firstBatch = new CountDownLatch(5);
-                CountDownLatch secondBatch = new CountDownLatch(5);
-
-                consumer.Listener += message =>
-                {
-                    if (firstBatch.Remaining > 0)
-                        firstBatch.countDown();
-                    else
-                        secondBatch.countDown();
-                };
-
-                // send first batch of messages
                 for (int i = 0; i < 5; i++)
                 {
-                    testAmqpPeer.SendMessage("myQueue", $"message{i.ToString()}");
+                    IMessage message = consumer.Receive(TimeSpan.FromMilliseconds(1000));
+                    Assert.IsNotNull(message);
                 }
-
-                connection.Start();
-                
-                Assert.True(firstBatch.@await(TimeSpan.FromMilliseconds(1000)));
                 
                 // stop the connection, consumers shouldn't receive any more messages
                 connection.Stop();
                 
-                // send second batch of messages
-                for (int i = 5; i < 10; i++)
-                {
-                    testAmqpPeer.SendMessage("myQueue", $"message{i.ToString()}");
-                }
-                
-                // No messages should arrive to consumer as connection has been stopped 
-                Assert.False(secondBatch.@await(TimeSpan.FromMilliseconds(1000)), "Message arrived despite the fact, that the connection was stopped.");
+                // No messages should arrive to consumer as connection has been stopped
+                Assert.IsNull(consumer.Receive(TimeSpan.FromMilliseconds(100)), "Message arrived despite the fact, that the connection was stopped.");
                 
                 // restart the connection
                 connection.Start();
                 
                 // The second batch of messages should be delivered
-                Assert.True(secondBatch.@await(TimeSpan.FromMilliseconds(1000)), "No messages arrived.");
+                for (int i = 0; i < 5; i++)
+                {
+                    IMessage message = consumer.Receive(TimeSpan.FromMilliseconds(1000));
+                    Assert.IsNotNull(message);
+                }
                 
-                // Try closing them explicitly, should effectively no-op in client.
-                // The test peer will throw during close if it sends anything.
-                consumer.Close();
-                session.Close();
+                testPeer.ExpectClose();
                 connection.Close();
+                
+                testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
     }

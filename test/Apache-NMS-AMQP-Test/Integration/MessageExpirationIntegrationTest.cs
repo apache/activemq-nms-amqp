@@ -1,175 +1,234 @@
 ﻿using System;
-using System.Linq;
-using System.Net;
 using System.Threading;
-using System.Threading.Tasks;
+using Amqp.Framing;
 using Apache.NMS;
-using Apache.NMS.AMQP;
-using Apache.NMS.AMQP.Message;
-using Apache.NMS.AMQP.Provider.Amqp.Message;
-using Moq;
 using NMS.AMQP.Test.TestAmqp;
 using NUnit.Framework;
-using Test.Amqp;
-
 
 namespace NMS.AMQP.Test.Integration
 {
     [TestFixture]
-    public class MessageExpirationIntegrationTest
+    public class MessageExpirationIntegrationTest : IntegrationTestFixture
     {
-        private static readonly string User = "USER";
-        private static readonly string Password = "PASSWORD";
-        private static readonly string Address = "amqp://127.0.0.1:5672";
-        private static readonly IPEndPoint IPEndPoint = new IPEndPoint(IPAddress.Any, 5672);
-
-        [Test, Timeout(4000)]
+        [Test, Timeout(20_000)]
         public void TestIncomingExpiredMessageGetsFiltered()
         {
-            const long ttl = 200;
-            TimeSpan time = TimeSpan.FromMilliseconds(ttl + 1);
-            using (TestAmqpPeer testPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                DateTime createTime = DateTime.UtcNow - time;
-                Amqp.Message expiredMsg = CreateMessageWithExpiration(ttl, createTime);
-                string contents = (expiredMsg.BodySection as Amqp.Framing.AmqpValue)?.Value as string;
-                Assert.NotNull(contents, "Failed to create expired message");
-                testPeer.Open();
-                testPeer.SendMessage("myQueue", expiredMsg);
-
-                NmsConnection connection = (NmsConnection)EstablishConnection(testPeer);
+                IConnection connection = EstablishConnection(testPeer);
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue queue = session.GetQueue("myQueue");
-                IMessageConsumer consumer = session.CreateConsumer(queue);
-                // TODO change to verify frames sent from client to be a Modified OutCome
-                IMessage message = consumer.Receive(time);
-                Assert.IsNull(message, "A message should not have been received");
 
-                session.Close();
+                // Expected the consumer to attach and send credit, then send it an
+                // already-expired message followed by a live message.
+                testPeer.ExpectReceiverAttach();
+                string expiredMsgContent = "already-expired";
+                Amqp.Message message = CreateExpiredMessage(expiredMsgContent);
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: message);
+
+                string liveMsgContent = "valid";
+                testPeer.SendTransferToLastOpenedLinkOnLastOpenedSession(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = liveMsgContent } }, nextIncomingId: 2);
+
+                IMessageConsumer consumer = session.CreateConsumer(queue);
+
+                // Call receive, expect the first message to be filtered due to expiry,
+                // and the second message to be given to the test app and accepted.
+                Action<DeliveryState> modifiedMatcher = state =>
+                {
+                    var modified = state as Modified;
+                    Assert.IsNotNull(modified);
+                    Assert.IsTrue(modified.DeliveryFailed);
+                    Assert.IsTrue(modified.UndeliverableHere);
+                };
+                testPeer.ExpectDisposition(settled: true, stateMatcher: modifiedMatcher, firstDeliveryId: 1, lastDeliveryId: 1);
+                testPeer.ExpectDisposition(settled: true, stateMatcher: Assert.IsInstanceOf<Accepted>, firstDeliveryId: 2, lastDeliveryId: 2);
+
+                IMessage m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                Assert.AreEqual(liveMsgContent, (m as ITextMessage).Text, "Unexpected message content");
+
+                // Verify the other message is not there. Will drain to be sure there are no messages.
+                Assert.IsNull(consumer.Receive(TimeSpan.FromMilliseconds(10)), "Message should not have been received");
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
             }
         }
 
-        [Test, Timeout(4000)]
-        public void TestIncomingExpiredMessageGetsConsumedWhenDisabled()
+        [Test, Timeout(20_000)]
+        public void TestIncomingExpiredMessageGetsConsumedWhenFilterDisabled()
         {
-            const long ttl = 200;
-            TimeSpan time = TimeSpan.FromMilliseconds(ttl + 1);
-            using (TestAmqpPeer testPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                DateTime createTime = DateTime.UtcNow - time;
-                Amqp.Message expiredMsg = CreateMessageWithExpiration(ttl, createTime);
-                string contents = (expiredMsg.BodySection as Amqp.Framing.AmqpValue)?.Value as string;
-                Assert.NotNull(contents, "Failed to create expired message");
-                testPeer.Open();
-                testPeer.SendMessage("myQueue", expiredMsg);
-
-                NmsConnection connection = (NmsConnection)EstablishConnection(testPeer, "nms.localMessageExpiry=false");
+                IConnection connection = EstablishConnection(testPeer, "?nms.localMessageExpiry=false");
                 connection.Start();
+
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue queue = session.GetQueue("myQueue");
-                IMessageConsumer consumer = session.CreateConsumer(queue);
-                IMessage message = consumer.Receive();
-                // TODO change to verify frames sent from client to be an Accepted OutCome
-                Assert.NotNull(message, "A message should have been received");
-                Assert.NotNull(message as ITextMessage, "Received incorrect message body type {0}", message.GetType().Name);
-                Assert.AreEqual(contents, (message as ITextMessage)?.Text, "Received message with unexpected body value");
 
-                session.Close();
+                // Expected the consumer to attach and send credit, then send it an
+                // already-expired message followed by a live message.
+                testPeer.ExpectReceiverAttach();
+
+                string expiredMsgContent = "already-expired";
+                Amqp.Message message = CreateExpiredMessage(expiredMsgContent);
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: message);
+
+                string liveMsgContent = "valid";
+                testPeer.SendTransferToLastOpenedLinkOnLastOpenedSession(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = liveMsgContent } }, nextIncomingId: 2);
+
+                IMessageConsumer consumer = session.CreateConsumer(queue);
+
+                // Call receive, expect the expired message as we disabled local expiry.
+                testPeer.ExpectDisposition(settled: true, stateMatcher: Assert.IsInstanceOf<Accepted>, firstDeliveryId: 1, lastDeliveryId: 1);
+
+                IMessage m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                Assert.AreEqual(expiredMsgContent, ((ITextMessage) m).Text, "Unexpected message content");
+
+                // Verify the other message is there
+                testPeer.ExpectDisposition(settled: true, stateMatcher: Assert.IsInstanceOf<Accepted>, firstDeliveryId: 2, lastDeliveryId: 2);
+
+                m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                Assert.AreEqual(liveMsgContent, ((ITextMessage) m).Text, "Unexpected message content");
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
             }
         }
 
-        [Test, Timeout(4000)]
+        [Test, Timeout(20_000)]
         public void TestIncomingExpiredMessageGetsFilteredAsync()
         {
-            const long ttl = 200;
-            TimeSpan time = TimeSpan.FromMilliseconds(ttl + 1);
-            using (TestAmqpPeer testPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                DateTime createTime = DateTime.UtcNow - time;
-                Amqp.Message expiredMsg = CreateMessageWithExpiration(ttl, createTime);
-                string contents = (expiredMsg.BodySection as Amqp.Framing.AmqpValue)?.Value as string;
-                Assert.NotNull(contents, "Failed to create expired message");
-                testPeer.Open();
-                testPeer.SendMessage("myQueue", expiredMsg);
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
 
-                NmsConnection connection = (NmsConnection)EstablishConnection(testPeer);
-                
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue queue = session.GetQueue("myQueue");
+
+                // Expected the consumer to attach and send credit, then send it an
+                // already-expired message followed by a live message.
+                testPeer.ExpectReceiverAttach();
+
+                string expiredMsgContent = "already-expired";
+                Amqp.Message message = CreateExpiredMessage(expiredMsgContent);
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: message);
+
+                string liveMsgContent = "valid";
+                testPeer.SendTransferToLastOpenedLinkOnLastOpenedSession(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = liveMsgContent } }, nextIncomingId: 2);
+
                 IMessageConsumer consumer = session.CreateConsumer(queue);
-                TaskCompletionSource<IMessage> tcs = new TaskCompletionSource<IMessage>();
-                consumer.Listener += m => { tcs.SetResult(m); };
-                connection.Start();
-                // TODO change to verify frames sent from client to be a Modified OutCome
-                Assert.AreEqual(1, Task.WaitAny(tcs.Task, Task.Delay(Convert.ToInt32(ttl))), "Received message when message should not have been received");
-                Assert.IsTrue(tcs.TrySetCanceled(), "Failed to cancel receive task");
-                
-                session.Close();
+
+                // Add message listener, expect the first message to be filtered due to expiry,
+                // and the second message to be given to the test app and accepted.
+                Action<DeliveryState> modifiedMatcher = state =>
+                {
+                    var modified = state as Modified;
+                    Assert.IsNotNull(modified);
+                    Assert.IsTrue(modified.DeliveryFailed);
+                    Assert.IsTrue(modified.UndeliverableHere);
+                };
+                testPeer.ExpectDisposition(settled: true, stateMatcher: modifiedMatcher, firstDeliveryId: 1, lastDeliveryId: 1);
+                testPeer.ExpectDisposition(settled: true, stateMatcher: Assert.IsInstanceOf<Accepted>, firstDeliveryId: 2, lastDeliveryId: 2);
+
+
+                ManualResetEvent success = new ManualResetEvent(false);
+                ManualResetEvent listenerFailure = new ManualResetEvent(false);
+
+                consumer.Listener += m =>
+                {
+                    if (liveMsgContent.Equals(((ITextMessage) m).Text))
+                        success.Set();
+                    else
+                        listenerFailure.Set();
+                };
+
+                Assert.True(success.WaitOne(TimeSpan.FromSeconds(5)), "didn't get expected message");
+                Assert.False(listenerFailure.WaitOne(TimeSpan.FromMilliseconds(100)), "Received message when message should not have been received");
+
+                testPeer.WaitForAllMatchersToComplete(3000);
+
+                testPeer.ExpectClose();
                 connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
             }
         }
 
-        [Test, Timeout(4000)]
-        public void TestIncomingExpiredMessageGetsConsumedWhenDisabledAsync()
+        [Test, Timeout(20_000)]
+        public void TestIncomingExpiredMessageGetsConsumedWhenFilterDisabledAsync()
         {
-            const long ttl = 200;
-            TimeSpan time = TimeSpan.FromMilliseconds(ttl + 1);
-            using (TestAmqpPeer testPeer = new TestAmqpPeer(Address, User, Password))
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                DateTime createTime = DateTime.UtcNow - time;
-                Amqp.Message expiredMsg = CreateMessageWithExpiration(ttl, createTime);
-                string contents = (expiredMsg.BodySection as Amqp.Framing.AmqpValue)?.Value as string;
-                Assert.NotNull(contents, "Failed to create expired message");
-                testPeer.Open();
-                testPeer.SendMessage("myQueue", expiredMsg);
+                IConnection connection = EstablishConnection(testPeer, "?nms.localMessageExpiry=false");
+                connection.Start();
 
-                NmsConnection connection = (NmsConnection)EstablishConnection(testPeer, "nms.localMessageExpiry=false");
+                testPeer.ExpectBegin();
+
                 ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 IQueue queue = session.GetQueue("myQueue");
+
+                // Expected the consumer to attach and send credit, then send it an
+                // already-expired message followed by a live message.
+                testPeer.ExpectReceiverAttach();
+
+                string expiredMsgContent = "already-expired";
+                Amqp.Message message = CreateExpiredMessage(expiredMsgContent);
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: message);
+
+                string liveMsgContent = "valid";
+                testPeer.SendTransferToLastOpenedLinkOnLastOpenedSession(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = liveMsgContent } }, nextIncomingId: 2);
+
                 IMessageConsumer consumer = session.CreateConsumer(queue);
-                TaskCompletionSource<IMessage> tcs = new TaskCompletionSource<IMessage>();
-                consumer.Listener += m => { tcs.SetResult(m); };
-                connection.Start();
-                // TODO change to verify frames sent from client to be an Accepted OutCome
-                Assert.AreEqual(0, Task.WaitAny(tcs.Task, Task.Delay(Convert.ToInt32(ttl))), "Did not receive message when message should have been received");
-                IMessage message = tcs.Task.Result;
-                Assert.NotNull(message, "A message should have been received");
-                Assert.NotNull(message as ITextMessage, "Received incorrect message body type {0}", message.GetType().Name);
-                Assert.AreEqual(contents, (message as ITextMessage)?.Text, "Received message with unexpected body value");
+                
+                // Add message listener, expect both messages as the filter is disabled
+                testPeer.ExpectDisposition(settled: true, stateMatcher: Assert.IsInstanceOf<Accepted>, firstDeliveryId:1, lastDeliveryId:1);
+                testPeer.ExpectDisposition(settled: true, stateMatcher: Assert.IsInstanceOf<Accepted>, firstDeliveryId:2, lastDeliveryId:2);
 
-                session.Close();
+                CountdownEvent success = new CountdownEvent(2);
+
+                consumer.Listener += m =>
+                {
+                    if (expiredMsgContent.Equals(((ITextMessage) m).Text) || liveMsgContent.Equals(((ITextMessage) m).Text))
+                        success.Signal();
+                };
+                
+                Assert.IsTrue(success.Wait(TimeSpan.FromSeconds(5)), "Didn't get expected messages");
+                
+                testPeer.WaitForAllMatchersToComplete(3000);
+                
+                testPeer.ExpectClose();
                 connection.Close();
+                
+                testPeer.WaitForAllMatchersToComplete(3000);
             }
         }
 
-        private static Amqp.Message CreateMessageWithExpiration(long ttl, DateTime? createTime = null, string payload = null)
+        private static Amqp.Message CreateExpiredMessage(string value)
         {
-            AmqpNmsTextMessageFacade msg = new AmqpNmsTextMessageFacade();
-            msg.Initialize(null);
-            msg.NMSTimestamp = createTime ?? DateTime.UtcNow;
-            if (ttl > 0)
+            return new Amqp.Message
             {
-                TimeSpan timeToLive = TimeSpan.FromMilliseconds(Convert.ToDouble(ttl));
-                msg.NMSTimeToLive = timeToLive;
-                msg.Expiration = msg.NMSTimestamp + timeToLive;
-            }
-            if (String.IsNullOrEmpty(payload))
-            {
-                payload = TestContext.CurrentContext.Test.FullName;
-            }
-            msg.Text = payload;
-            msg.NMSMessageId = Guid.NewGuid().ToString();
-            return msg.Message;
-        }
-
-        private static IConnection EstablishConnection(TestAmqpPeer peer, string queryParams = null)
-        {
-            string uri = String.IsNullOrEmpty(queryParams) ? peer.Address.OriginalString : $"{peer.Address.OriginalString}?{queryParams}";
-            NmsConnectionFactory factory = new NmsConnectionFactory(uri);
-            return factory.CreateConnection(User, Password);
+                BodySection = new AmqpValue() { Value = value },
+                Properties = new Properties { AbsoluteExpiryTime = DateTime.UtcNow - TimeSpan.FromMilliseconds(100) }
+            };
         }
     }
 }

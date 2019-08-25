@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,33 +15,13 @@
  * limitations under the License.
  */
 
-using System.Collections.Generic;
-using Amqp.Listener;
+using System.IO;
+using Amqp.Types;
 
-namespace NMS.AMQP.Test.TestAmqp
+namespace NMS.AMQP.Test.TestAmqp.Matchers
 {
-    class TestLinkEndpoint : LinkEndpoint
+    public interface IFrameMatcher : IMatcher
     {
-        private List<Amqp.Message> messages;
-
-        public TestLinkEndpoint(List<Amqp.Message> messages = null)
-        {
-            this.messages = messages;
-        }
-
-        public override void OnMessage(MessageContext messageContext)
-        {
-            messages?.Add(messageContext.Message);
-            messageContext.Complete();
-        }
-
-        public override void OnFlow(FlowContext flowContext)
-        {
-        }
-
-        public override void OnDisposition(DispositionContext dispositionContext)
-        {
-            dispositionContext.Complete();
-        }
+        bool OnFrame(Stream stream, ushort channel, DescribedList command, Amqp.Message message);
     }
 }
