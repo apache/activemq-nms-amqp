@@ -1016,11 +1016,11 @@ namespace NMS.AMQP.Test.Provider.Amqp
 
         // --- absolute-expiry-time field  ---
         [Test]
-        public void TestGetExpirationIsZeroForNewMessage()
+        public void TestGetExpirationIsNullForNewMessage()
         {
             AmqpNmsMessageFacade amqpNmsMessageFacade = CreateNewMessageFacade();
 
-            Assert.AreEqual(default(DateTime), amqpNmsMessageFacade.Expiration);
+            Assert.IsNull(amqpNmsMessageFacade.Expiration);
         }
 
         [Test]
@@ -1049,17 +1049,18 @@ namespace NMS.AMQP.Test.Provider.Amqp
         }
 
         [Test]
-        public void TestSetExpirationZeroOnMessageWithExistingExpiryTime()
+        public void TestSetExpirationNullOnMessageWithExistingExpiryTime()
         {
             DateTime timestamp = DateTime.UtcNow;
 
             AmqpNmsMessageFacade amqpNmsMessageFacade = CreateNewMessageFacade();
 
             amqpNmsMessageFacade.Expiration = timestamp;
-            amqpNmsMessageFacade.Expiration = default;
+            amqpNmsMessageFacade.Expiration = null;
 
             Assert.AreEqual(default(DateTime), amqpNmsMessageFacade.Message.Properties.AbsoluteExpiryTime, "Expected absolute-expiry-time to be default");
-            Assert.AreEqual(default(DateTime), amqpNmsMessageFacade.Expiration, "Expected no expiration");
+            Assert.IsFalse(amqpNmsMessageFacade.Message.Properties.HasField(8), "Expected absolute-expiry-time is not set");
+            Assert.AreEqual(null, amqpNmsMessageFacade.Expiration, "Expected no expiration");
         }
 
         // --- user-id field  ---
@@ -1352,7 +1353,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             Assert.AreEqual(source.IsPersistent, copy.IsPersistent);
             Assert.AreEqual(source.UserId, copy.UserId);
             Assert.AreEqual(source.NMSTimeToLive, copy.NMSTimeToLive);
-            Assert.IsTrue(Math.Abs((copy.Expiration - source.Expiration).TotalMilliseconds) < 1);
+            Assert.IsTrue(Math.Abs((copy.Expiration.Value - source.Expiration.Value).TotalMilliseconds) < 1);
             Assert.IsTrue(Math.Abs((copy.NMSTimestamp - source.NMSTimestamp).TotalMilliseconds) < 1);
             Assert.AreEqual(source.Properties.GetString("APP-Prop-1"), copy.Properties.GetString("APP-Prop-1"));
             Assert.AreEqual(source.GetMessageAnnotation("test-annotation"), copy.GetMessageAnnotation("test-annotation"));

@@ -29,12 +29,14 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
 {
     public class AmqpNmsMessageFacade : INmsMessageFacade
     {
+        private const int ABSOLUTE_EXPIRY_TIME_INDEX = 8;
+        
         private TimeSpan? amqpTimeToLiveOverride;
         private IDestination destination;
         private IDestination replyTo;
         private IDestination consumerDestination;
         private IAmqpConnection connection;
-        private DateTime syntheticExpiration;
+        private DateTime? syntheticExpiration;
         public global::Amqp.Message Message { get; private set; }
 
         public virtual bool HasBody()
@@ -206,19 +208,19 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             }
         }
 
-        public DateTime Expiration
+        public DateTime? Expiration
         {
-            get => Message.Properties?.AbsoluteExpiryTime ?? syntheticExpiration;
+            get => Message.Properties?.HasField(ABSOLUTE_EXPIRY_TIME_INDEX) == true ? Message.Properties.AbsoluteExpiryTime : syntheticExpiration;
             set
             {
-                if (value != default)
+                if (value != null)
                 {
                     LazyCreateProperties();
-                    Message.Properties.AbsoluteExpiryTime = value;
+                    Message.Properties.AbsoluteExpiryTime = value.Value;
                 }
-                else if (Message.Properties != null)
+                else
                 {
-                    Message.Properties.AbsoluteExpiryTime = default;
+                    Message.Properties?.ResetField(ABSOLUTE_EXPIRY_TIME_INDEX);
                 }
             }
         }
@@ -376,8 +378,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             InitializeHeader();
 
             TimeSpan ttl = NMSTimeToLive;
-            DateTime absoluteExpiryTime = Expiration;
-            if (absoluteExpiryTime == default && ttl != default)
+            DateTime? absoluteExpiryTime = Expiration;
+            if (absoluteExpiryTime == null && ttl != default)
             {
                 syntheticExpiration = DateTime.UtcNow + ttl;
             }

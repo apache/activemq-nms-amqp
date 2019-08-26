@@ -37,7 +37,7 @@ namespace Apache.NMS.AMQP.Message.Facade
         string NMSType { get; set; }
         string GroupId { get; set; }
         uint GroupSequence { get; set; }
-        DateTime Expiration { get; set; }
+        DateTime? Expiration { get; set; }
         sbyte JmsMsgType { get; }
         
         /// <summary>
