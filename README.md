@@ -16,7 +16,7 @@ If you are a .NET developer that doesn't want to be locked into a messaging impl
 Apache-NMS-AMQP uses [AmqpNetLite](https://github.com/Azure/amqpnetlite) as the underlying AMQP 1.0 transport Protocol engine. 
 
 ### Overall Architecture
-Apache-NMS-AMQP should bridge the familiar NMS concepts to AMQP protocol concepts as described in the document [amqp-bindmap-jms-v1.0-wd07.pdf](https://www.oasis-open.org/committees/download.php/59981/amqp-bindmap-jms-v1.0-wd07.pdf).
+Apache-NMS-AMQP should bridge the familiar NMS concepts to AMQP protocol concepts as described in the document [amqp-bindmap-jms-v1.0-wd09.pdf](https://www.oasis-open.org/committees/download.php/60574/amqp-bindmap-jms-v1.0-wd09.pdf).
 So in general most of the top level classes that implement the Apache.NMS interface _Connection, Session, MessageProducer,_ etc  create, manage, and destroy the amqpnetlite equivalent object _Connection, Session, Link,_ etc.
 
 ### Building With Visual Studio 2017
