@@ -237,8 +237,8 @@ namespace Apache.NMS.AMQP.Message
 
         public bool IsExpired()
         {
-            DateTime expireTime = Facade.Expiration;
-            return expireTime > DateTime.MinValue && DateTime.UtcNow > expireTime;
+            DateTime? expireTime = Facade.Expiration;
+            return expireTime != null && DateTime.UtcNow > expireTime;
         }
 
         public virtual NmsMessage Copy()
