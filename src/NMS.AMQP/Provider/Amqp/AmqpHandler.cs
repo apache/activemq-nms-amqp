@@ -48,6 +48,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             {
                 case EventId.SendDelivery when protocolEvent.Context is IDelivery delivery:
                     delivery.Batchable = false;
+                    delivery.Settled = false;
                     break;
                 case EventId.ConnectionRemoteOpen when protocolEvent.Context is Open open:
                     this.connection.OnRemoteOpened(open);
