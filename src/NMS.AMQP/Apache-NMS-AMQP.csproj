@@ -49,8 +49,8 @@ with the License.  You may obtain a copy of the License at
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
-        <None Include="..\..\NOTICE.txt" Pack="true" PackagePath="NOTICE.txt" />
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt"/>
+        <None Include="..\..\NOTICE.txt" Pack="true" PackagePath="NOTICE.txt"/>
     </ItemGroup>
 
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

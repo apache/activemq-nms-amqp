@@ -121,13 +121,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     if (envelope.SendAsync)
                         SendAsync(message, transactionalState);
                     else
-                    {
-                        // TODO: Should be unified after https://github.com/Azure/amqpnetlite/pull/374 is sorted out
-                        if (transactionalState != null)
-                            SendSync(message, transactionalState);
-                        else
-                            senderLink.Send(message, TimeSpan.FromMilliseconds(session.Connection.Provider.SendTimeout));
-                    }
+                        SendSync(message, transactionalState);
                 }
                 catch (TimeoutException tex)
                 {
