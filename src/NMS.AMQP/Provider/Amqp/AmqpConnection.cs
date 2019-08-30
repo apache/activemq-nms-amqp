@@ -71,7 +71,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             Address address = UriUtil.ToAddress(remoteUri, Info.username, Info.password);
             this.tsc = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             underlyingConnection = await transport.CreateAsync(address, new AmqpHandler(this)).ConfigureAwait(false);
-            underlyingConnection.AddClosedCallback(Provider.OnInternalClosed);
+            underlyingConnection.AddClosedCallback((sender, error) => Provider.OnConnectionClosed(error));
             
             // Wait for connection to be opened
             await tsc.Task;
