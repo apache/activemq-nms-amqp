@@ -234,7 +234,7 @@ namespace NMS.AMQP.Test.Integration
 
                         Assert.AreEqual(text, (message.BodySection as AmqpValue).Value);
                     }, stateMatcher: Assert.IsNull,
-                    settled: true, // 
+                    settled: false,
                     sendResponseDisposition: true,
                     responseState: new Accepted(),
                     responseSettled: true);
@@ -634,7 +634,6 @@ namespace NMS.AMQP.Test.Integration
 
                 testPeer.ExpectTransfer(Assert.IsNotNull);
 
-
                 producer.Send(session.CreateMessage());
 
                 testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
@@ -725,7 +724,7 @@ namespace NMS.AMQP.Test.Integration
                 IMessageProducer producer = session.CreateProducer(destination);
                 testPeer.ExpectTransfer(messageMatcher: Assert.IsNotNull,
                     stateMatcher: Assert.IsNull,
-                    settled: true,
+                    settled: false,
                     sendResponseDisposition: true,
                     responseState: new Accepted(),
                     responseSettled: true,
