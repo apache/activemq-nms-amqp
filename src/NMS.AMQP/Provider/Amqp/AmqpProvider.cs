@@ -56,9 +56,13 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             return connection.Start();
         }
 
-        internal void OnInternalClosed(IAmqpObject sender, Error error)
+        internal void OnConnectionClosed(Error error)
         {
-            Listener?.OnConnectionFailure(ExceptionSupport.GetException(error));
+            bool connectionExplicitlyClosed = error == null;
+            if (!connectionExplicitlyClosed)
+            {
+                Listener?.OnConnectionFailure(ExceptionSupport.GetException(error));
+            }
         }
 
         internal void FireConnectionEstablished()

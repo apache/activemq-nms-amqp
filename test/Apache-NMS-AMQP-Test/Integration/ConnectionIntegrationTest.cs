@@ -40,6 +40,22 @@ namespace NMS.AMQP.Test.Integration
         }
 
         [Test, Timeout(20_000)]
+        public void TestExplicitConnectionCloseListenerIsNotInvoked()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                ManualResetEvent exceptionFired = new ManualResetEvent(false);
+                IConnection connection = EstablishConnection(testPeer);
+                connection.ExceptionListener += exception => { exceptionFired.Set(); };
+                
+                testPeer.ExpectClose();
+                connection.Close();
+                
+                Assert.IsFalse(exceptionFired.WaitOne(TimeSpan.FromMilliseconds(100)));
+            }
+        }
+        
+        [Test, Timeout(20_000)]
         public void TestCreateAutoAckSession()
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
