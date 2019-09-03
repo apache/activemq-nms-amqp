@@ -19,49 +19,41 @@ Apache-NMS-AMQP uses [AmqpNetLite](https://github.com/Azure/amqpnetlite) as the 
 Apache-NMS-AMQP should bridge the familiar NMS concepts to AMQP protocol concepts as described in the document [amqp-bindmap-jms-v1.0-wd09.pdf](https://www.oasis-open.org/committees/download.php/60574/amqp-bindmap-jms-v1.0-wd09.pdf).
 So in general most of the top level classes that implement the Apache.NMS interface _Connection, Session, MessageProducer,_ etc  create, manage, and destroy the amqpnetlite equivalent object _Connection, Session, Link,_ etc.
 
-### Building With Visual Studio 2017
-There are multiple projects: Apache-NMS-AMQP, Apache-NMS-AMQP.Test, and HelloWorld. All projects use the new csproj format available in Visual Studio 2017.
+### Building With Visual Studio 2019
+There are multiple projects: Apache-NMS-AMQP, Apache-NMS-AMQP.Test, and HelloWorld. All projects use the new csproj format available in Visual Studio 2019.
 Apache-NMS-AMQP is the library which implements The Apache.NMS Interface using AmqpNetLite.
 Apache-NMS-AMQP.Test produces an NUnit dll for unit testing.
 HelloWorld is a sample application using the NMS library which can send messages to an AMQP Message Broker.
 
-To build, launch Visual Studio 2017 with the nms-amqp.sln file and build the solution.
+To build, launch Visual Studio 2019 with the nms-amqp.sln file and build the solution.
 Build artifacts will be under `<root_folder>\<project_folder>\bin\$(Configuration)\$(TargetFramework)`.
 
 ### Building With DotNet SDK
-Alternatively, to build without Visual Studio 2017 the project can be built using [.NET Core sdk tool](https://www.microsoft.com/net/download/windows), version 2.1.+.
-Execute the dotnet sdk command to build all projects :
+Alternatively, to build without Visual Studio 2019 the project can be built using [.NET Core sdk tool](https://www.microsoft.com/net/download/windows), version 2.2.+.
+Execute the dotnet sdk command to build all projects:
 ```
-C:\<root_folder>>dotnet build nms-amqp.sln 
+<root_folder>>dotnet build nms-amqp.sln 
 ```
-__Note__ The .Net Framework SDK must be downloaded and installed to build the solution.  This means that the solution can only be built on a Windows platform.  The solution, nms-amqp.sln and the all the soure in this project is compatible with .NET Core.  The project files, _*.csproj_, can be modified to include the appropriate 'netcoreapp2.0'  or 'netstandard2.0' Framework in the target <TargetFrames> element. However as the NMS API does not have a .NET Core build, the dependency will produce the following warning:
- 
-```
-Apache-NMS-AMQP.csproj : warning NU1701: Package 'Apache.NMS 1.7.1' was restored using '.NETFramework,Version=v4.6.1' instead of the project target framework '.NETStandard,Version=v2.0'. This package may not be fully compatible with your project.
-```
-The resulting DLL will __not__ run.
-
-When a .NET Standard build of the NMS API is available, this project can be built
-on any platform.
 
 ### Testing
-Tests use the NUnit Framework.  The tests include both unit and system tests (require a broker).  The test configuration is read from 'TestSuite.config' in the current directory.  For convenience the build copies 'test/TestSuite.config' to the 'bin' directory.
+Tests use the NUnit Framework. The tests include both unit and system tests (require a broker). 
 
-The Apache-NMS-AMQP.Test project builds a NUnit 3.7.0 unit test dll to be used by NUnit console, 3.7.0 or 3.8.0.
-To run the unit tests use the nunit3-console.exe under the `<nuget_packages_location>\nunit.consolerunner\3.7.0\tools\` folder. 
-**Eg:**
+Apache-NMS-AMQP-Test contains only unit tests and doesn't require any configuration and dependencies. 
+
+Apache-NMS-AMQP-Interop-Test contains system tests and require broker to be up and running. Broker can be configured either directly from the code (to do so you have to edit _AmqpTestSupport_ base class), or using environment variables:
+
+| Variable | Meaning |
+|----------|---------|
+|NMS_AMQP_TEST_URI|Broker uri|
+|NMS_AMQP_TEST_CU|Username|
+|NMS_AMQP_TEST_CPWD|Password|
+
 ```
-C:\Users\me\nms-amqp\test\bin\Debug\net452> nunit3-console.exe NMS.AMQP.Test.dll
+NUNIT3-CONSOLE Apache-NMS-AMQP-Interop-Test.dll -p:uri=brokerUri -p:cu=userName -p:cpwd=password
 ```
-#### Configuring ActiveMQ
 
-The distributed 'TestSuite.config' expects to connect using a plain text socket to the broker at 127.0.0.1:5672.  Secure connections are configured at 127.0.0.1:5671.  More information on secure connections can be found in _test/config/cert/ReadMe.md_.
-
-#### VS2017 Test Explorer
-Visual Studio 2017 will also run nunit tests with the built-in TestExplorer tool. If you wish to run tests inside VS2017 (useful for debugging) then you must configure _Test->Test Settings->Select Test Settings File_.  The *Test Settings File* is _test/config/Adapter.runsettings_.  
-
-The file _Adapter.runsettings_ must be modified to reflect your local directory 
-structure.
+#### VS2019 Test Explorer
+Visual Studio 2019 will also run NUnit tests with the built-in TestExplorer tool.
 
 #### dotnet test 
 
@@ -76,13 +68,13 @@ dotnet test filter=<Test Name>
 |---------------|:---------:|:-----------------|
 | TLS/SSL       | Y | Configuration is supported using transport properties. |
 | Client Certificate Authentication | Y | Configuration is supported using transport properties. |
-| Transactions (AcknowledgementMode.Transactional) | N | Session will throw NotSupportedException should a session's AcknowledgeMode be set to Transactional. |
+| Transactions (AcknowledgementMode.Transactional) | Y |
 | Distributed Transactions (INetTxConnectionFactory, INetTxConnection, INetTxSession) | N | |
 | AcknowledgementMode.AutoAcknowledge | Y | |
 | AcknowledgementMode.DupsOkAcknowledge | Y | |
 | AcknowledgementMode.ClientAcknowledge | Y | |
 | AcknowledgementMode.IndividualAcknowledge | Y | |
-| IObjectMessage | Y * | Amqp value object bodies and dotnet serializable object bodies are supported. Java serialized objects can not be read by by the provider and are not supported. |
+| IObjectMessage | Y * | Amqp value object bodies and dotnet serializable object bodies are supported. |
 | IBytesMessage | Y | |
 | IStreamMessage | Y | |
 | IMapMessage | Y | |
@@ -92,7 +84,7 @@ dotnet test filter=<Test Name>
 | IConnection | Y | The ConnectionInterruptedListener event and the ConnectionResumedListener are not supported. |
 | ProducerTransformerDelegate | N | Any member access should throw a NotSupportedException. |
 | ConsumerTransformerDelegate | N | Any member access should throw a NotSupportedException. |
-| ISession | Y | Note all methods and events related to AcknowledgementMode.Transactional are not supported and should throw a NotSupportedException. |
+| ISession | Y | 
 | IQueue | Y | |
 | ITopic | Y | |
 | ITemporaryQueue | Y | |
@@ -106,6 +98,7 @@ dotnet test filter=<Test Name>
 | Configurable NMSMessageID and amqp serializtion | N | For future consideration. The prodiver will generate a MessageID from a sequence and serialize it as a string. |
 | Flow control configuration | N | For future consideration. The provider will use amqpnetlite defaults except for initial link credits which is 200. |
 | Object Deserialization Policy | N | For future consideration. The provider considers all Dotnet serialized objects in Object Message bodies are safe to deserialize. |
+| Failover | Y
 
 # Licensing 
 
