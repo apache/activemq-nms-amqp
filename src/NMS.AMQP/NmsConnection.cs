@@ -514,7 +514,7 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        public void OnAsyncException(Exception error)
+        internal void OnAsyncException(Exception error)
         {
             ExceptionListener?.Invoke(error);
         }
