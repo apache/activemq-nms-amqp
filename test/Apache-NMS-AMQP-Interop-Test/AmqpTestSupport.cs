@@ -38,9 +38,9 @@ namespace NMS.AMQP.Test
 
         protected IConnection CreateAmqpConnection()
         {
-            string brokerUri = TestContext.Parameters.Get("uri", "amqp://127.0.0.1:5672");
-            string userName = TestContext.Parameters.Get("cu", "admin");
-            string password = TestContext.Parameters.Get("cpwd", "admin");
+            string brokerUri = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_URI") ?? "amqp://127.0.0.1:5672";
+            string userName = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_CU") ?? "admin";
+            string password = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_CPWD") ?? "admin";
 
             NmsConnectionFactory factory = new NmsConnectionFactory(brokerUri);
             return factory.CreateConnection(userName, password);
