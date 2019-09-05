@@ -952,6 +952,71 @@ namespace NMS.AMQP.Test.Integration
             }
         }
 
+        [Test, Timeout(20_000)]
+        public void TestConsumerCanReceivesMessagesWhenConnectionLostDuringAutoAck()
+        {
+            using (TestAmqpPeer originalPeer = new TestAmqpPeer())
+            using (TestAmqpPeer finalPeer = new TestAmqpPeer())
+            {
+                ManualResetEvent originalConnected = new ManualResetEvent(false);
+                ManualResetEvent finalConnected = new ManualResetEvent(false);
+                ManualResetEvent exceptionThrown = new ManualResetEvent(false);
+
+                // Connect to the first peer
+                originalPeer.ExpectSaslAnonymous();
+                originalPeer.ExpectOpen();
+                originalPeer.ExpectBegin();
+                originalPeer.ExpectBegin();
+
+                NmsConnection connection = EstablishAnonymousConnection(originalPeer, finalPeer);
+                connection.ExceptionListener += exception => { exceptionThrown.Set(); };
+
+                Mock<INmsConnectionListener> connectionListener = new Mock<INmsConnectionListener>();
+
+                connectionListener
+                    .Setup(listener => listener.OnConnectionEstablished(It.IsAny<Uri>()))
+                    .Callback(() => { originalConnected.Set(); });
+
+                connectionListener
+                    .Setup(listener => listener.OnConnectionRestored(It.IsAny<Uri>()))
+                    .Callback(() => { finalConnected.Set(); });
+
+                connection.AddConnectionListener(connectionListener.Object);
+
+                connection.Start();
+
+                Assert.True(originalConnected.WaitOne(TimeSpan.FromSeconds(5)), "Should connect to original peer");
+
+                originalPeer.ExpectReceiverAttach();
+                originalPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), 1);
+                originalPeer.DropAfterLastMatcher();
+
+                // Post Failover Expectations of FinalPeer
+                finalPeer.ExpectSaslAnonymous();
+                finalPeer.ExpectOpen();
+                finalPeer.ExpectBegin();
+                finalPeer.ExpectBegin();
+                finalPeer.ExpectReceiverAttach();
+                finalPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), 1);
+                finalPeer.ExpectDispositionThatIsAcceptedAndSettled();
+
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                IQueue queue = session.GetQueue("myQueue");
+                IMessageConsumer messageConsumer = session.CreateConsumer(queue);
+                int msgReceivedCount = 0;
+                messageConsumer.Listener += message =>
+                {
+                    finalConnected.WaitOne(TimeSpan.FromSeconds(5));
+                    msgReceivedCount++;
+                };
+
+                finalPeer.WaitForAllMatchersToComplete(5000);
+
+                Assert.AreEqual(2, msgReceivedCount);
+                Assert.IsTrue(exceptionThrown.WaitOne(TimeSpan.FromSeconds(1)));
+            }
+        }
+
         private NmsConnection EstablishAnonymousConnection(params TestAmqpPeer[] peers)
         {
             return EstablishAnonymousConnection(null, null, peers);

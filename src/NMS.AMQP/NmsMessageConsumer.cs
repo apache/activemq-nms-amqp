@@ -213,54 +213,67 @@ namespace Apache.NMS.AMQP
             {
                 lock (SyncRoot)
                 {
-                    if (started && Listener != null)
+                    try
                     {
-                        var envelope = messageQueue.DequeueNoWait();
-                        if (envelope == null)
-                            return;
-
-                        if (IsMessageExpired(envelope))
+                        if (started && Listener != null)
                         {
-                            if (Tracer.IsDebugEnabled)
-                                Tracer.Debug($"{Info.Id} filtered expired message: {envelope.Message.NMSMessageId}");
+                            var envelope = messageQueue.DequeueNoWait();
+                            if (envelope == null)
+                                return;
 
-                            DoAckExpired(envelope);
-                        }
-                        else if (IsRedeliveryExceeded(envelope))
-                        {
-                            if (Tracer.IsDebugEnabled)
-                                Tracer.Debug($"{Info.Id} filtered message with excessive redelivery count: {envelope.RedeliveryCount}");
+                            if (IsMessageExpired(envelope))
+                            {
+                                if (Tracer.IsDebugEnabled)
+                                    Tracer.Debug($"{Info.Id} filtered expired message: {envelope.Message.NMSMessageId}");
 
-                            // TODO: Apply redelivery policy
-                            DoAckExpired(envelope);
-                        }
-                        else
-                        {
-                            bool deliveryFailed = false;
-                            bool autoAckOrDupsOk = acknowledgementMode == AcknowledgementMode.AutoAcknowledge || acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge;
+                                DoAckExpired(envelope);
+                            }
+                            else if (IsRedeliveryExceeded(envelope))
+                            {
+                                if (Tracer.IsDebugEnabled)
+                                    Tracer.Debug($"{Info.Id} filtered message with excessive redelivery count: {envelope.RedeliveryCount}");
 
-                            if (autoAckOrDupsOk)
-                                DoAckDelivered(envelope);
+                                // TODO: Apply redelivery policy
+                                DoAckExpired(envelope);
+                            }
                             else
-                                AckFromReceive(envelope);
+                            {
+                                bool deliveryFailed = false;
+                                bool autoAckOrDupsOk = acknowledgementMode == AcknowledgementMode.AutoAcknowledge || acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge;
 
-                            try
-                            {
-                                Listener.Invoke(envelope.Message.Copy());
-                            }
-                            catch (Exception)
-                            {
-                                deliveryFailed = true;
-                            }
-
-                            if (autoAckOrDupsOk)
-                            {
-                                if (!deliveryFailed)
-                                    DoAckConsumed(envelope);
+                                if (autoAckOrDupsOk)
+                                    DoAckDelivered(envelope);
                                 else
-                                    DoAckReleased(envelope);
+                                    AckFromReceive(envelope);
+
+                                try
+                                {
+                                    Listener.Invoke(envelope.Message.Copy());
+                                }
+                                catch (Exception)
+                                {
+                                    deliveryFailed = true;
+                                }
+
+                                if (autoAckOrDupsOk)
+                                {
+                                    if (!deliveryFailed)
+                                        DoAckConsumed(envelope);
+                                    else
+                                        DoAckReleased(envelope);
+                                }
                             }
                         }
+                    }
+                    catch (Exception e)
+                    {
+                        // TODO - There are two cases when we can get an error here:
+                        // 1) error returned from the attempted ACK that was sent
+                        // 2) error while attempting to copy the incoming message.
+                        //
+                        // We need to decide how to respond to these, but definitely we cannot
+                        // let this error propagate as it could take down the SessionDispatcher
+                        Session.Connection.OnAsyncException(e);
                     }
                 }
             }
