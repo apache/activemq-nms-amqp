@@ -61,7 +61,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             {
                 try
                 {
-                    await this.DoTask(activeProvider);
+                    await this.DoTask(activeProvider).ConfigureAwait(false);
                     this.taskCompletionSource.TrySetResult(true);
                     this.failoverProvider.RemoveFailoverRequest(this);
                     this.cancellationTokenSource?.Dispose();

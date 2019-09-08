@@ -43,6 +43,10 @@ namespace Apache.NMS.AMQP
             {
                 Destination = destination
             };
+            
+            session.Connection.CreateResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+            
+            session.Add(this);
         }
 
         public ProducerInfo Info { get; }

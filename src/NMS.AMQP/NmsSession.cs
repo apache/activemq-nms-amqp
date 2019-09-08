@@ -20,6 +20,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Amqp;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
@@ -99,10 +100,7 @@ namespace Apache.NMS.AMQP
 
         public IMessageProducer CreateProducer(IDestination destination)
         {
-            NmsMessageProducer messageProducer = new NmsMessageProducer(producerIdGenerator.GenerateId(), this, destination);
-            messageProducer.Init().ConfigureAwait(false).GetAwaiter().GetResult();
-            producers.TryAdd(messageProducer.Info.Id, messageProducer);
-            return messageProducer;
+            return new NmsMessageProducer(producerIdGenerator.GenerateId(), this, destination);
         }
 
         public IMessageConsumer CreateConsumer(IDestination destination)
@@ -121,8 +119,6 @@ namespace Apache.NMS.AMQP
 
             NmsMessageConsumer messageConsumer = new NmsMessageConsumer(consumerIdGenerator.GenerateId(), this, destination, selector, noLocal);
             messageConsumer.Init().ConfigureAwait(false).GetAwaiter().GetResult();
-
-            consumers.TryAdd(messageConsumer.Info.Id, messageConsumer);
             
             return messageConsumer;
         }
@@ -131,10 +127,8 @@ namespace Apache.NMS.AMQP
         {
             CheckClosed();
 
-            NmsMessageConsumer messageConsumer = new NmsMessageConsumer(consumerIdGenerator.GenerateId(), this, destination, name, selector, noLocal);
-            messageConsumer.Info.IsDurable = true;
+            NmsMessageConsumer messageConsumer = new NmsDurableTopicSubscriber(consumerIdGenerator.GenerateId(), this, destination, name, selector, noLocal);
             messageConsumer.Init().ConfigureAwait(false).GetAwaiter().GetResult();
-            consumers.TryAdd(messageConsumer.Info.Id, messageConsumer);
 
             return messageConsumer;
         }
@@ -474,14 +468,24 @@ namespace Apache.NMS.AMQP
             return producer;
         }
 
+        public void Add(NmsMessageConsumer messageConsumer)
+        {
+            consumers.TryAdd(messageConsumer.Info.Id, messageConsumer);
+        }
+        
+        public void Add(NmsMessageProducer messageProducer)
+        {
+            producers.TryAdd(messageProducer.Info.Id, messageProducer);
+        }
+
         public void Remove(NmsMessageConsumer messageConsumer)
         {
-            consumers.TryRemove(messageConsumer.Info.Id, out messageConsumer);
+            consumers.TryRemove(messageConsumer.Info.Id, out _);
         }
 
         public void Remove(NmsMessageProducer messageProducer)
         {
-            producers.TryRemove(messageProducer.Info.Id, out messageProducer);
+            producers.TryRemove(messageProducer.Info.Id, out _);
         }
 
         public void Shutdown(NMSException exception = null)

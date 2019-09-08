@@ -40,7 +40,7 @@ namespace Apache.NMS.AMQP
         {
         }
 
-        public NmsMessageConsumer(Id consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal)
+        protected NmsMessageConsumer(Id consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal)
         {
             Session = session;
             acknowledgementMode = session.AcknowledgementMode;
@@ -56,9 +56,14 @@ namespace Apache.NMS.AMQP
                 Selector = selector,
                 NoLocal = noLocal,
                 SubscriptionName = name,
-                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry
+                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry,
+                IsDurable = IsDurableSubscription
             };
             deliveryTask = new MessageDeliveryTask(this);
+            
+            Session.Connection.CreateResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+            
+            Session.Add(this);
 
             if (Session.IsStarted)
                 Start();
@@ -67,6 +72,8 @@ namespace Apache.NMS.AMQP
         public NmsSession Session { get; }
         public ConsumerInfo Info { get; }
         public IDestination Destination => Info.Destination;
+
+        protected virtual bool IsDurableSubscription => false;
 
         public void Dispose()
         {
@@ -186,10 +193,9 @@ namespace Apache.NMS.AMQP
 
         private event MessageListener Listener;
 
-        public async Task Init()
+        public Task Init()
         {
-            await Session.Connection.CreateResource(Info);
-            await Session.Connection.StartResource(Info);
+            return Session.Connection.StartResource(Info);
         }
 
         public void OnInboundMessage(InboundMessageDispatch envelope)
@@ -417,10 +423,10 @@ namespace Apache.NMS.AMQP
         {
             if (closed.CompareAndSet(false, true))
             {
-                messageQueue.Dispose();
                 failureCause = exception;
                 Session.Remove(this);
                 started.Set(false);
+                messageQueue.Dispose();
             }
         }
 
@@ -500,9 +506,9 @@ namespace Apache.NMS.AMQP
         {
             try
             {
-                Session.Connection.StartResource(Info);
+                Session.Connection.StartResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
             }
-            catch (NMSException ex)
+            catch (NMSException)
             {
                 Session.Remove(this);
                 throw;

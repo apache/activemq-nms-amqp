@@ -69,7 +69,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     SessionInfo.remoteChannel = begin.RemoteChannel;
                     tcs.TrySetResult(true);
                 });
-            UnderlyingSession.AddClosedCallback((sender, error) => { tcs.TrySetException(ExceptionSupport.GetException(error)); });
             UnderlyingSession.AddClosedCallback((sender, error) =>
             {
                 if (!tcs.TrySetException(ExceptionSupport.GetException(error)))
