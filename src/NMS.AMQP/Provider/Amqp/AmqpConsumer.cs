@@ -195,6 +195,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         private void OnMessage(IReceiverLink receiver, global::Amqp.Message amqpMessage)
         {
+            if (Tracer.IsDebugEnabled)
+            {
+                Tracer.Debug($"Received message {amqpMessage?.Properties?.MessageId}");
+            }
+            
             NmsMessage message;
             try
             {

@@ -344,6 +344,10 @@ namespace Apache.NMS.AMQP
             {
                 messageConsumer.OnInboundMessage(envelope);
             }
+            else
+            {
+                Tracer.Error($"Could not dispatch message {envelope.Message.NMSMessageId} because consumer {envelope.ConsumerId} not found.");
+            }
         }
 
         public void Acknowledge(AckType ackType)
@@ -422,6 +426,11 @@ namespace Apache.NMS.AMQP
 
         internal void EnqueueForDispatch(NmsMessageConsumer.MessageDeliveryTask task)
         {
+            if (Tracer.IsDebugEnabled)
+            {
+                Tracer.Debug("Message enqueued for dispatch.");
+            }
+            
             dispatcher?.Post(task);
         }
 
@@ -451,7 +460,7 @@ namespace Apache.NMS.AMQP
 
         public NmsMessageProducer ProducerClosed(Id producerId, Exception cause)
         {
-            Tracer.Info($"A NMS MessageProducer has been closed: {producerId}");
+            Tracer.Info($"A NmsMessageProducer has been closed: {producerId}. Cause: {cause}");
 
             if (producers.TryGetValue(producerId, out NmsMessageProducer producer))
             {
@@ -463,6 +472,14 @@ namespace Apache.NMS.AMQP
                 {
                     Tracer.DebugFormat("Ignoring exception thrown during cleanup of closed producer", error);
                 }
+            }
+            else
+            {
+                if (Tracer.IsDebugEnabled)
+                {
+                    Tracer.Debug($"NmsMessageProducer: {producerId} not found in session {this.SessionInfo.Id}.");
+                }
+
             }
             
             return producer;

@@ -24,6 +24,7 @@ using Amqp.Types;
 using Apache.NMS;
 using Apache.NMS.AMQP;
 using Moq;
+using NLog;
 using NMS.AMQP.Test.TestAmqp;
 using NMS.AMQP.Test.TestAmqp.BasicTypes;
 using NUnit.Framework;
@@ -33,6 +34,8 @@ namespace NMS.AMQP.Test.Integration
     [TestFixture]
     public class FailoverIntegrationTest : IntegrationTestFixture
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        
         [Test, Timeout(20_000), Ignore("Ignore as we cannot detect connection disconnect on Linux.")]
         public void TestFailoverHandlesDropThenRejectionCloseAfterConnect()
         {
@@ -47,6 +50,10 @@ namespace NMS.AMQP.Test.Integration
                 var originalUri = CreatePeerUri(originalPeer);
                 var rejectingUri = CreatePeerUri(rejectingPeer);
                 var finalUri = CreatePeerUri(finalPeer);
+                
+                Logger.Info($"Original peer is at: {originalUri}");
+                Logger.Info($"Rejecting peer is at: {rejectingUri}");
+                Logger.Info($"Final peer is at: {finalUri}");
 
                 // Connect to the first
                 originalPeer.ExpectSaslAnonymous();
@@ -85,7 +92,7 @@ namespace NMS.AMQP.Test.Integration
                 finalPeer.ExpectBegin();
 
                 // Close the original peer and wait for things to shake out.
-                originalPeer.Close(sendClose: false);
+                originalPeer.Close(sendClose: true);
 
                 rejectingPeer.WaitForAllMatchersToComplete(2000);
 

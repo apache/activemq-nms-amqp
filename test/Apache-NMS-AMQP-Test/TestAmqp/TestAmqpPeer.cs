@@ -28,6 +28,7 @@ using Amqp.Framing;
 using Amqp.Sasl;
 using Amqp.Types;
 using Apache.NMS.AMQP.Util;
+using NLog;
 using NMS.AMQP.Test.TestAmqp.BasicTypes;
 using NMS.AMQP.Test.TestAmqp.Matchers;
 using NUnit.Framework;
@@ -36,6 +37,8 @@ namespace NMS.AMQP.Test.TestAmqp
 {
     public class TestAmqpPeer : IDisposable
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        
         public static readonly string MESSAGE_NUMBER = "MessageNumber";
 
         private static readonly Symbol ANONYMOUS = new Symbol("ANONYMOUS");
@@ -93,6 +96,8 @@ namespace NMS.AMQP.Test.TestAmqp
 
         public bool OnFrame(Stream stream, ushort channel, DescribedList command, Amqp.Message message)
         {
+            Logger.Debug($"Received frame, descriptor={command.GetType().Name} on port: {ServerPort}");
+            
             var matcher = GetFirstMatcher();
             if (matcher != null)
             {
@@ -327,10 +332,19 @@ namespace NMS.AMQP.Test.TestAmqp
                     message.ApplicationProperties[MESSAGE_NUMBER] = i;
                 }
 
+                if (message.Properties == null)
+                    message.Properties = new Properties();
+                
+                message.Properties.MessageId = $"ID:{i.ToString()}";
+
+                var messageId = message.Properties.MessageId;
+
                 ByteBuffer payload = message.Encode();
 
                 flowMatcher.WithOnComplete(context =>
                 {
+                    Logger.Debug($"Sending message {messageId}");
+
                     var transfer = new Transfer()
                     {
                         DeliveryId = (uint) nextId,
@@ -340,7 +354,15 @@ namespace NMS.AMQP.Test.TestAmqp
                         Handle = context.Command.Handle,
                     };
 
-                    context.SendCommand(transfer, payload);
+                    try
+                    {
+                        context.SendCommand(transfer, payload);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error($"Sending message {messageId} failed.");
+                        throw;
+                    }
                 });
             }
 
@@ -837,6 +859,8 @@ namespace NMS.AMQP.Test.TestAmqp
 
         public void Close(bool sendClose = false)
         {
+            Logger.Info($"Closing {nameof(TestAmqpPeer)}: {this.ServerPort}");
+            
             if (sendClose)
             {
                 var close = new Close();

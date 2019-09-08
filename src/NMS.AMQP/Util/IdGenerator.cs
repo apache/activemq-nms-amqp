@@ -125,7 +125,6 @@ namespace Apache.NMS.AMQP.Util
 
         public void Add(object component)
         {
-            Tracer.DebugFormat("Adding Component To Id, component {0}, current index: {1}", component, current);
             if (isReadOnly)
             {
                 throw new NMSException("Invalid Operation when generating Component Id. Can not change id once generated.");
