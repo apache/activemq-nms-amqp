@@ -123,7 +123,7 @@ namespace NMS.AMQP.Test.Integration
                 IConnection connection = EstablishConnection(testPeer: testPeer, setClientId: false);
 
                 // Tell the test peer to close the connection when executing its last handler
-                testPeer.RemotelyCloseConnection(expectCloseResponse: true);
+                testPeer.RemotelyCloseConnection(expectCloseResponse: true, errorCondition: ConnectionError.CONNECTION_FORCED, errorMessage: "buba");
 
                 connection.ExceptionListener += exception => done.Set();
 

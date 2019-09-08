@@ -1,0 +1,10 @@
+image: Visual Studio 2019
+configuration: Release
+test:
+  assemblies:
+    - '**\NMS.AMQP.Test.dll'
+before_build:
+  - cmd: dotnet --version
+  - cmd: dotnet restore apache-nms-amqp.sln
+build_script:
+  - cmd: dotnet build apache-nms-amqp.sln
