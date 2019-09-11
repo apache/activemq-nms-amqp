@@ -408,7 +408,7 @@ namespace Apache.NMS.AMQP
             {
                 envelope.Message.NmsAcknowledgeCallback = new NmsAcknowledgeCallback(Session);
             }
-            else if (Session.AcknowledgementMode == AcknowledgementMode.IndividualAcknowledge)
+            else if (Session.IsIndividualAcknowledge())
             {
                 envelope.Message.NmsAcknowledgeCallback = new NmsAcknowledgeCallback(Session, envelope);
             }
