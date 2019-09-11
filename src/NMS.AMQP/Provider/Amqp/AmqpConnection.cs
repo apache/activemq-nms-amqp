@@ -74,7 +74,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             underlyingConnection.AddClosedCallback((sender, error) => Provider.OnConnectionClosed(error));
             
             // Wait for connection to be opened
-            await tsc.Task;
+            await tsc.Task.ConfigureAwait(false);
 
             // Create a Session for this connection that is used for Temporary Destinations
             // and perhaps later on management and advisory monitoring.
@@ -130,7 +130,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public async Task CreateSession(SessionInfo sessionInfo)
         {
             var amqpSession = new AmqpSession(this, sessionInfo);
-            await amqpSession.Start();
+            await amqpSession.Start().ConfigureAwait(false);
             sessions.TryAdd(sessionInfo.Id, amqpSession);
         }
 
@@ -154,8 +154,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             {
                 return session;
             }
-
-            throw new Exception();
+            throw new InvalidOperationException($"Amqp Session {sessionId} doesn't exist and cannot be retrieved.");
         }
 
         public void RemoveSession(Id sessionId)

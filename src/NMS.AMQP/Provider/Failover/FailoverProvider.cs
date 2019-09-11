@@ -128,8 +128,8 @@ namespace Apache.NMS.AMQP.Provider.Failover
                             {
                                 Tracer.Debug($"Connection attempt:[{reconnectAttempts}] to: {target.Scheme}://{target.Host}:{target.Port} in-progress");
                                 provider = ProviderFactory.Create(target);
-                                await provider.Connect(connectionInfo);
-                                await InitializeNewConnection(provider);
+                                await provider.Connect(connectionInfo).ConfigureAwait(false);
+                                await InitializeNewConnection(provider).ConfigureAwait(false);
                                 return;
                             }
                             catch (Exception e)
@@ -171,7 +171,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
                         }
                         else
                         {
-                            await reconnectControl.ScheduleReconnect(Reconnect);
+                            await reconnectControl.ScheduleReconnect(Reconnect).ConfigureAwait(false);
                         }
                     }
                 }
@@ -218,21 +218,21 @@ namespace Apache.NMS.AMQP.Provider.Failover
                 Tracer.Debug($"Signalling connection recovery: {provider}");
 
                 // Allow listener to recover its resources
-                await listener.OnConnectionRecovery(provider);
+                await listener.OnConnectionRecovery(provider).ConfigureAwait(false);
 
                 // Restart consumers, send pull commands, etc.
-                await listener.OnConnectionRecovered(provider);
+                await listener.OnConnectionRecovered(provider).ConfigureAwait(false);
 
                 // Let the client know that connection has restored.
                 listener.OnConnectionRestored(connectedUri);
 
                 // If we try to run pending requests right after the connection is reestablished 
                 // it will result in timeout on the first send request
-                await Task.Delay(50);
+                await Task.Delay(50).ConfigureAwait(false);
 
                 foreach (FailoverRequest request in GetPendingRequests())
                 {
-                    await request.Run();
+                    await request.Run().ConfigureAwait(false);
                 }
 
                 reconnectControl.ConnectionEstablished();
