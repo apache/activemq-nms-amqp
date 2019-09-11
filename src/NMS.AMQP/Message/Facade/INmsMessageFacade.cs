@@ -38,7 +38,7 @@ namespace Apache.NMS.AMQP.Message.Facade
         string GroupId { get; set; }
         uint GroupSequence { get; set; }
         DateTime? Expiration { get; set; }
-        sbyte JmsMsgType { get; }
+        sbyte? JmsMsgType { get; }
         
         /// <summary>
         /// True if this message is tagged as being persistent

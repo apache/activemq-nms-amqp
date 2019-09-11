@@ -30,7 +30,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         private IList list;
         private int position = 0;
         
-        public override sbyte JmsMsgType => MessageSupport.JMS_TYPE_STRM;
+        public override sbyte? JmsMsgType => MessageSupport.JMS_TYPE_STRM;
 
         public object Peek()
         {
