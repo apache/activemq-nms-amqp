@@ -592,5 +592,7 @@ namespace Apache.NMS.AMQP
                 consumer.OnConnectionInterrupted();
             }
         }
+
+        internal bool IsIndividualAcknowledge() => acknowledgementMode == AcknowledgementMode.IndividualAcknowledge;
     }
 }
