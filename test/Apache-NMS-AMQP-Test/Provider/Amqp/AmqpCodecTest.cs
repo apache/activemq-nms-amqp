@@ -458,7 +458,6 @@ namespace NMS.AMQP.Test.Provider.Amqp
             DoTestNMSMessageEncodingAddsProperMessageAnnotations(MessageSupport.JMS_TYPE_MAP, null, MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE);
             DoTestNMSMessageEncodingAddsProperMessageAnnotations(MessageSupport.JMS_TYPE_TXT, MessageSupport.JMS_DEST_TYPE_TOPIC, MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE);
             DoTestNMSMessageEncodingAddsProperMessageAnnotations(MessageSupport.JMS_TYPE_STRM, MessageSupport.JMS_DEST_TYPE_QUEUE, MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE);
-            DoTestNMSMessageEncodingAddsProperMessageAnnotations(MessageSupport.JMS_TYPE_OBJ, MessageSupport.JMS_DEST_TYPE_QUEUE, MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE);
         }
 
         private void DoTestNMSMessageEncodingAddsProperMessageAnnotations(sbyte msgType, byte? toType, byte? replyToType)

@@ -121,7 +121,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
 
             Assert.IsInstanceOf<NmsObjectMessage>(message);
             Assert.IsInstanceOf<AmqpNmsObjectMessageFacade>(facade);
-            Assert.AreEqual(MessageSupport.JMS_TYPE_OBJ, facade.JmsMsgType);
+            Assert.IsNull(facade.JmsMsgType);
 
             Assert.IsNull(((AmqpNmsObjectMessageFacade) facade).Body);
         }
@@ -137,7 +137,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
 
             Assert.IsInstanceOf<NmsObjectMessage>(message);
             Assert.IsInstanceOf<AmqpNmsObjectMessageFacade>(facade);
-            Assert.AreEqual(MessageSupport.JMS_TYPE_OBJ, facade.JmsMsgType);
+            Assert.IsNull(facade.JmsMsgType);
 
             AmqpNmsObjectMessageFacade objectMessageFacade = (AmqpNmsObjectMessageFacade) facade;
 

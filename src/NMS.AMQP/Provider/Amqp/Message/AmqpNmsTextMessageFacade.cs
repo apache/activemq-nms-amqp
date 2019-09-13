@@ -83,7 +83,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             }
         }
 
-        public override sbyte JmsMsgType => MessageSupport.JMS_TYPE_TXT;
+        public override sbyte? JmsMsgType => MessageSupport.JMS_TYPE_TXT;
 
         private static string DecodeBinaryBody(byte[] body)
         {

@@ -39,7 +39,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             AmqpNmsObjectMessageFacade amqpObjectMessageFacade = CreateNewObjectMessageFacade(false);
             Assert.Null(amqpObjectMessageFacade.MessageAnnotations);
 
-            Assert.AreEqual(MessageSupport.JMS_TYPE_OBJ, amqpObjectMessageFacade.JmsMsgType);
+            Assert.IsNull(amqpObjectMessageFacade.JmsMsgType);
         }
 
         [Test]

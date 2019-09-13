@@ -35,7 +35,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             set => Delegate.Object = value;
         }
 
-        public override sbyte JmsMsgType => MessageSupport.JMS_TYPE_OBJ;
+        public override sbyte? JmsMsgType => typeDelegate is AmqpTypedObjectDelegate ? (sbyte?) MessageSupport.JMS_TYPE_OBJ : null;
 
         public override void OnSend(TimeSpan producerTtl)
         {

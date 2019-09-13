@@ -75,7 +75,7 @@ namespace NMS.AMQP.Test.Message.Facade
         public string GroupId { get; set; }
         public uint GroupSequence { get; set; }
         public DateTime? Expiration { get; set; }
-        public sbyte JmsMsgType { get; }
+        public sbyte? JmsMsgType { get; }
         public bool IsPersistent { get; set; }
 
         public INmsMessageFacade Copy()

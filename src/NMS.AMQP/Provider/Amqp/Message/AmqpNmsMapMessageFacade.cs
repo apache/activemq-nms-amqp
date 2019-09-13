@@ -29,7 +29,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         private AMQPValueMap map;
         public IPrimitiveMap Map => map;
 
-        public override sbyte JmsMsgType => MessageSupport.JMS_TYPE_MAP;
+        public override sbyte? JmsMsgType => MessageSupport.JMS_TYPE_MAP;
 
         protected override void InitializeEmptyBody()
         {

@@ -333,7 +333,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         }
 
         public MessageAnnotations MessageAnnotations => Message.MessageAnnotations;
-        public virtual sbyte JmsMsgType => MessageSupport.JMS_TYPE_MSG;
+        public virtual sbyte? JmsMsgType => MessageSupport.JMS_TYPE_MSG;
 
         /// <summary>
         /// The annotation value for the JMS Message content type.  For a generic JMS message this

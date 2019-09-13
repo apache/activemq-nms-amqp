@@ -33,7 +33,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
 
         private static readonly Data EMPTY_DATA = new Data { Binary = new byte[0] };
 
-        public override sbyte JmsMsgType => MessageSupport.JMS_TYPE_BYTE;
+        public override sbyte? JmsMsgType => MessageSupport.JMS_TYPE_BYTE;
         public long BodyLength => GetBinaryFromBody().Binary.LongLength;
 
         public BinaryReader GetDataReader()
