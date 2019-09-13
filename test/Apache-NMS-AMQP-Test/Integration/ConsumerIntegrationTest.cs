@@ -83,7 +83,7 @@ namespace NMS.AMQP.Test.Integration
                 // Create a consumer, then remotely end it afterwards.
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlow();
-                testPeer.RemotelyDetachLastOpenedLinkOnLastOpenedSession(expectDetachResponse: true, closed: true, errorType: AmqpError.RESOURCE_DELETED, errorMessage: errorMessage);
+                testPeer.RemotelyDetachLastOpenedLinkOnLastOpenedSession(expectDetachResponse: true, closed: true, errorType: AmqpError.RESOURCE_DELETED, errorMessage: errorMessage, delayBeforeSend: 400);
 
                 IQueue queue = session.GetQueue("myQueue");
                 IMessageConsumer consumer = session.CreateConsumer(queue);
@@ -322,7 +322,7 @@ namespace NMS.AMQP.Test.Integration
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlow();
                 testPeer.RunAfterLastHandler(() => { consumerReady.WaitOne(2000); });
-                testPeer.RemotelyCloseConnection(expectCloseResponse: true);
+                testPeer.DropAfterLastMatcher(delay: 10);
 
                 IMessageConsumer consumer = session.CreateConsumer(queue);
                 consumerReady.Set();
@@ -375,7 +375,7 @@ namespace NMS.AMQP.Test.Integration
 
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlow();
-                testPeer.RemotelyCloseConnection(expectCloseResponse: true);
+                testPeer.RemotelyCloseConnection(expectCloseResponse: true, errorCondition: ConnectionError.CONNECTION_FORCED, errorMessage: "buba");
 
                 IMessageConsumer consumer = session.CreateConsumer(queue);
 

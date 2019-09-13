@@ -543,7 +543,7 @@ namespace NMS.AMQP.Test.Integration
 
                 // Create a producer, then remotely end it afterwards.
                 testPeer.ExpectSenderAttach();
-                testPeer.RemotelyDetachLastOpenedLinkOnLastOpenedSession(expectDetachResponse: true, closed: true, errorType: AmqpError.RESOURCE_DELETED, breadCrumb);
+                testPeer.RemotelyDetachLastOpenedLinkOnLastOpenedSession(expectDetachResponse: true, closed: true, errorType: AmqpError.RESOURCE_DELETED, breadCrumb, delayBeforeSend: 10);
 
                 IQueue destination = session.GetQueue("myQueue");
                 IMessageProducer producer = session.CreateProducer(destination);
