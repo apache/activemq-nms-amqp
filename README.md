@@ -51,10 +51,6 @@ Apache-NMS-AMQP-Interop-Test contains system tests and require broker to be up a
 |NMS_AMQP_TEST_CU|Username|
 |NMS_AMQP_TEST_CPWD|Password|
 
-```
-NUNIT3-CONSOLE Apache-NMS-AMQP-Interop-Test.dll -p:uri=brokerUri -p:cu=userName -p:cpwd=password
-```
-
 #### VS2019 Test Explorer
 Visual Studio 2019 will also run NUnit tests with the built-in TestExplorer tool.
 
