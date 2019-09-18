@@ -1,8 +1,13 @@
 # Apache-NMS-AMQP
 
-[![Build Status](https://travis-ci.org/apache/activemq-nms-amqp.svg?branch=master)](https://travis-ci.org/apache/activemq-nms-amqp)
+## Build Status
 
-### Overview
+OS | Status
+---|---
+Linux | [![Build Status](https://travis-ci.org/apache/activemq-nms-amqp.svg?branch=master)](https://travis-ci.org/apache/activemq-nms-amqp)
+Windows | [![Build status](https://ci.appveyor.com/api/projects/status/yn2wkhq1nbhkfsur?svg=true)](https://ci.appveyor.com/project/ApacheSoftwareFoundation/activemq-nms-amqp) 
+
+## Overview
 The goal of this project is to combine the [.NET Message Service API](http://activemq.apache.org/nms/) (NMS) with
 the [Advanced Message Queuing Protocol (AMQP)](https://www.amqp.org/) 1.0 standard wireline protocol. Historically, the Apache community created the NMS API which provided a vendor agnostic .NET interface to a variety of messaging systems. The NMS API gives the flexibility to write .NET applications in C#, VB or any other .NET language, all while using a single API to connect to any number of messaging providers. The Advanced Message Queuing Protocol (AMQP) is an open and standardized internet protocol for reliably passing messages between applications or organizations.
 Before AMQP became a standard, organizations used proprietary wireline protocols to connect their systems which lead to vendor lock-in and integration problems when integrating with external organizations.
@@ -15,53 +20,19 @@ The key to enabling vendor independence and mass adoption of technology is to co
 If you are a .NET developer that doesn't want to be locked into a messaging implementation then get engaged with this project. Here you will find the open source code base and please provide comments and make your own enhancements. The project will be folded into the Apache community once fully mature.
 
 
-### AMQP1.0 Protocol Engine AmqpNetLite
+## AMQP1.0 Protocol Engine AmqpNetLite
 Apache-NMS-AMQP uses [AmqpNetLite](https://github.com/Azure/amqpnetlite) as the underlying AMQP 1.0 transport Protocol engine. 
 
-### Overall Architecture
+## Overall Architecture
 Apache-NMS-AMQP should bridge the familiar NMS concepts to AMQP protocol concepts as described in the document [amqp-bindmap-jms-v1.0-wd09.pdf](https://www.oasis-open.org/committees/download.php/60574/amqp-bindmap-jms-v1.0-wd09.pdf).
 So in general most of the top level classes that implement the Apache.NMS interface _Connection, Session, MessageProducer,_ etc  create, manage, and destroy the amqpnetlite equivalent object _Connection, Session, Link,_ etc.
 
-### Building With Visual Studio 2019
-There are multiple projects: Apache-NMS-AMQP, Apache-NMS-AMQP.Test, and HelloWorld. All projects use the new csproj format available in Visual Studio 2019.
-Apache-NMS-AMQP is the library which implements The Apache.NMS Interface using AmqpNetLite.
-Apache-NMS-AMQP.Test produces an NUnit dll for unit testing.
-HelloWorld is a sample application using the NMS library which can send messages to an AMQP Message Broker.
+## Getting started
+- [Configuration](docs/configuration.md) contains various uri options that can be set when defining a ConnectionFactory.
+- [Interested in the code?](docs/working_with_code.md) Clone and build the projects.
+- Want to contribute? Github pull requests are one way to contribute, but our real issue tracker is [JIRA](https://issues.apache.org/jira/issues/?jql=project%20%3D%20AMQNET%20AND%20component%20%3D%20AMQP).
 
-To build, launch Visual Studio 2019 with the nms-amqp.sln file and build the solution.
-Build artifacts will be under `<root_folder>\<project_folder>\bin\$(Configuration)\$(TargetFramework)`.
-
-### Building With DotNet SDK
-Alternatively, to build without Visual Studio 2019 the project can be built using [.NET Core sdk tool](https://www.microsoft.com/net/download/windows), version 2.2.+.
-Execute the dotnet sdk command to build all projects:
-```
-<root_folder>>dotnet build nms-amqp.sln 
-```
-
-### Testing
-Tests use the NUnit Framework. The tests include both unit and system tests (require a broker). 
-
-Apache-NMS-AMQP-Test contains only unit tests and doesn't require any configuration and dependencies. 
-
-Apache-NMS-AMQP-Interop-Test contains system tests and require broker to be up and running. Broker can be configured either directly from the code (to do so you have to edit _AmqpTestSupport_ base class), or using environment variables:
-
-| Variable | Meaning |
-|----------|---------|
-|NMS_AMQP_TEST_URI|Broker uri|
-|NMS_AMQP_TEST_CU|Username|
-|NMS_AMQP_TEST_CPWD|Password|
-
-#### VS2019 Test Explorer
-Visual Studio 2019 will also run NUnit tests with the built-in TestExplorer tool.
-
-#### dotnet test 
-
-If building with the dotnet sdk,  From the top level directory simply enter _dotnet test_ to build and run all the tests.  Individual tests can be run with:
-```
-dotnet test filter=<Test Name>
-```
-
-### Amqp Provider NMS Feature Support
+## Amqp Provider NMS Feature Support
 
 | Feature       | Supported | Comments         |
 |---------------|:---------:|:-----------------|
