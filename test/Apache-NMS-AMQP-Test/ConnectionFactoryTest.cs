@@ -76,7 +76,8 @@ namespace NMS.AMQP.Test
                                 "&nms.connectionIdPrefix=ID:TEST" +
                                 "&nms.clientIDPrefix=clientId" +
                                 "&nms.requestTimeout=1000" +
-                                "&nms.sendTimeout=1000";
+                                "&nms.sendTimeout=1000" +
+                                "&nms.localMessageExpiry=false";
 
             NmsConnectionFactory factory = new NmsConnectionFactory(configured);
 
@@ -87,6 +88,7 @@ namespace NMS.AMQP.Test
             Assert.AreEqual("clientId", factory.ClientIdPrefix);
             Assert.AreEqual(1000, factory.RequestTimeout);
             Assert.AreEqual(1000, factory.SendTimeout);
+            Assert.IsFalse(factory.LocalMessageExpiry);
         }
 
         [Test]
