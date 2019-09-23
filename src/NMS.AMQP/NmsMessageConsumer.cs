@@ -27,7 +27,7 @@ namespace Apache.NMS.AMQP
 {
     public class NmsMessageConsumer : IMessageConsumer
     {
-        private static readonly object SyncRoot = new object();
+        private readonly object syncRoot = new object();
         private readonly AcknowledgementMode acknowledgementMode;
         private readonly AtomicBool closed = new AtomicBool();
         private readonly MessageDeliveryTask deliveryTask;
@@ -92,7 +92,7 @@ namespace Apache.NMS.AMQP
             if (closed)
                 return;
 
-            lock (SyncRoot)
+            lock (syncRoot)
             {
                 Shutdown(null);
                 Session.Connection.DestroyResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
@@ -106,7 +106,7 @@ namespace Apache.NMS.AMQP
             add
             {
                 CheckClosed();
-                lock (SyncRoot)
+                lock (syncRoot)
                 {
                     Listener += value;
                     DrainMessageQueueToListener();
@@ -114,7 +114,7 @@ namespace Apache.NMS.AMQP
             }
             remove
             {
-                lock (SyncRoot)
+                lock (syncRoot)
                 {
                     Listener -= value;
                 }
@@ -217,7 +217,7 @@ namespace Apache.NMS.AMQP
         {
             if (Session.IsStarted && started && Listener != null)
             {
-                lock (SyncRoot)
+                lock (syncRoot)
                 {
                     try
                     {
@@ -463,7 +463,7 @@ namespace Apache.NMS.AMQP
 
         public void Stop()
         {
-            lock (SyncRoot)
+            lock (syncRoot)
             {
                 started.Set(false);
             }
