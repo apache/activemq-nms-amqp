@@ -31,13 +31,13 @@ namespace Apache.NMS.AMQP.Transport
         int SendBufferSize { get; set; }
 
         int SendTimeout { get; set; }
+        
         bool TcpNoDelay { get; set; }
-
-        bool UseLogging { get; set; }
+        
         bool IsSecure { get; }
-
+        
         ITransportContext Copy();
-
+        
         Task<Connection> CreateAsync(Address address, IHandler handler);
     }
 }

@@ -314,10 +314,14 @@ namespace Apache.NMS.AMQP
             {
                 session.OnInboundMessage(envelope);
             }
+            else
+            {
+                Tracer.Error($"Could not dispatch message {envelope.Message.NMSMessageId} because session {envelope.ConsumerInfo.SessionId} not found.");
+            }
 
             if (connectionListeners.Any())
             {
-                foreach (INmsConnectionListener listener in connectionListeners) 
+                foreach (INmsConnectionListener listener in connectionListeners)
                     listener.OnInboundMessage(envelope.Message);
             }
         }

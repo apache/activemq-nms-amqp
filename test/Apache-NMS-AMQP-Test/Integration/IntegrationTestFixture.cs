@@ -27,7 +27,7 @@ namespace NMS.AMQP.Test.Integration
     {
         static IntegrationTestFixture()
         {
-            Tracer.Trace = new Logger(Logger.LogLevel.DEBUG);
+            Tracer.Trace = new NLogAdapter();
         }
         
         protected IConnection EstablishConnection(TestAmqpPeer testPeer, string optionsString = null, Symbol[] serverCapabilities = null, Fields serverProperties = null, bool setClientId = true)

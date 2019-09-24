@@ -296,7 +296,7 @@ namespace NMS.AMQP.Test.Integration
                     testPeer.ExpectDispositionThatIsAcceptedAndSettled();
 
                 for (int i = 0; i < msgCount; i++) 
-                    Assert.NotNull(consumer.Receive(TimeSpan.FromMilliseconds(3000)));
+                    Assert.NotNull(consumer.Receive(TimeSpan.FromMilliseconds(3000)), $"Message {i} not received within given timeout.");
                 
                 testPeer.WaitForAllMatchersToComplete(3000);
                 

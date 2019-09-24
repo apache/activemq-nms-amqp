@@ -41,6 +41,66 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             this.transport = transport;
         }
 
+        static AmqpProvider()
+        {
+            // Set up tracing in AMQP. We capture all AMQP traces in the TraceListener below
+            // and map to NMS 'Tracer' logs as follows:
+            //    AMQP          Tracer
+            //    Verbose       Debug
+            //    Frame         Debug
+            //    Information   Info
+            //    Output        Info    (should not happen)
+            //    Warning       Warn
+            //    Error         Error
+            Trace.TraceLevel = TraceLevel.Verbose;
+            Trace.TraceListener = (level, format, args) =>
+            {
+                switch (level)
+                {
+                    case TraceLevel.Verbose:
+                    case TraceLevel.Frame:
+                        Tracer.DebugFormat(format, args);
+                        break;
+                    case TraceLevel.Information:
+                    case TraceLevel.Output:
+                        // 
+                        // Applications should not access AmqpLite directly so there
+                        // should be no 'Output' level logs.
+                        Tracer.InfoFormat(format, args);
+                        break;
+                    case TraceLevel.Warning:
+                        Tracer.WarnFormat(format, args);
+                        break;
+                    case TraceLevel.Error:
+                        Tracer.ErrorFormat(format, args);
+                        break;
+                    default:
+                        Tracer.InfoFormat("Unknown AMQP LogLevel: {}", level);
+                        Tracer.InfoFormat(format, args);
+                        break;
+                }
+            };
+        }
+        
+        /// <summary>
+        /// Enables AmqpNetLite's Frame logging level.
+        /// </summary>
+        public bool TraceFrames
+        {
+            get => ((Trace.TraceLevel & TraceLevel.Frame) == TraceLevel.Frame);
+            set
+            {
+                if (value)
+                {
+                    Trace.TraceLevel = Trace.TraceLevel | TraceLevel.Frame;
+                }
+                else
+                {
+                    Trace.TraceLevel = Trace.TraceLevel & ~TraceLevel.Frame;
+                }
+            }
+        }
+
         public long SendTimeout => connectionInfo?.SendTimeout ?? ConnectionInfo.DEFAULT_SEND_TIMEOUT;
         public Uri RemoteUri { get; }
         public IProviderListener Listener { get; private set; }
@@ -58,6 +118,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         internal void OnConnectionClosed(Error error)
         {
+            if (Tracer.IsDebugEnabled)
+            {
+                Tracer.Debug($"Connection closed. {error}");
+            }
+
             bool connectionExplicitlyClosed = error == null;
             if (!connectionExplicitlyClosed)
             {

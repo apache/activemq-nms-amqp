@@ -200,6 +200,11 @@ namespace Apache.NMS.AMQP
 
         public void OnInboundMessage(InboundMessageDispatch envelope)
         {
+            if (Tracer.IsDebugEnabled)
+            {
+                Tracer.Debug($"Message {envelope.Message.NMSMessageId} passed to consumer {Info.Id}");
+            }
+
             SetAcknowledgeCallback(envelope);
 
             if (envelope.EnqueueFirst)
@@ -215,6 +220,11 @@ namespace Apache.NMS.AMQP
 
         private void DeliverNextPending()
         {
+            if (Tracer.IsDebugEnabled)
+            {
+                Tracer.Debug($"{Info.Id} is about to deliver next pending message.");
+            }
+            
             if (Session.IsStarted && started && Listener != null)
             {
                 lock (syncRoot)
@@ -225,19 +235,30 @@ namespace Apache.NMS.AMQP
                         {
                             var envelope = messageQueue.DequeueNoWait();
                             if (envelope == null)
+                            {
+                                if (Tracer.IsDebugEnabled)
+                                {
+                                    Tracer.Debug($"No message available for delivery.");
+                                }
+
                                 return;
+                            }
 
                             if (IsMessageExpired(envelope))
                             {
                                 if (Tracer.IsDebugEnabled)
+                                {
                                     Tracer.Debug($"{Info.Id} filtered expired message: {envelope.Message.NMSMessageId}");
+                                }
 
                                 DoAckExpired(envelope);
                             }
                             else if (IsRedeliveryExceeded(envelope))
                             {
                                 if (Tracer.IsDebugEnabled)
-                                    Tracer.Debug($"{Info.Id} filtered message with excessive redelivery count: {envelope.RedeliveryCount}");
+                                {
+                                    Tracer.Debug($"{Info.Id} filtered message with excessive redelivery count: {envelope.RedeliveryCount.ToString()}");
+                                }
 
                                 // TODO: Apply redelivery policy
                                 DoAckExpired(envelope);
@@ -320,6 +341,11 @@ namespace Apache.NMS.AMQP
 
                 while (true)
                 {
+                    if (Tracer.IsDebugEnabled)
+                    {
+                        Tracer.Debug("Trying to dequeue next message.");
+                    }
+
                     InboundMessageDispatch envelope = messageQueue.Dequeue(timeout);
 
                     if (failureCause != null)
@@ -331,7 +357,9 @@ namespace Apache.NMS.AMQP
                     if (IsMessageExpired(envelope))
                     {
                         if (Tracer.IsDebugEnabled)
+                        {
                             Tracer.Debug($"{Info.Id} filtered expired message: {envelope.Message.NMSMessageId}");
+                        }
 
                         DoAckExpired(envelope);
 
@@ -341,7 +369,9 @@ namespace Apache.NMS.AMQP
                     else if (IsRedeliveryExceeded(envelope))
                     {
                         if (Tracer.IsDebugEnabled)
-                            Tracer.Debug($"{Info.Id} filtered message with excessive redelivery count: {envelope.RedeliveryCount}");
+                        {
+                            Tracer.Debug($"{Info.Id} filtered message with excessive redelivery count: {envelope.RedeliveryCount.ToString()}");
+                        }
 
                         // TODO: Apply redelivery policy
                         DoAckExpired(envelope);
@@ -349,7 +379,9 @@ namespace Apache.NMS.AMQP
                     else
                     {
                         if (Tracer.IsDebugEnabled)
-                            Tracer.Debug($"{Info.Id}  received message {envelope.Message.NMSMessageId}.");
+                        {
+                            Tracer.Debug($"{Info.Id} received message {envelope.Message.NMSMessageId}.");
+                        }
 
                         AckFromReceive(envelope);
                         return envelope.Message.Copy();
@@ -423,10 +455,22 @@ namespace Apache.NMS.AMQP
         {
             if (closed.CompareAndSet(false, true))
             {
+                if (Tracer.IsDebugEnabled)
+                {
+                    Tracer.Debug("Shutting down NmsMessageConsumer.");
+                }
+
                 failureCause = exception;
                 Session.Remove(this);
                 started.Set(false);
                 messageQueue.Dispose();
+            }
+            else
+            {
+                if (Tracer.IsDebugEnabled)
+                {
+                    Tracer.Debug("NmsMessageConsumer already closed.");
+                }
             }
         }
 

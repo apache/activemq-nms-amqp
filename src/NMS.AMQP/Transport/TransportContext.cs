@@ -43,49 +43,6 @@ namespace Apache.NMS.AMQP.Transport
             connectionBuilder.SASL.Profile = Amqp.Sasl.SaslProfile.Anonymous;            
         }
 
-        static TransportContext()
-        {
-            //
-            // Set up tracing in AMQP.  We capture all AMQP traces in the TraceListener below
-            // and map to NMS 'Tracer' logs as follows:
-            //    AMQP          Tracer
-            //    Verbose       Debug
-            //    Frame         Debug
-            //    Information   Info
-            //    Output        Info    (should not happen)
-            //    Warning       Warn
-            //    Error         Error
-            //
-            Amqp.Trace.TraceLevel = Amqp.TraceLevel.Verbose | Amqp.TraceLevel.Frame;
-            Amqp.Trace.TraceListener = (level, format, args) =>
-            {
-                switch (level)
-                {
-                    case Amqp.TraceLevel.Verbose:
-                    case Amqp.TraceLevel.Frame:
-                        Tracer.DebugFormat(format, args);
-                        break;
-                    case Amqp.TraceLevel.Information:
-                    case Amqp.TraceLevel.Output:
-                        // 
-                        // Applications should not access AmqpLite directly so there
-                        // should be no 'Output' level logs.
-                        Tracer.InfoFormat(format, args);
-                        break;
-                    case Amqp.TraceLevel.Warning:
-                        Tracer.WarnFormat(format, args);
-                        break;
-                    case Amqp.TraceLevel.Error:
-                        Tracer.ErrorFormat(format, args);
-                        break;
-                    default:
-                        Tracer.InfoFormat("Unknown AMQP LogLevel: {}", level);
-                        Tracer.InfoFormat(format, args);
-                        break;
-                }
-            };
-        }
-
         #region Transport Options
 
         public int ReceiveBufferSize { get => this.connectionBuilder.TCP.ReceiveBufferSize; set => this.connectionBuilder.TCP.ReceiveBufferSize = value; }
@@ -124,25 +81,6 @@ namespace Apache.NMS.AMQP.Transport
                 else
                 {
                     this.connectionBuilder.TCP.LingerOption.LingerTime = value;
-                }
-            }
-        }
-
-        /// <summary>
-        /// UseLogging Enables AmqpNetLite's Frame logging level.
-        /// </summary>
-        public bool UseLogging
-        {
-            get => ((Amqp.Trace.TraceLevel & Amqp.TraceLevel.Frame) == Amqp.TraceLevel.Frame);
-            set
-            {
-                if (value)
-                {
-                    Amqp.Trace.TraceLevel = Amqp.Trace.TraceLevel | Amqp.TraceLevel.Frame;
-                }
-                else
-                {
-                    Amqp.Trace.TraceLevel = Amqp.Trace.TraceLevel & ~Amqp.TraceLevel.Frame;
                 }
             }
         }

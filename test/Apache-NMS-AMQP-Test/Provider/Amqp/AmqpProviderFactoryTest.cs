@@ -16,6 +16,7 @@
  */
 
 using System;
+using Amqp;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Provider.Amqp;
 using NUnit.Framework;
@@ -26,7 +27,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
     public class AmqpProviderFactoryTest
     {
         private uint customMaxHandle = 2048;
-        
+
         [Test]
         public void TestCreateAmqpProvider()
         {
@@ -38,21 +39,31 @@ namespace NMS.AMQP.Test.Provider.Amqp
         public void TestCreateWithDefaultOptions()
         {
             AmqpProvider provider = ProviderFactory.Create(new Uri("amqp://localhost:5672")) as AmqpProvider;
-            
+
             Assert.IsNotNull(provider);
             Assert.AreEqual(AmqpProvider.DEFAULT_MAX_HANDLE, provider.MaxHandle);
+            Assert.IsFalse(provider.TraceFrames);
         }
 
         [Test]
         public void TestCreateWithCustomOptions()
         {
-            Uri uri = new Uri("amqp://localhost:5672" + "?" +
-                              "amqp.maxHandle=" + customMaxHandle);
-            
+            Uri uri = new Uri("amqp://localhost:5672" +
+                              "?amqp.maxHandle=" + customMaxHandle +
+                              "&amqp.traceFrames=true");
+
             AmqpProvider provider = ProviderFactory.Create(uri) as AmqpProvider;
-            
+
             Assert.IsNotNull(provider);
             Assert.AreEqual(customMaxHandle, provider.MaxHandle);
+            Assert.IsTrue(provider.TraceFrames);
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            // clean up trace level as it may interfere with other tests
+            Trace.TraceLevel = 0;
         }
     }
 }

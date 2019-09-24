@@ -23,12 +23,15 @@ using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
 using Amqp.Types;
+using NLog.Fluent;
 using NMS.AMQP.Test.TestAmqp.BasicTypes;
 
 namespace NMS.AMQP.Test.TestAmqp
 {
     public class TestAmqpPeerRunner
     {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        
         private readonly TestAmqpPeer testAmqpPeer;
         private readonly IPEndPoint ip;
         private Socket socket;
@@ -123,8 +126,9 @@ namespace NMS.AMQP.Test.TestAmqp
                     }
                 }
             }
-            catch
+            catch(Exception e)
             {
+                Logger.Info(e);
                 stream.Dispose();
             }
         }
