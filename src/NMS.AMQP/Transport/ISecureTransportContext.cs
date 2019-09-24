@@ -21,9 +21,6 @@ namespace Apache.NMS.AMQP.Transport
 {
     public interface ISecureTransportContext : ITransportContext
     {
-        
-        new ISecureTransportContext Copy();
-
         string ServerName { get; set; }
 
         string ClientCertFileName { get; set; }

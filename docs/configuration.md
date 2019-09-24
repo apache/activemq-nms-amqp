@@ -37,7 +37,11 @@ The complete set of TCP Transport options is listed below:
 - **transport.receiveBufferSize** Specifies the SendBufferSize option of the TCP socket.
 - **transport.receiveTimeout** Specifies the ReceiveTimeout option of the TCP socket.
 - **transport.sendTimeout** Specifies the SendTimeout option of the TCP socket.
+- **transport.tcpKeepAliveTime** Specifies how often a keep-alive transmission is sent to an idle connection.
+- **transport.tcpKeepAliveInterval** Specifies how often a keep-alive transmission is sent when no response is received from previous keep-alive transmissions.
 - **transport.tcpNoDelay** Specifies the NoDelay option of the TCP socket.
+
+If *tcpKeepAliveTime* or *tcpKeepAliveInterval* it set, TCP Keep-Alive is enabled.
 
 ### Failover Configuration options
 With failover enabled the client can reconnect to another server automatically when connection to the current server is lost for some reason. The failover URI is always initiated with the failover prefix and a list of URIs for the server(s) is contained inside a set of parentheses. The "nms." options are applied to the overall failover URI, outside the parentheses, and affect the NMS Connection object for its lifetime.
