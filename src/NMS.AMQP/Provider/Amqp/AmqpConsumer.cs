@@ -25,6 +25,7 @@ using Amqp.Transactions;
 using Amqp.Types;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
+using Apache.NMS.AMQP.Provider.Amqp.Filters;
 using Apache.NMS.AMQP.Provider.Amqp.Message;
 using Apache.NMS.AMQP.Util;
 
@@ -164,14 +165,9 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 filters.Add(SymbolUtil.ATTACH_FILTER_NO_LOCAL, "NoLocalFilter{}");
             }
 
-            // Selector
-            // qpid jms defines a selector filter as an amqp described type 
-            //      AmqpJmsSelectorType where
-            //          Descriptor = 0x0000468C00000004UL
-            //          Described = "<selector_string>" (type string)
             if (info.HasSelector)
             {
-                filters.Add(SymbolUtil.ATTACH_FILTER_SELECTOR, info.Selector);
+                filters.Add(SymbolUtil.ATTACH_FILTER_SELECTOR, new AmqpNmsSelectorType(info.Selector));
             }
 
             // Assign filters

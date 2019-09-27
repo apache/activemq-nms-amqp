@@ -42,7 +42,7 @@ namespace Apache.NMS.AMQP.Meta
         public string SubscriptionName { get; internal set; } = null;
 
         public bool NoLocal { get; internal set; } = false;
-        public bool HasSelector => !string.IsNullOrEmpty(Selector);
+        public bool HasSelector => !string.IsNullOrWhiteSpace(Selector);
         public bool IsDurable { get; set; }
         public bool IsBrowser { get; set; }
         public bool LocalMessageExpiry { get; set; }
