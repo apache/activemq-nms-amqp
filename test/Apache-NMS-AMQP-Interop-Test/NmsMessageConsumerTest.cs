@@ -83,5 +83,22 @@ namespace NMS.AMQP.Test
             Assert.AreEqual(text, ((ITextMessage) msg).Text);
             Assert.IsNull(messageConsumer.Receive(TimeSpan.FromSeconds(1)));
         }
+
+        [Test, Timeout(60_000)]
+        public void TestSelectNoLocal()
+        {
+            PurgeTopic(TimeSpan.FromMilliseconds(500));
+            
+            Connection = CreateAmqpConnection();
+            Connection.Start();
+            
+            ISession session = Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+            ITopic topic = session.GetTopic(TestName);
+            IMessageProducer producer = session.CreateProducer(topic);                        
+            ITextMessage message = session.CreateTextMessage("text");
+            producer.Send(message, MsgDeliveryMode.Persistent, MsgPriority.Normal, TimeSpan.Zero);
+            IMessageConsumer messageConsumer = session.CreateConsumer(topic, null, noLocal: true);
+            Assert.IsNull(messageConsumer.Receive(TimeSpan.FromMilliseconds(500)));
+        }
     }
 }
