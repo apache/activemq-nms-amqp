@@ -232,67 +232,6 @@ namespace NMS.AMQP.Test.Integration
             }
         }
 
-        // TODO: To be fixed
-        [Test, Timeout(20_000), Ignore("Ignore")]
-        public void TestCloseDurableSubscriberWithUnackedAndUnconsumedPrefetchedMessages()
-        {
-            using (TestAmqpPeer testPeer = new TestAmqpPeer())
-            {
-                IConnection connection = EstablishConnection(testPeer);
-                connection.Start();
-
-                testPeer.ExpectBegin();
-
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-
-                string topicName = "myTopic";
-                string subscriptionName = "mySubscription";
-                ITopic topic = session.GetTopic(topicName);
-
-                int messageCount = 5;
-                // Create a consumer and fill the prefetch with some messages,
-                // which we will consume some of but ack none of.
-                testPeer.ExpectDurableSubscriberAttach(topicName, subscriptionName);
-                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), count: messageCount);
-
-                IMessageConsumer durableConsumer = session.CreateDurableConsumer(topic, subscriptionName, null, false);
-
-                int consumeCount = 2;
-                IMessage receivedMessage = null;
-                for (int i = 1; i <= consumeCount; i++)
-                {
-                    receivedMessage = durableConsumer.Receive();
-                    Assert.NotNull(receivedMessage);
-                    Assert.IsInstanceOf<NmsTextMessage>(receivedMessage);
-                }
-
-                // Expect the messages that were not delivered to be released.
-                for (int i = 1; i <= consumeCount; i++)
-                {
-                    testPeer.ExpectDispositionThatIsAcceptedAndSettled();
-                }
-
-                receivedMessage.Acknowledge();
-
-                testPeer.ExpectDetach(expectClosed: false, sendResponse: true, replyClosed: false);
-
-                for (int i = consumeCount + 1; i <= messageCount; i++)
-                {
-                    testPeer.ExpectDispositionThatIsReleasedAndSettled();
-                }
-
-                testPeer.ExpectEnd();
-
-                durableConsumer.Close();
-                session.Close();
-
-                testPeer.ExpectClose();
-                connection.Close();
-
-                testPeer.WaitForAllMatchersToComplete(3000);
-            }
-        }
-
         [Test, Timeout(20_000)]
         public void TestConsumerReceiveThrowsIfConnectionLost()
         {
