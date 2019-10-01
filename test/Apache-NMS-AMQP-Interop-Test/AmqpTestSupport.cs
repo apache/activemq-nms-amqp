@@ -116,5 +116,22 @@ namespace NMS.AMQP.Test
 
             amqpConnection.Close();
         }
+
+        protected void PurgeTopic(TimeSpan timeout)
+        {
+            IConnection amqpConnection = CreateAmqpConnection();
+            amqpConnection.Start();
+            ISession session = amqpConnection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+            ITopic queue = session.GetTopic(TestName);
+            IMessageConsumer consumer = session.CreateConsumer(queue);
+
+            IMessage message;
+            do
+            {
+                message = consumer.Receive(timeout);
+            } while (message != null);
+
+            amqpConnection.Close();
+        }
     }
 }

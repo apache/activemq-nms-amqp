@@ -152,17 +152,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             source.Capabilities = new[] { SymbolUtil.GetTerminusCapabilitiesForDestination(info.Destination) };
 
             Map filters = new Map();
-
-            // TODO add filters for noLocal and Selector using appropriate Amqp Described types
-
-            // No Local
-            // qpid jms defines a no local filter as an amqp described type 
-            //      AmqpJmsNoLocalType where
-            //          Descriptor = 0x0000468C00000003UL
-            //          Described = "NoLocalFilter{}" (type string)
+            
             if (info.NoLocal)
             {
-                filters.Add(SymbolUtil.ATTACH_FILTER_NO_LOCAL, "NoLocalFilter{}");
+                filters.Add(SymbolUtil.ATTACH_FILTER_NO_LOCAL, AmqpNmsNoLocalType.NO_LOCAL);
             }
 
             if (info.HasSelector)
@@ -170,7 +163,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 filters.Add(SymbolUtil.ATTACH_FILTER_SELECTOR, new AmqpNmsSelectorType(info.Selector));
             }
 
-            // Assign filters
             if (filters.Count > 0)
             {
                 source.FilterSet = filters;
