@@ -62,7 +62,7 @@ So in general most of the top level classes that implement the Apache.NMS interf
 | IMessageProducer | Y * | Anonymous producers are only supported on connections with the ANONYMOUS-RELAY capability. |
 | MsgDeliveryMode.Persistent | Y | Producers will block on send until an outcome is received or will timeout after waiting the RequestTimeout timespan amount. Exceptions may be throw depending on the outcome or if the producer times out. |
 | MsgDeliveryMode.NonPersistent | Y | Producers will not block on send nor expect to receive an outcome. Should an exception be raised from the outcome the exception will be delivered using the the connection ExceptionListener. |
-| IMessageConsumer | Y * | Message Selectors and noLocal filter are not supported. |
+| IMessageConsumer | Y * | NoLocal filter is not supported. |
 | Durable Consumers | Y | |
 | IQueueBrowser | N | The provider will throw NotImplementedException for the ISession create methods. |
 | Configurable NMSMessageID and amqp serializtion | N | For future consideration. The prodiver will generate a MessageID from a sequence and serialize it as a string. |
