@@ -29,6 +29,8 @@ namespace NMS.AMQP.Test.Transport
         private int customReceiveTimeout = 1000;
         private int customSendBufferSize = 32 * 1024;
         private int customSendTimeout = 2000;
+        private int customTcpKeepAliveTime = 2500;
+        private int customTcpKeepAliveInterval = 3000;
 
         [Test]
         public void TestCreateWithDefaultOptions()
@@ -54,6 +56,8 @@ namespace NMS.AMQP.Test.Transport
                               "transport.receiveTimeout=" + customReceiveTimeout + "&" +
                               "transport.sendBufferSize=" + customSendBufferSize + "&" +
                               "transport.sendTimeout=" + customSendTimeout + "&" +
+                              "transport.tcpKeepAliveTime=" + customTcpKeepAliveTime + "&" +
+                              "transport.tcpKeepAliveInterval=" + customTcpKeepAliveInterval + "&" +
                               "transport.tcpNoDelay=" + customTcpNoDelay);
             ITransportContext transportContext = TransportContextFactory.CreateTransportContext(uri);
 
@@ -64,6 +68,8 @@ namespace NMS.AMQP.Test.Transport
             Assert.AreEqual(customReceiveTimeout, transportContext.ReceiveTimeout);
             Assert.AreEqual(customSendBufferSize, transportContext.SendBufferSize);
             Assert.AreEqual(customSendTimeout, transportContext.SendTimeout);
+            Assert.AreEqual(customTcpKeepAliveTime, transportContext.TcpKeepAliveTime);
+            Assert.AreEqual(customTcpKeepAliveInterval, transportContext.TcpKeepAliveInterval);
             Assert.AreEqual(customTcpNoDelay, transportContext.TcpNoDelay);
         }
 

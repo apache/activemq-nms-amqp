@@ -26,9 +26,6 @@ using Apache.NMS.AMQP.Util;
 
 namespace Apache.NMS.AMQP.Transport
 {
-
-    #region Transport Context
-
     /// <summary>
     /// Transport management is mainly handled by the AmqpNetLite library, Except for custom transports.
     /// TransportContext should configure the Amqp.ConnectionFactory for the tcp transport properties.
@@ -43,15 +40,25 @@ namespace Apache.NMS.AMQP.Transport
             connectionBuilder.SASL.Profile = Amqp.Sasl.SaslProfile.Anonymous;            
         }
 
-        #region Transport Options
-
         public int ReceiveBufferSize { get => this.connectionBuilder.TCP.ReceiveBufferSize; set => this.connectionBuilder.TCP.ReceiveBufferSize = value; }
         public int ReceiveTimeout { get => this.connectionBuilder.TCP.ReceiveTimeout; set => this.connectionBuilder.TCP.ReceiveTimeout = value; }
         public int SendBufferSize { get => this.connectionBuilder.TCP.SendBufferSize; set => this.connectionBuilder.TCP.SendBufferSize = value; }
         public int SendTimeout { get => this.connectionBuilder.TCP.SendTimeout; set => this.connectionBuilder.TCP.SendTimeout = value; }
         public bool TcpNoDelay { get => this.connectionBuilder.TCP.NoDelay; set => this.connectionBuilder.TCP.NoDelay = value; }
-        public uint TcpKeepAliveTime { get => this.connectionBuilder.TCP.KeepAlive.KeepAliveTime; set => this.connectionBuilder.TCP.KeepAlive.KeepAliveTime = value; }
-        public uint TcpKeepAliveInterval { get => this.connectionBuilder.TCP.KeepAlive.KeepAliveInterval; set => this.connectionBuilder.TCP.KeepAlive.KeepAliveInterval = value; }
+
+        public uint TcpKeepAliveTime
+        {
+            get => this.connectionBuilder.TCP.KeepAlive?.KeepAliveTime ?? default;
+            set => this.TcpKeepAliveSettings.KeepAliveTime = value;
+        }
+
+        public uint TcpKeepAliveInterval
+        {
+            get => this.connectionBuilder.TCP.KeepAlive?.KeepAliveInterval ?? default;
+            set => this.TcpKeepAliveSettings.KeepAliveInterval = value;
+        }
+
+        private TcpKeepAliveSettings TcpKeepAliveSettings => this.connectionBuilder.TCP.KeepAlive ?? (this.connectionBuilder.TCP.KeepAlive = new TcpKeepAliveSettings());
 
         public bool SocketLingerEnabled
         {
@@ -84,42 +91,12 @@ namespace Apache.NMS.AMQP.Transport
                 }
             }
         }
-        
-        #endregion
 
         public virtual bool IsSecure { get; } = false;
-
-        public virtual ITransportContext Copy()
-        {
-            TransportContext copy = new TransportContext();
-            this.CopyInto(copy);
-            return copy;
-        }
 
         public virtual Task<Connection> CreateAsync(Address address, IHandler handler)
         {
             return connectionBuilder.CreateAsync(address, handler);    
         }
-
-        protected virtual void CopyInto(TransportContext copy)
-        {
-            //copy.factory = this.factory;
-            //copy.UseLogging = this.UseLogging;
-            //Amqp.ConnectionFactory builder = new Amqp.ConnectionFactory();
-            //this.CopyBuilder(builder);
-            //copy.connectionBuilder = builder;
-        }
-
-        protected virtual void CopyBuilder(Amqp.ConnectionFactory copy)
-        {
-            StringDictionary amqpProperties = PropertyUtil.GetProperties(this.connectionBuilder.AMQP);
-            StringDictionary tcpProperties = PropertyUtil.GetProperties(this.connectionBuilder.TCP);
-            PropertyUtil.SetProperties(copy.AMQP, amqpProperties);
-            PropertyUtil.SetProperties(copy.TCP, tcpProperties);
-            copy.SASL.Profile = this.connectionBuilder.SASL.Profile;
-        }
     }
-
-    #endregion
-
 }

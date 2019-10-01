@@ -37,8 +37,8 @@ namespace Apache.NMS.AMQP.Transport
     internal class SecureTransportContext : TransportContext, ISecureTransportContext
     {
         
-        private readonly static List<string> SupportedProtocols;
-        private readonly static Dictionary<string, int> SupportedProtocolValues;
+        private static readonly List<string> SupportedProtocols;
+        private static readonly Dictionary<string, int> SupportedProtocolValues;
 
         #region static Initializer
 
@@ -408,65 +408,6 @@ namespace Apache.NMS.AMQP.Transport
                 }
             }
             return valid ?? this.AcceptInvalidBrokerCert;
-        }
-
-        #endregion
-        
-        #region Copy Methods
-
-
-        protected override void CopyBuilder(Amqp.ConnectionFactory copy)
-        {
-            base.CopyBuilder(copy);
-            
-            copy.SSL.Protocols = connectionBuilder.SSL.Protocols;
-            copy.SSL.CheckCertificateRevocation = connectionBuilder.SSL.CheckCertificateRevocation;
-
-            if (connectionBuilder.SSL.ClientCertificates != null)
-            {
-                copy.SSL.ClientCertificates = new X509CertificateCollection(connectionBuilder.SSL.ClientCertificates);
-            }
-
-        }
-
-        protected override void CopyInto(TransportContext copy)
-        {
-            SecureTransportContext stcCopy = copy as SecureTransportContext;
-
-            // Copy Secure properties.
-
-            // copy keystore properties
-            stcCopy.KeyStoreName = this.KeyStoreName;
-            stcCopy.KeyStorePassword = this.KeyStorePassword;
-            stcCopy.KeyStoreLocation = this.KeyStoreLocation;
-
-            // copy certificate properties
-            stcCopy.AcceptInvalidBrokerCert = this.AcceptInvalidBrokerCert;
-            stcCopy.ServerName = this.ServerName;
-            stcCopy.ClientCertFileName = this.ClientCertFileName;
-            stcCopy.ClientCertPassword = this.ClientCertPassword;
-            stcCopy.ClientCertSubject = this.ClientCertSubject;
-
-            // copy application callback
-            stcCopy.ServerCertificateValidateCallback = this.ServerCertificateValidateCallback;
-            stcCopy.ClientCertificateSelectCallback = this.ClientCertificateSelectCallback;
-            
-            base.CopyInto(copy);
-
-            stcCopy.connectionBuilder.SSL.RemoteCertificateValidationCallback = this.ContextServerCertificateValidation;
-            stcCopy.connectionBuilder.SSL.LocalCertificateSelectionCallback = this.ContextLocalCertificateSelect;
-        }
-
-        public override ITransportContext Copy()
-        {
-            TransportContext copy = new SecureTransportContext();
-            this.CopyInto(copy);
-            return copy;
-        }
-        
-        ISecureTransportContext ISecureTransportContext.Copy()
-        {
-            return this.Copy() as SecureTransportContext;
         }
 
         #endregion

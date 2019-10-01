@@ -33,10 +33,18 @@ namespace Apache.NMS.AMQP.Transport
         int SendTimeout { get; set; }
         
         bool TcpNoDelay { get; set; }
+
+        /// <summary>
+        /// Gets or sets how often a keep-alive transmission is sent to an idle connection.
+        /// </summary>
+        uint TcpKeepAliveTime { get; set; }
+        
+        /// <summary>
+        /// Gets or sets How often a keep-alive transmission is sent when no response is received from previous keep-alive transmissions.
+        /// </summary>
+        uint TcpKeepAliveInterval { get; set; }
         
         bool IsSecure { get; }
-        
-        ITransportContext Copy();
         
         Task<Connection> CreateAsync(Address address, IHandler handler);
     }
