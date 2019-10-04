@@ -66,10 +66,10 @@ namespace NMS.AMQP.Test
         }
 
         [Test]
-        public void TestSetPropertiesFromUri()
+        public void TestSetPropertiesFromStringUri()
         {
             string baseUri = "amqp://localhost:1234";
-            string configured = baseUri +
+            string configuredUri = baseUri +
                                 "?nms.username=user" +
                                 "&nms.password=password" +
                                 "&nms.clientId=client" +
@@ -79,7 +79,33 @@ namespace NMS.AMQP.Test
                                 "&nms.sendTimeout=1000" +
                                 "&nms.localMessageExpiry=false";
 
-            NmsConnectionFactory factory = new NmsConnectionFactory(configured);
+            NmsConnectionFactory factory = new NmsConnectionFactory(configuredUri);
+
+            Assert.AreEqual("user", factory.UserName);
+            Assert.AreEqual("password", factory.Password);
+            Assert.AreEqual("client", factory.ClientId);
+            Assert.AreEqual("ID:TEST", factory.ConnectionIdPrefix);
+            Assert.AreEqual("clientId", factory.ClientIdPrefix);
+            Assert.AreEqual(1000, factory.RequestTimeout);
+            Assert.AreEqual(1000, factory.SendTimeout);
+            Assert.IsFalse(factory.LocalMessageExpiry);
+        }
+        
+        [Test]
+        public void TestSetPropertiesFromUri()
+        {
+            string baseUri = "amqp://localhost:1234";
+            string configuredUri = baseUri +
+                                "?nms.username=user" +
+                                "&nms.password=password" +
+                                "&nms.clientId=client" +
+                                "&nms.connectionIdPrefix=ID:TEST" +
+                                "&nms.clientIDPrefix=clientId" +
+                                "&nms.requestTimeout=1000" +
+                                "&nms.sendTimeout=1000" +
+                                "&nms.localMessageExpiry=false";
+
+            NmsConnectionFactory factory = new NmsConnectionFactory(new Uri(configuredUri));
 
             Assert.AreEqual("user", factory.UserName);
             Assert.AreEqual("password", factory.Password);
