@@ -58,7 +58,7 @@ namespace Apache.NMS.AMQP
 
         public NmsConnectionFactory(Uri brokerUri)
         {
-            this.brokerUri = brokerUri;
+            BrokerUri = brokerUri;
         }
 
         private IdGenerator ClientIdGenerator
