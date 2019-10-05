@@ -421,7 +421,11 @@ namespace NMS.AMQP.Test.TestAmqp
             ExpectSenderAttach(sourceMatcher: Assert.NotNull, targetMatcher: Assert.NotNull);
         }
 
-        public void ExpectSenderAttach(Action<Source> sourceMatcher, Action<Target> targetMatcher, uint creditAmount = 100, bool senderSettled = false)
+        public void ExpectSenderAttach(Action<Source> sourceMatcher,
+            Action<Target> targetMatcher,
+            bool refuseLink = false,
+            uint creditAmount = 100,
+            bool senderSettled = false)
         {
             var attachMatcher = new FrameMatcher<Attach>()
                 .WithAssertion(attach => Assert.IsNotNull(attach.LinkName))
@@ -440,15 +444,26 @@ namespace NMS.AMQP.Test.TestAmqp
                         RcvSettleMode = ReceiverSettleMode.First,
                         Handle = context.Command.Handle,
                         LinkName = context.Command.LinkName,
-                        Source = context.Command.Source,
-                        Target = context.Command.Target
+                        Source = context.Command.Source
                     };
+
+                    if (refuseLink)
+                        attach.Target = null;
+                    else
+                        attach.Target = context.Command.Target;
 
                     lastInitiatedLinkHandle = context.Command.Handle;
 
                     context.SendCommand(attach);
 
-                    var flow = new Flow()
+                    if (refuseLink)
+                    {
+                        var detach = new Detach { Closed = true, Handle = context.Command.Handle };
+                        context.SendCommand(detach);
+                    }
+                    else
+                    {
+                        var flow = new Flow
                     {
                         NextIncomingId = 1,
                         IncomingWindow = 2048,
@@ -460,6 +475,7 @@ namespace NMS.AMQP.Test.TestAmqp
                     };
 
                     context.SendCommand(flow);
+                    }
                 });
 
             AddMatcher(attachMatcher);
