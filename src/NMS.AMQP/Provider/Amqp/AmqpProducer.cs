@@ -54,7 +54,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             string linkName = info.Id + ":" + target.Address;
             var taskCompletionSource = new TaskCompletionSource<bool>();
-            senderLink = new SenderLink(session.UnderlyingSession, linkName, frame, (link, attach) => { taskCompletionSource.SetResult(true); });
+            senderLink = new SenderLink(session.UnderlyingSession, linkName, frame, HandleOpened(taskCompletionSource));
 
             senderLink.AddClosedCallback((sender, error) =>
             {
@@ -72,6 +72,21 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             });
 
             return taskCompletionSource.Task;
+        }
+        
+        private OnAttached HandleOpened(TaskCompletionSource<bool> tsc) => (link, attach) =>
+        {
+            if (IsClosePending(attach))
+                return;
+
+            tsc.SetResult(true);
+        };
+        
+        private static bool IsClosePending(Attach attach)
+        {
+            // When no link terminus was created, the peer will now detach/close us otherwise
+            // we need to validate the returned remote target prior to open completion.
+            return attach.Target == null;
         }
 
         private Source CreateSource() => new Source

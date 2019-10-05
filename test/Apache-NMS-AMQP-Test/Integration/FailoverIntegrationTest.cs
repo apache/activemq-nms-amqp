@@ -1028,6 +1028,45 @@ namespace NMS.AMQP.Test.Integration
             }
         }
 
+        [Test, Timeout(20_000)]
+        public void TestCreateProducerFailsWhenLinkRefused()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                testPeer.ExpectSaslAnonymous();
+                testPeer.ExpectOpen();
+                testPeer.ExpectBegin();
+
+                NmsConnection connection = EstablishAnonymousConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+
+                string topicName = "myTopic";
+                ITopic topic = session.GetTopic(topicName);
+
+                // Expect a link to a topic node, which we will then refuse
+                testPeer.ExpectSenderAttach(targetMatcher: source =>
+                {
+                    Assert.AreEqual(topicName, source.Address);
+                    Assert.IsFalse(source.Dynamic);
+                    Assert.AreEqual((uint) TerminusDurability.NONE, source.Durable);
+                }, sourceMatcher: Assert.NotNull, refuseLink: true);
+
+                //Expect the detach response to the test peer closing the producer link after refusal.
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: false, replyClosed: false);
+
+                Assert.Catch<NMSException>(() => session.CreateProducer(topic));
+
+                // Shut it down
+                testPeer.ExpectClose();
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+
         private NmsConnection EstablishAnonymousConnection(params TestAmqpPeer[] peers)
         {
             return EstablishAnonymousConnection(null, null, peers);
