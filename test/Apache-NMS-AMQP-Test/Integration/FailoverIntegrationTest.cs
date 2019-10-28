@@ -36,7 +36,7 @@ namespace NMS.AMQP.Test.Integration
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         
-        [Test, Timeout(20_000), Ignore("Ignore as we cannot detect connection disconnect on Linux.")]
+        [Test, Timeout(20_000), Category("Windows")]
         public void TestFailoverHandlesDropThenRejectionCloseAfterConnect()
         {
             using (TestAmqpPeer originalPeer = new TestAmqpPeer())
@@ -62,7 +62,6 @@ namespace NMS.AMQP.Test.Integration
 
                 long ird = 0;
                 long rd = 2000;
-                DateTime start = DateTime.UtcNow;
 
                 NmsConnection connection = EstablishAnonymousConnection("failover.initialReconnectDelay=" + ird + "&failover.reconnectDelay=" + rd + "&failover.maxReconnectAttempts=10", originalPeer,
                     rejectingPeer, finalPeer);
@@ -96,15 +95,7 @@ namespace NMS.AMQP.Test.Integration
 
                 rejectingPeer.WaitForAllMatchersToComplete(2000);
 
-                Assert.True(finalConnected.WaitOne(TimeSpan.FromSeconds(5)), "Should connect to final peer");
-                DateTime end = DateTime.UtcNow;
-
-                long margin = 2000;
-
-                // TODO: It is failing because, we are not handling rejected connection properly, when socket connection is established
-                // but broker replies with amqp:connection-establishment-failed. Initially connection is treated as successful, which resets
-                // the attempts counter. As a result next connect attempt is being made without any delay.
-                // Assert.That((end - start).TotalMilliseconds, Is.GreaterThanOrEqualTo(ird + rd).And.LessThanOrEqualTo(ird + rd + margin), "Elapsed time outwith expected range for reconnect");
+                Assert.True(finalConnected.WaitOne(TimeSpan.FromSeconds(10)), "Should connect to final peer");
 
                 finalPeer.ExpectClose();
                 connection.Close();

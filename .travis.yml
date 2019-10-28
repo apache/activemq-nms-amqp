@@ -4,4 +4,4 @@ mono: none
 dotnet: 2.2.401
 script:
  - dotnet build -p:AppTargetFramework=netcoreapp2.2 -c Release
- - dotnet test ./test/Apache-NMS-AMQP-Test/Apache-NMS-AMQP-Test.csproj -f netcoreapp2.2 -c Release
+ - dotnet test ./test/Apache-NMS-AMQP-Test/Apache-NMS-AMQP-Test.csproj -f netcoreapp2.2 -c Release --filter Category!=Windows

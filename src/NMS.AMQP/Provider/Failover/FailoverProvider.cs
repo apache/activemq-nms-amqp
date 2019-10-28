@@ -35,13 +35,13 @@ namespace Apache.NMS.AMQP.Provider.Failover
         public static int DEFAULT_INITIAL_RECONNECT_DELAY = 0;
         public static long DEFAULT_RECONNECT_DELAY = 10;
         public static double DEFAULT_RECONNECT_BACKOFF_MULTIPLIER = 2.0d;
-        public static long DEFAULT_MAX_RECONNECT_DELAY = (long)Math.Round(TimeSpan.FromSeconds(30).TotalMilliseconds);
+        public static long DEFAULT_MAX_RECONNECT_DELAY = (long) Math.Round(TimeSpan.FromSeconds(30).TotalMilliseconds);
         public static int DEFAULT_STARTUP_MAX_RECONNECT_ATTEMPTS = UNDEFINED;
         public static int DEFAULT_MAX_RECONNECT_ATTEMPTS = UNDEFINED;
         public static bool DEFAULT_USE_RECONNECT_BACKOFF = true;
         public static int DEFAULT_WARN_AFTER_RECONNECT_ATTEMPTS = 10;
         public static bool DEFAULT_RANDOMIZE_ENABLED = false;
-        
+
         private readonly ReconnectControls reconnectControl;
         private readonly FailoverUriPool uris;
 
@@ -140,7 +140,9 @@ namespace Apache.NMS.AMQP.Provider.Failover
                                 {
                                     provider?.Close();
                                 }
-                                catch { }
+                                catch
+                                {
+                                }
                                 finally
                                 {
                                     provider = null;
@@ -164,7 +166,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
                 {
                     if (provider == null)
                     {
-                        Tracer.Debug($"Connection attempt:[{reconnectControl.ReconnectAttempts}] failed error: {failure.Message}");
+                        Tracer.Debug($"Connection attempt:[{reconnectControl.ReconnectAttempts}] failed error: {failure?.Message}");
                         if (!reconnectControl.IsReconnectAllowed(failure))
                         {
                             ReportReconnectFailure(failure);
@@ -337,7 +339,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
         public Task Recover(Id sessionId)
         {
             CheckClosed();
-            
+
             FailoverRequest request = new FailoverRequest(this, requestTimeout)
             {
                 DoTask = activeProvider => activeProvider.Recover(sessionId),
@@ -404,7 +406,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
         public Task Unsubscribe(string name)
         {
             CheckClosed();
-            
+
             FailoverRequest request = new FailoverRequest(this, SendTimeout)
             {
                 DoTask = activeProvider => activeProvider.Unsubscribe(name),
@@ -524,7 +526,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
                         {
                             failoverRequest.ScheduleTimeout();
                         }
-                    
+
                         TriggerReconnectionAttempt();
 
                         listener?.OnConnectionInterrupted(failedUri);
@@ -646,7 +648,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
                 if (failoverProvider.UseReconnectBackOff && ReconnectAttempts > 1)
                 {
                     // Exponential increment of reconnect delay.
-                    nextReconnectDelay = (long)Math.Round(nextReconnectDelay * failoverProvider.ReconnectBackOffMultiplier);
+                    nextReconnectDelay = (long) Math.Round(nextReconnectDelay * failoverProvider.ReconnectBackOffMultiplier);
                     if (nextReconnectDelay > failoverProvider.MaxReconnectDelay)
                     {
                         nextReconnectDelay = failoverProvider.MaxReconnectDelay;

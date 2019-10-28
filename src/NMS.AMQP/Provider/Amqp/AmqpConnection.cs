@@ -71,10 +71,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             Address address = UriUtil.ToAddress(remoteUri, Info.username, Info.password);
             this.tsc = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             underlyingConnection = await transport.CreateAsync(address, new AmqpHandler(this)).ConfigureAwait(false);
-            underlyingConnection.AddClosedCallback((sender, error) => Provider.OnConnectionClosed(error));
-            
+            underlyingConnection.AddClosedCallback(OnClosed);
+
             // Wait for connection to be opened
-            await tsc.Task.ConfigureAwait(false);
+            await this.tsc.Task.ConfigureAwait(false);
 
             // Create a Session for this connection that is used for Temporary Destinations
             // and perhaps later on management and advisory monitoring.
@@ -84,6 +84,24 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             connectionSession = new AmqpConnectionSession(this, sessionInfo);
             await connectionSession.Start().ConfigureAwait(false);
+        }
+
+        private void OnClosed(IAmqpObject sender, Error error)
+        {
+            if (Tracer.IsDebugEnabled)
+            {
+                Tracer.Debug($"Connection closed. {error}");
+            }
+
+            bool connectionExplicitlyClosed = error == null;
+            if (!connectionExplicitlyClosed)
+            {
+                var exception = ExceptionSupport.GetException(error);
+                if (!this.tsc.TrySetException(exception))
+                {
+                    Provider.OnConnectionClosed(exception);
+                }
+            }
         }
 
         internal void OnLocalOpen(Open open)
@@ -122,7 +140,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     Info.QueuePrefix = queuePrefix;
                 }
 
-                this.tsc.SetResult(true);
+                this.tsc.TrySetResult(true);
                 Provider.FireConnectionEstablished();
             }
         }
