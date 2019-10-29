@@ -156,7 +156,7 @@ namespace NMS.AMQP.Test.TestAmqp
 
         public void ExpectOpen(Fields serverProperties = null)
         {
-            ExpectOpen(desiredCapabilities: DEFAULT_DESIRED_CAPABILITIES, serverCapabilities: new[] { SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER }, serverProperties: null);
+            ExpectOpen(desiredCapabilities: DEFAULT_DESIRED_CAPABILITIES, serverCapabilities: new[] { SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER }, serverProperties: serverProperties);
         }
 
         public void ExpectOpen(Symbol[] serverCapabilities, Fields serverProperties)
@@ -190,7 +190,7 @@ namespace NMS.AMQP.Test.TestAmqp
         public void RejectConnect(Symbol errorType, string errorMessage)
         {
             // Expect a connection, establish through the SASL negotiation and sending of the Open frame
-            Fields serverProperties = new Fields { { SymbolUtil.CONNECTION_ESTABLISH_FAILED, true } };
+            Fields serverProperties = new Fields { { SymbolUtil.CONNECTION_ESTABLISH_FAILED, SymbolUtil.BOOLEAN_TRUE } };
             ExpectSaslAnonymous();
             ExpectOpen(serverProperties: serverProperties);
 
@@ -198,11 +198,9 @@ namespace NMS.AMQP.Test.TestAmqp
             IMatcher lastMatcher = GetLastMatcher();
             lastMatcher.WithOnComplete(context =>
             {
-                var close = new Close { Error = new Error(errorType) { Description = errorMessage } };
+                var close = new Close { Error = new Error(errorType) { Description = errorMessage} };
                 context.SendCommand(CONNECTION_CHANNEL, close);
             });
-
-            AddMatcher(new FrameMatcher<Begin>());
 
             var closeMatcher = new FrameMatcher<Close>()
                 .WithAssertion(close => Assert.IsNull(close.Error));
