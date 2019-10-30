@@ -257,7 +257,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             {
                 try
                 {
-                    provider.Close();
+                    provider?.Close();
                 }
                 catch (Exception e)
                 {
