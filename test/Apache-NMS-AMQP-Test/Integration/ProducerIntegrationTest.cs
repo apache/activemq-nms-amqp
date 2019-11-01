@@ -206,11 +206,16 @@ namespace NMS.AMQP.Test.Integration
                 testPeer.ExpectBegin();
 
                 string queueName = "myQueue";
-                Action<Target> targetMatcher = null;
-                if (anonymousProducer)
-                    targetMatcher = target => Assert.IsNull(target.Address);
-                else
-                    targetMatcher = target => Assert.AreEqual(queueName, target.Address);
+                Action<object> targetMatcher = t =>
+                {
+                    var target = t as Target;
+                    Assert.IsNotNull(target);
+                    if (anonymousProducer)
+                        Assert.IsNull(target.Address);
+                    else
+                        Assert.AreEqual(queueName, target.Address);
+                };
+                
 
                 testPeer.ExpectSenderAttach(targetMatcher: targetMatcher, sourceMatcher: Assert.NotNull, senderSettled: false);
 

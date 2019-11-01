@@ -157,7 +157,7 @@ namespace Apache.NMS.AMQP
 
             try
             {
-                await this.connection.Commit(this.transactionInfo, nextTx);
+                await this.connection.Commit(this.transactionInfo, nextTx).ConfigureAwait(false);
                 OnTransactionCommitted();
                 Reset();
                 this.transactionInfo = nextTx;
@@ -166,6 +166,10 @@ namespace Apache.NMS.AMQP
             {
                 Tracer.Info($"Commit failed for transaction :{oldTransactionId}");
                 throw;
+            }
+            catch (Exception e)
+            {
+                throw NMSExceptionSupport.Create(e);
             }
             finally
             {
@@ -176,7 +180,7 @@ namespace Apache.NMS.AMQP
                     // one to recover our state.
                     if (nextTx.ProviderTxId == null)
                     {
-                        await Begin();
+                        await Begin().ConfigureAwait(false);
                     }
                 }
                 catch (Exception e)

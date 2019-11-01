@@ -53,6 +53,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public IEnumerable<AmqpConsumer> Consumers => consumers.Values.ToArray();
         public Id SessionId => SessionInfo.Id;
 
+        internal bool IsTransacted => SessionInfo.IsTransacted;
+
+        internal bool IsTransactionFailed => TransactionContext?.IsTransactionFailed ?? false;
+
         public Task Start()
         {
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -82,7 +86,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public void Close()
         {
             TimeSpan timeout = TimeSpan.FromMilliseconds(SessionInfo.closeTimeout);
-            TransactionContext?.Close(timeout);
             UnderlyingSession.Close(timeout);
             Connection.RemoveSession(SessionInfo.Id);
         }
@@ -153,8 +156,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         }
 
         /// <summary>
-        ///     Perform re-send of all delivered but not yet acknowledged messages for all consumers
-        ///     active in this Session.
+        /// Perform re-send of all delivered but not yet acknowledged messages for all consumers
+        /// active in this Session.
         /// </summary>
         public void Recover()
         {
@@ -173,8 +176,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         /// Roll back the currently running Transaction
         /// </summary>
         /// <param name="transactionInfo">The TransactionInfo describing the transaction being rolled back.</param>
-        /// <param name="nextTransactionInfo">The JmsTransactionInfo describing the transaction that should be started immediately.</param>
-        /// <exception cref="IllegalStateException"></exception>
+        /// <param name="nextTransactionInfo">The TransactionInfo describing the transaction that should be started immediately.</param>
+        /// <exception cref="Exception">throws Exception if an error occurs while performing the operation.</exception>
         public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
         {
             if (!SessionInfo.IsTransacted)
@@ -185,13 +188,19 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             return TransactionContext.Rollback(transactionInfo, nextTransactionInfo);
         }
 
+        /// <summary>
+        /// Commit the currently running Transaction.
+        /// </summary>
+        /// <param name="transactionInfo">the TransactionInfo describing the transaction being committed.</param>
+        /// <param name="nextTransactionInfo">the TransactionInfo describing the transaction that should be started immediately.</param>
+        /// <exception cref="Exception">throws Exception if an error occurs while performing the operation.</exception>
         public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
         {
             if (!SessionInfo.IsTransacted)
             {
                 throw new IllegalStateException("Non-transacted Session cannot commit a TX.");
             }
-            
+
             return TransactionContext.Commit(transactionInfo, nextTransactionInfo);
         }
     }
