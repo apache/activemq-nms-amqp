@@ -9,7 +9,7 @@ Windows | [![Build status](https://ci.appveyor.com/api/projects/status/yn2wkhq1n
 
 ### Installing Apache NMS AMQP
 
-You should install [Apache NMS AMQP with NuGet](https://www.nuget.org/packages/Apache.NMS.AMQP):
+You can install [Apache NMS AMQP with NuGet](https://www.nuget.org/packages/Apache.NMS.AMQP):
 
 ```
 Install-Package Apache.NMS.AMQP
