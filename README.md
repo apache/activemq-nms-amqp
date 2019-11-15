@@ -5,7 +5,23 @@
 OS | Status
 ---|---
 Linux | [![Build Status](https://travis-ci.org/apache/activemq-nms-amqp.svg?branch=master)](https://travis-ci.org/apache/activemq-nms-amqp)
-Windows | [![Build status](https://ci.appveyor.com/api/projects/status/yn2wkhq1nbhkfsur?svg=true)](https://ci.appveyor.com/project/ApacheSoftwareFoundation/activemq-nms-amqp) 
+Windows | [![Build status](https://ci.appveyor.com/api/projects/status/yn2wkhq1nbhkfsur?svg=true)](https://ci.appveyor.com/project/ApacheSoftwareFoundation/activemq-nms-amqp)
+
+### Installing Apache NMS AMQP
+
+You should install [Apache NMS AMQP with NuGet](https://www.nuget.org/packages/Apache.NMS.AMQP):
+
+```
+Install-Package Apache.NMS.AMQP
+```
+
+Or via the .NET Core command line interface:
+
+```
+dotnet add package Apache.NMS.AMQP
+```
+
+Either commands, from Package Manager Console or .NET Core CLI, will download and install Apache NMS AMQP and all required dependencies.
 
 ## Overview
 The goal of this project is to combine the [.NET Message Service API](http://activemq.apache.org/nms/) (NMS) with
