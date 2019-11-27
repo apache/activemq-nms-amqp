@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -14,24 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using Apache.NMS.AMQP.Meta;
-using Apache.NMS.AMQP.Util;
 
-namespace Apache.NMS.AMQP.Message
+using System.Threading.Tasks;
+using Amqp;
+using Amqp.Framing;
+
+namespace Apache.NMS.AMQP.Provider.Amqp
 {
-    public class InboundMessageDispatch
+    internal static class AmqpLinkExtensions
     {
-        public Id ConsumerId { get; set; }
-        public ConsumerInfo ConsumerInfo { get; set; }
-        public NmsMessage Message { get; set; }
-        public bool IsDelivered { get; set; }
-
-        public int RedeliveryCount => Message?.Facade.RedeliveryCount ?? 0;
-        public bool EnqueueFirst { get; set; }
-
-        public override string ToString()
+        internal static bool IsDetaching(this Link link)
         {
-            return $"[{nameof(InboundMessageDispatch)}] MessageId: {Message.NMSMessageId}, {nameof(ConsumerId)}: {ConsumerId}";
+            return link.LinkState >= LinkState.DetachPipe;
+        }
+
+        internal static Task<Outcome> SendAsync(this SenderLink link, global::Amqp.Message message, DeliveryState deliveryState, long timeoutMillis)
+        {
+            return new AmqpSendTask(link, message, deliveryState, timeoutMillis).Task;
         }
     }
 }

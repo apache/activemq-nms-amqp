@@ -1038,11 +1038,13 @@ namespace NMS.AMQP.Test.Integration
                 ITopic topic = session.GetTopic(topicName);
 
                 // Expect a link to a topic node, which we will then refuse
-                testPeer.ExpectSenderAttach(targetMatcher: source =>
+                testPeer.ExpectSenderAttach(targetMatcher: x =>
                 {
-                    Assert.AreEqual(topicName, source.Address);
-                    Assert.IsFalse(source.Dynamic);
-                    Assert.AreEqual((uint) TerminusDurability.NONE, source.Durable);
+                    Target target = (Target) x;
+
+                    Assert.AreEqual(topicName, target.Address);
+                    Assert.IsFalse(target.Dynamic);
+                    Assert.AreEqual((uint) TerminusDurability.NONE, target.Durable);
                 }, sourceMatcher: Assert.NotNull, refuseLink: true);
 
                 //Expect the detach response to the test peer closing the producer link after refusal.

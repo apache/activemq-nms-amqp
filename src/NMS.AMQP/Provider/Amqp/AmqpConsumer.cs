@@ -239,17 +239,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         envelope.IsDelivered = true;
                         break;
                     case AckType.ACCEPTED:
-                        AmqpTransactionContext transactionalState = session.TransactionContext;
-                        if (transactionalState != null)
-                        {
-                            receiverLink.Complete(message, transactionalState.GetTxnAcceptState());
-                            transactionalState.RegisterTxConsumer(this);
-                        }
-                        else
-                        {
-                            receiverLink.Accept(message);
-                        }
-                        RemoveMessage(envelope);
+                        HandleAccepted(envelope, message);
                         break;
                     case AckType.RELEASED:
                         receiverLink.Release(message);
@@ -260,14 +250,40 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         RemoveMessage(envelope);
                         break;
                     default:
-                        Tracer.Error($"Unsupported Ack Type for message: {envelope.Message}");
-                        throw new ArgumentException($"Unsupported Ack Type for message: {envelope.Message}");
+                        Tracer.ErrorFormat("Unsupported Ack Type for message: {0}", envelope);
+                        throw new ArgumentException($"Unsupported Ack Type for message: {envelope}");
                 }
             }
             else
             {
                 Tracer.ErrorFormat($"Received Ack for unknown message: {envelope}");
             }
+        }
+
+        private void HandleAccepted(InboundMessageDispatch envelope, global::Amqp.Message message)
+        {
+            Tracer.DebugFormat("Accepted Ack of message: {0}", envelope);
+            
+            if (session.IsTransacted)
+            {
+                if (!session.IsTransactionFailed)
+                {
+                    var transactionalState = session.TransactionContext;
+                    receiverLink.Complete(message, transactionalState.GetTxnAcceptState());
+                    transactionalState.RegisterTxConsumer(this);
+                }
+                else
+                {
+                    Tracer.DebugFormat("Skipping ack of message {0} in failed transaction.", envelope);
+                }
+                
+            }
+            else
+            {
+                receiverLink.Accept(message);
+            }
+
+            RemoveMessage(envelope);
         }
 
         private void AddMessage(InboundMessageDispatch envelope)

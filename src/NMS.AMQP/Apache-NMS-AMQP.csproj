@@ -49,8 +49,8 @@ with the License.  You may obtain a copy of the License at
     </PropertyGroup>
 
     <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt"/>
-        <None Include="..\..\NOTICE.txt" Pack="true" PackagePath="NOTICE.txt"/>
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
+        <None Include="..\..\NOTICE.txt" Pack="true" PackagePath="NOTICE.txt" />
     </ItemGroup>
 
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -74,8 +74,8 @@ with the License.  You may obtain a copy of the License at
 
     <ItemGroup>
         <!-- AMQPNetLite.Core is .NET Standard 1.3 package -->
-        <PackageReference Include="AMQPNetLite.Core" Version="2.2.0"/>
-        <PackageReference Include="Apache.NMS" Version="1.8.0"/>
-        <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.9.0"/>
+        <PackageReference Include="AMQPNetLite.Core" Version="2.3.0" />
+        <PackageReference Include="Apache.NMS" Version="1.8.0" />
+        <PackageReference Include="System.Threading.Tasks.Dataflow" Version="4.9.0" />
     </ItemGroup>
 </Project>

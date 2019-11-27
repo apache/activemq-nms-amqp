@@ -26,48 +26,67 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 {
     public class AmqpTransactionCoordinator : SenderLink
     {
-        public AmqpTransactionCoordinator(AmqpSession session) : base(session.UnderlyingSession, GetName(), new Attach { Target = new Coordinator(), Source = new Source() }, null)
+        private static readonly global::Amqp.Message DeclareMessage = new global::Amqp.Message(new Declare());
+
+        private readonly AmqpSession session;
+
+        public AmqpTransactionCoordinator(AmqpSession session) : base(session.UnderlyingSession, GetName(), new Attach
         {
+            Target = new Coordinator
+            {
+                Capabilities = new[] { TxnCapabilities.LocalTransactions }
+            },
+            Source = new Source
+            {
+                Outcomes = new[] { SymbolUtil.ATTACH_OUTCOME_ACCEPTED, SymbolUtil.ATTACH_OUTCOME_REJECTED, SymbolUtil.ATTACH_OUTCOME_RELEASED, SymbolUtil.ATTACH_OUTCOME_MODIFIED },
+            },
+            SndSettleMode = SenderSettleMode.Unsettled,
+            RcvSettleMode = ReceiverSettleMode.First
+        }, null)
+        {
+            this.session = session;
         }
 
         private static string GetName() => "transaction-link-" + Guid.NewGuid().ToString("N").Substring(0, 5);
 
-        public Task<byte[]> DeclareAsync()
+        public async Task<byte[]> DeclareAsync()
         {
-            var message = new global::Amqp.Message(new Declare());
-            var tcs = new TaskCompletionSource<byte[]>();
-            Send(message, null, OnDeclareOutcome, tcs);
-            return tcs.Task;
-        }
-
-        private static void OnDeclareOutcome(ILink link, global::Amqp.Message message, Outcome outcome, object state)
-        {
-            var tcs = (TaskCompletionSource<byte[]>) state;
+            var outcome = await this.SendAsync(DeclareMessage, null, this.session.Connection.Info.requestTimeout).ConfigureAwait(false);
             if (outcome.Descriptor.Code == MessageSupport.DECLARED_INSTANCE.Descriptor.Code)
-                tcs.SetResult(((Declared) outcome).TxnId);
+            {
+                return ((Declared) outcome).TxnId;
+            }
             else if (outcome.Descriptor.Code == MessageSupport.REJECTED_INSTANCE.Descriptor.Code)
-                tcs.SetException(new AmqpException(((Rejected) outcome).Error));
+            {
+                var rejected = (Rejected) outcome;
+                var rejectedError = rejected.Error ?? new Error(ErrorCode.InternalError);
+                throw new AmqpException(rejectedError);
+            }
             else
-                tcs.SetCanceled();
+            {
+                throw new NMSException(outcome.ToString(), ErrorCode.InternalError);
+            }
         }
 
-        public Task DischargeAsync(byte[] txnId, bool fail)
+        public async Task DischargeAsync(byte[] txnId, bool fail)
         {
             var message = new global::Amqp.Message(new Discharge { TxnId = txnId, Fail = fail });
-            var tcs = new TaskCompletionSource<bool>();
-            Send(message, null, OnDischargeOutcome, tcs);
-            return tcs.Task;
-        }
+            var outcome = await this.SendAsync(message, null, this.session.Connection.Info.requestTimeout).ConfigureAwait(false);
 
-        private static void OnDischargeOutcome(ILink link, global::Amqp.Message message, Outcome outcome, object state)
-        {
-            var tcs = (TaskCompletionSource<bool>) state;
             if (outcome.Descriptor.Code == MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code)
-                tcs.SetResult(true);
+            {
+                // accepted, do nothing
+            }
             else if (outcome.Descriptor.Code == MessageSupport.REJECTED_INSTANCE.Descriptor.Code)
-                tcs.SetException(new AmqpException(((Rejected) outcome).Error));
+            {
+                var rejected = (Rejected) outcome;
+                var rejectedError = rejected.Error ?? new Error(ErrorCode.TransactionRollback);
+                throw new TransactionRolledBackException(rejectedError.Condition, rejectedError.Description);
+            }
             else
-                tcs.SetCanceled();
+            {
+                throw new NMSException(outcome.ToString(), ErrorCode.InternalError);
+            }
         }
     }
 }

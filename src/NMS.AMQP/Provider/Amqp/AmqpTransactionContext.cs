@@ -40,6 +40,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             this.session = session;
         }
 
+        public bool IsTransactionFailed => coordinator != null && coordinator.IsDetaching();
+        
         public TransactionalState GetTxnEnrolledState()
         {
             return this.cachedTransactedState;
@@ -63,8 +65,9 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             Tracer.Debug($"TX Context{this} rolling back current TX[{this.current}]");
 
-            await this.coordinator.DischargeAsync(this.txnId, true).ConfigureAwait(false);
             this.current = null;
+            await this.coordinator.DischargeAsync(this.txnId, true).ConfigureAwait(false);
+            
 
             PostRollback();
 
@@ -97,8 +100,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             Tracer.Debug($"TX Context{this} committing back current TX[{this.current}]");
 
-            await this.coordinator.DischargeAsync(this.txnId, false).ConfigureAwait(false);
             this.current = null;
+            await this.coordinator.DischargeAsync(this.txnId, false).ConfigureAwait(false);
 
             PostCommit();
 
@@ -115,12 +118,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             if (this.current != null)
                 throw new NMSException("Begin called while a TX is still Active.");
 
-            if (this.coordinator == null || this.coordinator.IsClosed)
+            if (this.coordinator == null || this.coordinator.IsDetaching())
             {
                 this.coordinator = new AmqpTransactionCoordinator(this.session);
             }
 
-            this.txnId = await this.coordinator.DeclareAsync();
+            this.txnId = await this.coordinator.DeclareAsync().ConfigureAwait(false);
             this.current = transactionInfo.Id;
             transactionInfo.ProviderTxId = this.txnId;
             this.cachedTransactedState = new TransactionalState { TxnId = this.txnId };

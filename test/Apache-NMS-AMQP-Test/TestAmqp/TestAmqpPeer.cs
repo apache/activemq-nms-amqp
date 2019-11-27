@@ -26,6 +26,7 @@ using System.Threading;
 using Amqp;
 using Amqp.Framing;
 using Amqp.Sasl;
+using Amqp.Transactions;
 using Amqp.Types;
 using Apache.NMS.AMQP.Util;
 using NLog;
@@ -55,6 +56,7 @@ namespace NMS.AMQP.Test.TestAmqp
 
         private ushort lastInitiatedChannel = 0;
         private uint lastInitiatedLinkHandle;
+        private uint lastInitiatedCoordinatorLinkHandle = 0;
 
         private readonly LinkedList<IMatcher> matchers = new LinkedList<IMatcher>();
         private readonly object matchersLock = new object();
@@ -273,7 +275,7 @@ namespace NMS.AMQP.Test.TestAmqp
             );
         }
 
-        public void ExpectLinkFlowRespondWithTransfer(Amqp.Message message, int count = 1)
+        public void ExpectLinkFlowRespondWithTransfer(Amqp.Message message, int count = 1, bool addMessageNumberProperty = false)
         {
             Action<uint> creditMatcher = credit => Assert.Greater(credit, 0);
 
@@ -283,7 +285,7 @@ namespace NMS.AMQP.Test.TestAmqp
                 drain: false,
                 sendDrainFlowResponse: false,
                 sendSettled: false,
-                addMessageNumberProperty: false,
+                addMessageNumberProperty: addMessageNumberProperty,
                 creditMatcher: creditMatcher,
                 nextIncomingId: 1
             );
@@ -306,7 +308,7 @@ namespace NMS.AMQP.Test.TestAmqp
 
             FrameMatcher<Flow> flowMatcher = new FrameMatcher<Flow>()
                 .WithAssertion(flow => Assert.AreEqual(drain, flow.Drain))
-                .WithAssertion(flow => creditMatcher(flow.LinkCredit));
+                .WithAssertion(flow => creditMatcher?.Invoke(flow.LinkCredit));
 
             if (nextIncomingId != null)
             {
@@ -419,19 +421,20 @@ namespace NMS.AMQP.Test.TestAmqp
             ExpectSenderAttach(sourceMatcher: Assert.NotNull, targetMatcher: Assert.NotNull);
         }
 
-        public void ExpectSenderAttach(Action<Source> sourceMatcher,
-            Action<Target> targetMatcher,
+        public void ExpectSenderAttach(Action<object> sourceMatcher,
+            Action<object> targetMatcher,
             bool refuseLink = false,
             uint creditAmount = 100,
-            bool senderSettled = false)
+            bool senderSettled = false,
+            Error error = null)
         {
             var attachMatcher = new FrameMatcher<Attach>()
                 .WithAssertion(attach => Assert.IsNotNull(attach.LinkName))
                 .WithAssertion(attach => Assert.AreEqual(attach.Role, Role.SENDER))
                 .WithAssertion(attach => Assert.AreEqual(senderSettled ? SenderSettleMode.Settled : SenderSettleMode.Unsettled, attach.SndSettleMode))
                 .WithAssertion(attach => Assert.AreEqual(attach.RcvSettleMode, ReceiverSettleMode.First))
-                .WithAssertion(attach => sourceMatcher(attach.Source as Source))
-                .WithAssertion(attach => targetMatcher(attach.Target as Target))
+                .WithAssertion(attach => sourceMatcher(attach.Source))
+                .WithAssertion(attach => targetMatcher(attach.Target))
                 .WithOnComplete(context =>
                 {
                     var attach = new Attach()
@@ -452,11 +455,21 @@ namespace NMS.AMQP.Test.TestAmqp
 
                     lastInitiatedLinkHandle = context.Command.Handle;
 
+                    if (context.Command.Target is Coordinator)
+                    {
+                        lastInitiatedCoordinatorLinkHandle = context.Command.Handle;
+                    }
+
                     context.SendCommand(attach);
 
                     if (refuseLink)
                     {
                         var detach = new Detach { Closed = true, Handle = context.Command.Handle };
+                        if (error != null)
+                        {
+                            detach.Error = error;
+                        }
+
                         context.SendCommand(detach);
                     }
                     else
@@ -684,6 +697,19 @@ namespace NMS.AMQP.Test.TestAmqp
             AddMatcher(dispositionMatcher);
         }
 
+        public void ExpectSettledTransactionalDisposition(byte[] txnId)
+        {
+            void StateMatcher(DeliveryState state)
+            {
+                Assert.IsInstanceOf<TransactionalState>(state);
+                var transactionalState = (TransactionalState) state;
+                Assert.IsInstanceOf<Accepted>(transactionalState.Outcome);
+                CollectionAssert.AreEqual(txnId, transactionalState.TxnId);
+            }
+
+            ExpectDisposition(settled: true, StateMatcher);
+        }
+
         public void ExpectTransferButDoNotRespond(Action<Amqp.Message> messageMatcher)
         {
             ExpectTransfer(messageMatcher: messageMatcher,
@@ -702,6 +728,17 @@ namespace NMS.AMQP.Test.TestAmqp
                 sendResponseDisposition: true,
                 responseState: new Accepted(),
                 responseSettled: true
+            );
+        }
+
+        public void ExpectTransfer(Action<Amqp.Message> messageMatcher, Action<DeliveryState> stateMatcher, DeliveryState responseState, bool responseSettled)
+        {
+            ExpectTransfer(messageMatcher: messageMatcher,
+                stateMatcher: stateMatcher,
+                settled: false,
+                sendResponseDisposition: true,
+                responseState: responseState,
+                responseSettled: responseSettled
             );
         }
 
@@ -862,7 +899,124 @@ namespace NMS.AMQP.Test.TestAmqp
                 responseSourceOverride: responseSourceOverride,
                 desiredCapabilitiesMatcher: linkDesiredCapabilitiesMatcher);
         }
-        
+
+        public void ExpectCoordinatorAttach(Action<object> sourceMatcher = null, bool refuseLink = false, Error error = null)
+        {
+            Action<object> coordinatorMatcher = Assert.IsInstanceOf<Coordinator>;
+            sourceMatcher = sourceMatcher ?? Assert.IsNotNull;
+
+            ExpectSenderAttach(sourceMatcher: sourceMatcher, targetMatcher: coordinatorMatcher, refuseLink: refuseLink, error: error);
+        }
+
+        public void ExpectDeclare(byte[] txnId)
+        {
+            ExpectTransfer(messageMatcher: DeclareMatcher, stateMatcher: Assert.IsNull, settled: false, sendResponseDisposition: true, responseState: new Declared() { TxnId = txnId },
+                responseSettled: true);
+        }
+
+        public void ExpectDeclareButDoNotRespond()
+        {
+            ExpectTransfer(messageMatcher: DeclareMatcher, stateMatcher: Assert.IsNull, settled: false, sendResponseDisposition: false, responseState: null, responseSettled: false);
+        }
+
+
+        public void ExpectDeclareAndReject()
+        {
+            ExpectTransfer(messageMatcher: DeclareMatcher, stateMatcher: Assert.IsNull, responseState: new Rejected(), responseSettled: true);
+        }
+
+        void DeclareMatcher(Amqp.Message message)
+        {
+            Assert.IsNotNull(message);
+            Assert.IsInstanceOf<AmqpValue>(message.BodySection);
+            Assert.IsInstanceOf<Declare>(((AmqpValue) message.BodySection).Value);
+        }
+
+        public void ExpectDischarge(byte[] txnId, bool dischargeState)
+        {
+            ExpectDischarge(txnId: txnId, dischargeState: dischargeState, new Accepted());
+        }
+
+        public void ExpectDischargeButDoNotRespond(byte[] txnId, bool dischargeState)
+        {
+            ExpectTransfer(messageMatcher: m => DischargeMatcher(m, txnId, dischargeState),
+                stateMatcher: Assert.IsNull,
+                settled: false,
+                sendResponseDisposition: false,
+                responseState: null,
+                responseSettled: true);
+        }
+
+        public void ExpectDischarge(byte[] txnId, bool dischargeState, DeliveryState responseState)
+        {
+            // Expect an unsettled 'discharge' transfer to the txn coordinator containing the txnId,
+            // and reply with given response and settled disposition to indicate the outcome.
+            ExpectTransfer(messageMatcher: m => DischargeMatcher(m, txnId, dischargeState),
+                stateMatcher: Assert.IsNull,
+                settled: false,
+                sendResponseDisposition: true,
+                responseState: responseState,
+                responseSettled: true);
+        }
+
+        private void DischargeMatcher(Amqp.Message message, byte[] txnId, bool dischargeState)
+        {
+            Assert.IsNotNull(message);
+            var bodySection = message.BodySection as AmqpValue;
+            Assert.IsNotNull(bodySection);
+            var discharge = bodySection.Value as Discharge;
+            Assert.AreEqual(dischargeState, discharge.Fail);
+            CollectionAssert.AreEqual(txnId, discharge.TxnId);
+        }
+
+        public void RemotelyCloseLastCoordinatorLinkOnDischarge(byte[] txnId, bool dischargeState, byte[] nextTxnId)
+        {
+            // Expect an unsettled 'discharge' transfer to the txn coordinator containing the txnId,
+            // and reply with given response and settled disposition to indicate the outcome.
+            void DischargeMatcher(Amqp.Message message)
+            {
+                Assert.IsNotNull(message);
+                var bodySection = message.BodySection as AmqpValue;
+                Assert.IsNotNull(bodySection);
+                var discharge = bodySection.Value as Discharge;
+                Assert.AreEqual(dischargeState, discharge.Fail);
+                CollectionAssert.AreEqual(txnId, discharge.TxnId);
+            }
+
+            ExpectTransfer(messageMatcher: DischargeMatcher, stateMatcher: Assert.IsNull, settled: false, sendResponseDisposition: false, responseState: null, responseSettled: false);
+
+            RemotelyCloseLastCoordinatorLink(expectDetachResponse: true, closed: true, error: new Error(ErrorCode.TransactionRollback) { Description = "Discharge of TX failed." });
+        }
+
+        public void RemotelyCloseLastCoordinatorLink()
+        {
+            RemotelyCloseLastCoordinatorLink(expectDetachResponse: true, closed: true, error: new Error(ErrorCode.TransactionRollback) { Description = "Discharge of TX failed." });
+        }
+
+        private void RemotelyCloseLastCoordinatorLink(bool expectDetachResponse, bool closed, Error error)
+        {
+            lock (matchersLock)
+            {
+                var matcher = GetLastMatcher();
+                matcher.WithOnComplete(context =>
+                {
+                    var detach = new Detach { Closed = true, Handle = lastInitiatedCoordinatorLinkHandle };
+                    if (error != null)
+                    {
+                        detach.Error = error;
+                    }
+
+                    context.SendCommand(detach);
+                });
+
+                if (expectDetachResponse)
+                {
+                    var detachMatcher = new FrameMatcher<Detach>().WithAssertion(detach => Assert.AreEqual(closed, detach.Closed));
+                    AddMatcher(detachMatcher);
+                }
+            }
+        }
+
         public void PurgeExpectations()
         {
             lock (matchersLock)

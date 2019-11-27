@@ -67,7 +67,25 @@ namespace Apache.NMS.AMQP
         internal async Task Begin()
         {
             await Connection.CreateResource(SessionInfo).ConfigureAwait(false);
-            await TransactionContext.Begin().ConfigureAwait(false);
+
+            try
+            {
+                // We always keep an open TX if transacted so start now.
+                await TransactionContext.Begin().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // failed, close the AMQP session before we throw
+                try
+                {
+                    await Connection.DestroyResource(SessionInfo).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // Ignore, throw original error
+                }
+                throw;
+            }
         }
 
         public void Close()

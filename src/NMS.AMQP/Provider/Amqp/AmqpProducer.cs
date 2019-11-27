@@ -130,7 +130,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
                 try
                 {
-                    
+                    // If the transaction has failed due to remote termination etc then we just indicate
+                    // the send has succeeded until the a new transaction is started.
+                    if (session.IsTransacted && session.IsTransactionFailed)
+                        return;
+
                     var transactionalState = session.TransactionContext?.GetTxnEnrolledState();
 
                     if (envelope.SendAsync)
