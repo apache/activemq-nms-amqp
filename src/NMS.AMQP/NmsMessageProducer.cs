@@ -17,6 +17,7 @@
 
 using System;
 using System.Threading.Tasks;
+using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
@@ -27,6 +28,7 @@ namespace Apache.NMS.AMQP
     {
         private readonly NmsSession session;
         private readonly AtomicBool closed = new AtomicBool();
+        private readonly AtomicLong messageSequence = new AtomicLong();
 
         private Exception failureCause;
         private MsgDeliveryMode deliveryMode = MsgDeliveryMode.Persistent;
@@ -36,21 +38,22 @@ namespace Apache.NMS.AMQP
         private bool disableMessageId;
         private bool disableMessageTimestamp;
 
-        public NmsMessageProducer(Id producerId, NmsSession session, IDestination destination)
+        public NmsMessageProducer(NmsProducerId producerId, NmsSession session, IDestination destination)
         {
             this.session = session;
-            Info = new ProducerInfo(producerId, session.SessionInfo.Id)
+            Info = new NmsProducerInfo(producerId)
             {
                 Destination = destination
             };
-            
+
             session.Connection.CreateResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
-            
+
             session.Add(this);
         }
 
-        public ProducerInfo Info { get; }
-        public IdGenerator MessageIdGenerator { get; } = new CustomIdGenerator(true, "ID", new AtomicSequence());
+        public NmsProducerId ProducerId => Info.Id;
+        public NmsProducerInfo Info { get; }
+        public INmsMessageIdBuilder MessageIdBuilder { get; } = new DefaultMessageIdBuilder();
 
         public void Dispose()
         {
@@ -228,11 +231,6 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        public Task Init()
-        {
-            return session.Connection.CreateResource(Info);
-        }
-
         public Task OnConnectionRecovery(IProvider provider)
         {
             return provider.CreateResource(Info);
@@ -255,6 +253,14 @@ namespace Apache.NMS.AMQP
                 failureCause = error;
                 session.Remove(this);
             }
+        }
+
+        /// <summary>
+        /// Returns the next logical sequence for a Message sent from this Producer.
+        /// </summary>
+        public long GetNextMessageSequence()
+        {
+            return messageSequence.IncrementAndGet();
         }
     }
 }

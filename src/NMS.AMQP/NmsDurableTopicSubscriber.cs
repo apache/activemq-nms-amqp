@@ -15,17 +15,17 @@
  * limitations under the License.
  */
 
-using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Meta;
 
 namespace Apache.NMS.AMQP
 {
     public class NmsDurableTopicSubscriber : NmsMessageConsumer
     {
-        public NmsDurableTopicSubscriber(Id consumerId, NmsSession session, IDestination destination, string selector, bool noLocal) : base(consumerId, session, destination, selector, noLocal)
+        public NmsDurableTopicSubscriber(NmsConsumerId consumerId, NmsSession session, IDestination destination, string selector, bool noLocal) : base(consumerId, session, destination, selector, noLocal)
         {
         }
 
-        public NmsDurableTopicSubscriber(Id consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal) : base(consumerId, session, destination, name, selector, noLocal)
+        public NmsDurableTopicSubscriber(NmsConsumerId consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal) : base(consumerId, session, destination, name, selector, noLocal)
         {
         }
 

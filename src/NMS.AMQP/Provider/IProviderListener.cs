@@ -58,7 +58,7 @@ namespace Apache.NMS.AMQP.Provider
         /// <param name="remoteUri">The Uri of the Broker that the client has now connected to.</param>
         void OnConnectionRestored(Uri remoteUri);
 
-        void OnResourceClosed(ResourceInfo resourceInfo, Exception error);
+        void OnResourceClosed(INmsResource resource, Exception error);
 
         /// <summary>
         /// Called from a fault tolerant Provider instance to signal that the underlying

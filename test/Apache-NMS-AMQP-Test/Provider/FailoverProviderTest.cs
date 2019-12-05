@@ -36,9 +36,8 @@ namespace NMS.AMQP.Test.Provider
     [TestFixture]
     public class FailoverProviderTest
     {
-        private readonly IdGenerator connectionIdGenerator = new IdGenerator();
         private List<Uri> uris;
-        private ConnectionInfo connectionInfo;
+        private NmsConnectionInfo connectionInfo;
         private FailoverProvider provider;
         private MockRemotePeer mockPeer;
 
@@ -233,8 +232,8 @@ namespace NMS.AMQP.Test.Provider
             connection.CreateSession(AcknowledgementMode.AutoAcknowledge).Close();
             connection.Close();
 
-            Assert.AreEqual(1, mockPeer.ContextStats.GetCreateResourceCalls<SessionInfo>());
-            Assert.AreEqual(1, mockPeer.ContextStats.GetDestroyResourceCalls<SessionInfo>());
+            Assert.AreEqual(1, mockPeer.ContextStats.GetCreateResourceCalls<NmsSessionInfo>());
+            Assert.AreEqual(1, mockPeer.ContextStats.GetDestroyResourceCalls<NmsSessionInfo>());
         }
 
         [Test, Timeout(3000)]
@@ -250,9 +249,9 @@ namespace NMS.AMQP.Test.Provider
             session.CreateConsumer(topic).Close();
             connection.Close();
 
-            Assert.AreEqual(1, mockPeer.ContextStats.GetCreateResourceCalls<ConsumerInfo>());
-            Assert.AreEqual(1, mockPeer.ContextStats.GetStartResourceCalls<ConsumerInfo>());
-            Assert.AreEqual(1, mockPeer.ContextStats.GetDestroyResourceCalls<ConsumerInfo>());
+            Assert.AreEqual(1, mockPeer.ContextStats.GetCreateResourceCalls<NmsConsumerInfo>());
+            Assert.AreEqual(1, mockPeer.ContextStats.GetStartResourceCalls<NmsConsumerInfo>());
+            Assert.AreEqual(1, mockPeer.ContextStats.GetDestroyResourceCalls<NmsConsumerInfo>());
         }
 
         [Test, Timeout(300000)]
@@ -268,8 +267,8 @@ namespace NMS.AMQP.Test.Provider
             session.CreateProducer(topic).Close();
             connection.Close();
 
-            Assert.AreEqual(1, mockPeer.ContextStats.GetCreateResourceCalls<ProducerInfo>());
-            Assert.AreEqual(1, mockPeer.ContextStats.GetDestroyResourceCalls<ProducerInfo>());
+            Assert.AreEqual(1, mockPeer.ContextStats.GetCreateResourceCalls<NmsProducerInfo>());
+            Assert.AreEqual(1, mockPeer.ContextStats.GetDestroyResourceCalls<NmsProducerInfo>());
         }
 
         [Test, Timeout(300000)]
@@ -287,9 +286,9 @@ namespace NMS.AMQP.Test.Provider
             Assert.AreEqual(1, mockPeer.ContextStats.RecoverCalls);
         }
 
-        private ConnectionInfo CreateConnectionInfo()
+        private NmsConnectionInfo CreateConnectionInfo()
         {
-            return new ConnectionInfo(connectionIdGenerator.GenerateId());
+            return new NmsConnectionInfo(new NmsConnectionId("test"));
         }
     }
 }

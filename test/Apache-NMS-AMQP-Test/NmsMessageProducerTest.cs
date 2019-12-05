@@ -29,7 +29,7 @@ namespace NMS.AMQP.Test
     public class NmsMessageProducerTest
     {
         private readonly MockRemotePeer remotePeer = new MockRemotePeer();
-        private ConnectionInfo connectionInfo;
+        private NmsConnectionInfo connectionInfo;
         private NmsConnection connection;
         private ISession session;
 
@@ -37,7 +37,7 @@ namespace NMS.AMQP.Test
         public void SetUp()
         {
             remotePeer.Start();
-            connectionInfo = new ConnectionInfo(new Id("ID:TEST:1"));
+            connectionInfo = new NmsConnectionInfo(new NmsConnectionId("ID:TEST:1"));
             connection = CreateConnectionToMockProvider();
             session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
         }

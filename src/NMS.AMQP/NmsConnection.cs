@@ -35,17 +35,17 @@ namespace Apache.NMS.AMQP
         private readonly AtomicBool connected = new AtomicBool();
         private readonly HashSet<INmsConnectionListener> connectionListeners = new HashSet<INmsConnectionListener>();
         private readonly IProvider provider;
-        private readonly ConcurrentDictionary<Id, NmsSession> sessions = new ConcurrentDictionary<Id, NmsSession>();
-        private readonly ConcurrentDictionary<Id, NmsTemporaryDestination> tempDestinations = new ConcurrentDictionary<Id, NmsTemporaryDestination>();
+        private readonly ConcurrentDictionary<NmsSessionId, NmsSession> sessions = new ConcurrentDictionary<NmsSessionId, NmsSession>();
+        private readonly ConcurrentDictionary<NmsTemporaryDestination, NmsTemporaryDestination> tempDestinations = new ConcurrentDictionary<NmsTemporaryDestination, NmsTemporaryDestination>();
         private readonly AtomicBool started = new AtomicBool();
-        private IdGenerator sessionIdGenerator;
-        private IdGenerator temporaryTopicIdGenerator;
-        private IdGenerator temporaryQueueIdGenerator;
-        private NestedIdGenerator transactionIdGenerator;
+        private readonly AtomicLong sessionIdGenerator = new AtomicLong();
+        private readonly AtomicLong temporaryTopicIdGenerator = new AtomicLong();
+        private readonly AtomicLong temporaryQueueIdGenerator = new AtomicLong();
+        private readonly AtomicLong transactionIdGenerator = new AtomicLong();
         private Exception failureCause;
         private readonly object syncRoot = new object();
 
-        public NmsConnection(ConnectionInfo connectionInfo, IProvider provider)
+        public NmsConnection(NmsConnectionInfo connectionInfo, IProvider provider)
         {
             if (provider == null)
             {
@@ -66,87 +66,10 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        public ConnectionInfo ConnectionInfo { get; }
-
-        private IdGenerator SessionIdGenerator
-        {
-            get
-            {
-                if (sessionIdGenerator == null)
-                {
-                    lock (syncRoot)
-                    {
-                        if (sessionIdGenerator == null)
-                        {
-                            sessionIdGenerator = new NestedIdGenerator("ID:ses", ConnectionInfo.Id, true);
-                        }
-                    }
-                }
-
-                return sessionIdGenerator;
-            }
-        }
-
-        private IdGenerator TemporaryTopicIdGenerator
-        {
-            get
-            {
-                if (temporaryTopicIdGenerator == null)
-                {
-                    lock (syncRoot)
-                    {
-                        if (temporaryTopicIdGenerator == null)
-                        {
-                            temporaryTopicIdGenerator = new NestedIdGenerator("ID:nms-temp-topic", ConnectionInfo.Id, true);
-                        }
-                    }
-                }
-
-                return temporaryTopicIdGenerator;
-            }
-        }
-
-        private IdGenerator TemporaryQueueIdGenerator
-        {
-            get
-            {
-                if (temporaryQueueIdGenerator == null)
-                {
-                    lock (syncRoot)
-                    {
-                        if (temporaryQueueIdGenerator == null)
-                        {
-                            temporaryQueueIdGenerator = new NestedIdGenerator("ID:nms-temp-queue", ConnectionInfo.Id, true);
-                        }
-                    }
-                }
-
-                return temporaryQueueIdGenerator;
-            }
-        }
-        
-        internal IdGenerator TransactionIdGenerator
-        {
-            get
-            {
-                if (transactionIdGenerator == null)
-                {
-                    lock (syncRoot)
-                    {
-                        if (transactionIdGenerator == null)
-                        {
-                            transactionIdGenerator = new NestedIdGenerator("ID:nms-transaction", ConnectionInfo.Id, true);
-                        }
-                    }
-                }
-
-                return transactionIdGenerator;
-            }
-        }
-
+        public NmsConnectionInfo ConnectionInfo { get; }
         public bool IsClosed => closed.Value;
         public bool IsConnected => connected.Value;
-        public Id Id => ConnectionInfo.Id;
+        public NmsConnectionId Id => ConnectionInfo.Id;
         public INmsMessageFactory MessageFactory { get; private set; }
 
         public void Dispose()
@@ -192,10 +115,7 @@ namespace Apache.NMS.AMQP
             CheckClosedOrFailed();
             CreateNmsConnection();
 
-            NmsSession session = new NmsSession(this, SessionIdGenerator.GenerateId(), acknowledgementMode)
-            {
-                SessionInfo = { requestTimeout = ConnectionInfo.requestTimeout }
-            };
+            NmsSession session = new NmsSession(this, GetNextSessionId(), acknowledgementMode);
             try
             {
                 session.Begin().ConfigureAwait(false).GetAwaiter().GetResult();
@@ -268,8 +188,8 @@ namespace Apache.NMS.AMQP
 
         public TimeSpan RequestTimeout
         {
-            get => TimeSpan.FromMilliseconds(ConnectionInfo.requestTimeout);
-            set => ConnectionInfo.requestTimeout = Convert.ToInt64(value.TotalMilliseconds);
+            get => TimeSpan.FromMilliseconds(ConnectionInfo.RequestTimeout);
+            set => ConnectionInfo.RequestTimeout = Convert.ToInt64(value.TotalMilliseconds);
         }
 
         public AcknowledgementMode AcknowledgementMode { get; set; }
@@ -408,11 +328,11 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        public void OnResourceClosed(ResourceInfo resourceInfo, Exception error)
+        public void OnResourceClosed(INmsResource resource, Exception error)
         {
-            switch (resourceInfo)
+            switch (resource)
             {
-                case ConsumerInfo consumerInfo:
+                case NmsConsumerInfo consumerInfo:
                 {
                     if (!sessions.TryGetValue(consumerInfo.SessionId, out NmsSession session))
                         return;
@@ -425,7 +345,7 @@ namespace Apache.NMS.AMQP
                     break;
                 }
 
-                case ProducerInfo producerInfo:
+                case NmsProducerInfo producerInfo:
                 {
                     if (!sessions.TryGetValue(producerInfo.SessionId, out NmsSession session))
                         return;
@@ -464,14 +384,14 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        internal Task CreateResource(ResourceInfo resourceInfo)
+        internal Task CreateResource(INmsResource resource)
         {
-            return provider.CreateResource(resourceInfo);
+            return provider.CreateResource(resource);
         }
 
-        internal Task DestroyResource(ResourceInfo resourceInfo)
+        internal Task DestroyResource(INmsResource resource)
         {
-            return provider.DestroyResource(resourceInfo);
+            return provider.DestroyResource(resource);
         }
 
         internal Task Send(OutboundMessageDispatch envelope)
@@ -523,17 +443,17 @@ namespace Apache.NMS.AMQP
             ExceptionListener?.Invoke(error);
         }
 
-        internal Task Recover(Id sessionId)
+        internal Task Recover(NmsSessionId sessionId)
         {
             return provider.Recover(sessionId);
         }
 
-        public Task StartResource(ResourceInfo resourceInfo)
+        public Task StartResource(INmsResource resourceInfo)
         {
             return provider.StartResource(resourceInfo);
         }
 
-        public Task StopResource(ResourceInfo resourceInfo)
+        public Task StopResource(INmsResource resourceInfo)
         {
             return provider.StopResource(resourceInfo);
         }
@@ -543,7 +463,7 @@ namespace Apache.NMS.AMQP
             connectionListeners.Add(listener);
         }
 
-        internal Task Acknowledge(Id sessionId, AckType ackType)
+        internal Task Acknowledge(NmsSessionId sessionId, AckType ackType)
         {
             return provider.Acknowledge(sessionId, ackType);
         }
@@ -553,21 +473,23 @@ namespace Apache.NMS.AMQP
             return provider.Acknowledge(envelope, ackType);
         }
 
-        internal void RemoveSession(SessionInfo sessionInfo)
+        internal void RemoveSession(NmsSessionInfo sessionInfo)
         {
             sessions.TryRemove(sessionInfo.Id, out _);
         }
 
         public ITemporaryQueue CreateTemporaryQueue()
         {
-            NmsTemporaryQueue queue = new NmsTemporaryQueue(TemporaryQueueIdGenerator.GenerateId());
+            var destinationName = $"{Id}:{temporaryQueueIdGenerator.IncrementAndGet().ToString()}";
+            var queue = new NmsTemporaryQueue(destinationName);
             InitializeTemporaryDestination(queue);
             return queue;
         }
 
         public ITemporaryTopic CreateTemporaryTopic()
         {
-            NmsTemporaryTopic topic = new NmsTemporaryTopic(TemporaryTopicIdGenerator.GenerateId());
+            var destinationName = $"{Id}:{temporaryTopicIdGenerator.IncrementAndGet().ToString()}";
+            NmsTemporaryTopic topic = new NmsTemporaryTopic(destinationName);
             InitializeTemporaryDestination(topic);
             return topic;
         }
@@ -575,7 +497,7 @@ namespace Apache.NMS.AMQP
         private void InitializeTemporaryDestination(NmsTemporaryDestination temporaryDestination)
         {
             CreateResource(temporaryDestination).ConfigureAwait(false).GetAwaiter().GetResult();
-            tempDestinations.TryAdd(temporaryDestination.Id, temporaryDestination);
+            tempDestinations.TryAdd(temporaryDestination, temporaryDestination);
             temporaryDestination.Connection = this;
         }
 
@@ -599,7 +521,7 @@ namespace Apache.NMS.AMQP
                     }
                 }
 
-                tempDestinations.TryRemove(destination.Id, out _);
+                tempDestinations.TryRemove(destination, out _);
 
                 DestroyResource(destination).ConfigureAwait(false).GetAwaiter().GetResult();
             }
@@ -616,14 +538,24 @@ namespace Apache.NMS.AMQP
             provider.Unsubscribe(subscriptionName).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
-        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Rollback(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             return provider.Rollback(transactionInfo, nextTransactionInfo);
         }
 
-        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Commit(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             return provider.Commit(transactionInfo, nextTransactionInfo);
+        }
+
+        private NmsSessionId GetNextSessionId()
+        {
+            return new NmsSessionId(ConnectionInfo.Id, sessionIdGenerator.IncrementAndGet());
+        }
+
+        public NmsTransactionId GetNextTransactionId()
+        {
+            return new NmsTransactionId(Id, transactionIdGenerator);
         }
     }
 }

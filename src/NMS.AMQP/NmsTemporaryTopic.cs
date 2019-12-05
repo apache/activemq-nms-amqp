@@ -15,13 +15,11 @@
  * limitations under the License.
  */
 
-using Apache.NMS.AMQP.Util;
-
 namespace Apache.NMS.AMQP
 {
     public class NmsTemporaryTopic : NmsTemporaryDestination, ITemporaryTopic
     {
-        public NmsTemporaryTopic(Id resourceId) : base(resourceId)
+        public NmsTemporaryTopic(string topicName) : base(topicName)
         {
         }
 

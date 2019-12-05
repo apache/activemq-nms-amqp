@@ -29,12 +29,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
     public class AmqpProvider : IProvider
     {
         public static readonly uint DEFAULT_MAX_HANDLE = 1024;
+        private static readonly uint DEFAULT_SESSION_OUTGOING_WINDOW = 2048; // AmqpNetLite default
 
         private readonly ITransportContext transport;
-        private ConnectionInfo connectionInfo;
+        private NmsConnectionInfo connectionInfo;
         private AmqpConnection connection;
-        public uint MaxHandle { get; set; } = DEFAULT_MAX_HANDLE;
-
         public AmqpProvider(Uri remoteUri, ITransportContext transport)
         {
             RemoteUri = remoteUri;
@@ -101,7 +100,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public long SendTimeout => connectionInfo?.SendTimeout ?? ConnectionInfo.DEFAULT_SEND_TIMEOUT;
+        public long SendTimeout => connectionInfo?.SendTimeout ?? NmsConnectionInfo.DEFAULT_SEND_TIMEOUT;
+        public long CloseTimeout => connectionInfo?.CloseTimeout ?? NmsConnectionInfo.DEFAULT_CLOSE_TIMEOUT;
+        public long RequestTimeout => connectionInfo?.RequestTimeout ?? NmsConnectionInfo.DEFAULT_REQUEST_TIMEOUT;
+        public uint SessionOutgoingWindow { get; set; } = DEFAULT_SESSION_OUTGOING_WINDOW;
+        public uint MaxHandle { get; set; } = DEFAULT_MAX_HANDLE;
+        
         public Uri RemoteUri { get; }
         public IProviderListener Listener { get; private set; }
 
@@ -109,7 +113,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
         }
 
-        public Task Connect(ConnectionInfo connectionInfo)
+        public Task Connect(NmsConnectionInfo connectionInfo)
         {
             this.connectionInfo = connectionInfo;
             connection = new AmqpConnection(this, transport, connectionInfo);
@@ -136,25 +140,25 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             Listener = providerListener;
         }
 
-        public Task CreateResource(ResourceInfo resourceInfo)
+        public Task CreateResource(INmsResource resourceInfo)
         {
             switch (resourceInfo)
             {
-                case SessionInfo sessionInfo:
+                case NmsSessionInfo sessionInfo:
                     return connection.CreateSession(sessionInfo);
-                case ConsumerInfo consumerInfo:
+                case NmsConsumerInfo consumerInfo:
                 {
                     AmqpSession session = connection.GetSession(consumerInfo.SessionId);
                     return session.CreateConsumer(consumerInfo);
                 }
-                case ProducerInfo producerInfo:
+                case NmsProducerInfo producerInfo:
                 {
                     AmqpSession session = connection.GetSession(producerInfo.SessionId);
                     return session.CreateProducer(producerInfo);
                 }
                 case NmsTemporaryDestination temporaryDestination:
                     return connection.CreateTemporaryDestination(temporaryDestination);
-                case TransactionInfo transactionInfo:
+                case NmsTransactionInfo transactionInfo:
                     var amqpSession = connection.GetSession(transactionInfo.SessionId);
                     return amqpSession.BeginTransaction(transactionInfo);
                 default:
@@ -162,17 +166,17 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public Task DestroyResource(ResourceInfo resourceInfo)
+        public Task DestroyResource(INmsResource resourceInfo)
         {
             switch (resourceInfo)
             {
-                case SessionInfo sessionInfo:
+                case NmsSessionInfo sessionInfo:
                 {
                     AmqpSession session = connection.GetSession(sessionInfo.Id);
                     session.Close();
                     return Task.CompletedTask;
                 }
-                case ConsumerInfo consumerInfo:
+                case NmsConsumerInfo consumerInfo:
                 {
                     AmqpSession session = connection.GetSession(consumerInfo.SessionId);
                     AmqpConsumer consumer = session.GetConsumer(consumerInfo.Id);
@@ -180,7 +184,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     session.RemoveConsumer(consumerInfo.Id);
                     return Task.CompletedTask;
                 }
-                case ProducerInfo producerInfo:
+                case NmsProducerInfo producerInfo:
                 {
                     AmqpSession session = connection.GetSession(producerInfo.SessionId);
                     AmqpProducer producer = session.GetProducer(producerInfo.Id);
@@ -194,10 +198,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     if (amqpTemporaryDestination != null)
                     {
                         amqpTemporaryDestination.Close();
-                        connection.RemoveTemporaryDestination(temporaryDestination.Id);
+                        connection.RemoveTemporaryDestination(temporaryDestination);
                     }
                     else
-                        Tracer.Debug($"Could not find temporary destination {temporaryDestination.Id} to delete.");
+                        Tracer.Debug($"Could not find temporary destination {temporaryDestination} to delete.");
 
                     return Task.CompletedTask;
                 }
@@ -206,11 +210,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public Task StartResource(ResourceInfo resourceInfo)
+        public Task StartResource(INmsResource resourceInfo)
         {
             switch (resourceInfo)
             {
-                case ConsumerInfo consumerInfo:
+                case NmsConsumerInfo consumerInfo:
                     AmqpSession session = connection.GetSession(consumerInfo.SessionId);
                     AmqpConsumer amqpConsumer = session.GetConsumer(consumerInfo.Id);
                     amqpConsumer.Start();
@@ -220,11 +224,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public Task StopResource(ResourceInfo resourceInfo)
+        public Task StopResource(INmsResource resourceInfo)
         {
             switch (resourceInfo)
             {
-                case ConsumerInfo consumerInfo:
+                case NmsConsumerInfo consumerInfo:
                     AmqpSession session = connection.GetSession(consumerInfo.SessionId);
                     AmqpConsumer amqpConsumer = session.GetConsumer(consumerInfo.Id);
                     amqpConsumer.Stop();
@@ -234,14 +238,14 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public Task Recover(Id sessionId)
+        public Task Recover(NmsSessionId sessionId)
         {
             AmqpSession session = connection.GetSession(sessionId);
             session.Recover();
             return Task.CompletedTask;
         }
 
-        public Task Acknowledge(Id sessionId, AckType ackType)
+        public Task Acknowledge(NmsSessionId sessionId, AckType ackType)
         {
             AmqpSession session = connection.GetSession(sessionId);
             foreach (AmqpConsumer consumer in session.Consumers)
@@ -276,19 +280,19 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             return connection.Unsubscribe(subscriptionName);
         }
 
-        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Rollback(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             var session = connection.GetSession(transactionInfo.SessionId);
             return session.Rollback(transactionInfo, nextTransactionInfo);
         }
 
-        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Commit(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             var session = connection.GetSession(transactionInfo.SessionId);
             return session.Commit(transactionInfo, nextTransactionInfo);
         }
 
-        public void FireResourceClosed(ResourceInfo resourceInfo, Exception error)
+        public void FireResourceClosed(INmsResource resourceInfo, Exception error)
         {
             Listener.OnResourceClosed(resourceInfo, error);
         }

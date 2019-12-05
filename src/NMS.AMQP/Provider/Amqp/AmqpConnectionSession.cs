@@ -16,7 +16,6 @@
  */
 
 using System;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
@@ -30,7 +29,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
     {
         private readonly bool hasClientId;
 
-        public AmqpConnectionSession(AmqpConnection connection, SessionInfo sessionInfo) : base(connection, sessionInfo)
+        public AmqpConnectionSession(AmqpConnection connection, NmsSessionInfo sessionInfo) : base(connection, sessionInfo)
         {
             this.hasClientId = connection.Info.IsExplicitClientId;
         }
@@ -59,8 +58,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             });
 
             await tcs.Task;
-
-            receiverLink.Close(TimeSpan.FromMilliseconds(SessionInfo.closeTimeout));
+            
+            receiverLink.Close(TimeSpan.FromMilliseconds(Connection.Provider.CloseTimeout));
         }
 
         private Attach CreateAttach(string subscriptionName)

@@ -19,7 +19,7 @@ using System.Threading;
 
 namespace Apache.NMS.AMQP.Util
 {
-    public class AtomicBool
+    internal class AtomicBool
     {
         private int value;
 

@@ -796,7 +796,7 @@ namespace NMS.AMQP.Test.Integration
                 connection.AddConnectionListener(connectionListener.Object);
                 
                 testPeer.ExpectBegin();
-                testPeer.ExpectBegin(nextOutgoingId: 2);
+                testPeer.ExpectBegin();
 
                 ISession session1 = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
                 ISession session2 = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);

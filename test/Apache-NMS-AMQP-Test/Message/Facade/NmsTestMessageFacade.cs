@@ -20,7 +20,6 @@ using Apache.NMS;
 using Apache.NMS.AMQP;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Message.Facade;
-using Apache.NMS.AMQP.Provider.Amqp;
 using Apache.NMS.Util;
 
 namespace NMS.AMQP.Test.Message.Facade
@@ -28,12 +27,6 @@ namespace NMS.AMQP.Test.Message.Facade
     [Serializable]
     public class NmsTestMessageFacade : INmsMessageFacade
     {
-        private bool hasBody;
-
-        public void Initialize(AmqpConsumer consumer)
-        {
-        }
-
         public virtual NmsMessage AsMessage()
         {
             return new NmsMessage(this);
@@ -47,22 +40,17 @@ namespace NMS.AMQP.Test.Message.Facade
 
         public int RedeliveryCount { get; set; }
 
-        public bool HasBody()
-        {
-            return hasBody;
-        }
-
         public void OnSend(TimeSpan producerTtl)
         {
             
         }
 
-        public void OnDispatch()
+        public string NMSMessageId
         {
-            
+            get => ProviderMessageIdObject as string;
+            set => ProviderMessageIdObject = value;
         }
 
-        public string NMSMessageId { get; set; }
         public IPrimitiveMap Properties { get; } = new PrimitiveMap();
         public string NMSCorrelationID { get; set; }
         public IDestination NMSDestination { get; set; }
@@ -77,6 +65,7 @@ namespace NMS.AMQP.Test.Message.Facade
         public DateTime? Expiration { get; set; }
         public sbyte? JmsMsgType { get; }
         public bool IsPersistent { get; set; }
+        public object ProviderMessageIdObject { get; set; }
 
         public INmsMessageFacade Copy()
         {

@@ -33,7 +33,7 @@ namespace Apache.NMS.AMQP
 
         private IdGenerator clientIdGenerator;
         private IdGenerator connectionIdGenerator;
-        private object syncRoot = new object();
+        private readonly object syncRoot = new object();
 
         public NmsConnectionFactory(string userName, string password)
         {
@@ -76,7 +76,7 @@ namespace Apache.NMS.AMQP
                     }
                 }
 
-                return connectionIdGenerator;
+                return clientIdGenerator;
             }
         }
 
@@ -118,13 +118,25 @@ namespace Apache.NMS.AMQP
         /// Timeout value that controls how long the client waits on completion of various synchronous interactions, such as opening a producer or consumer,
         /// before returning an error. Does not affect synchronous message sends. By default the client will wait indefinitely for a request to complete.
         /// </summary>
-        public long RequestTimeout { get; set; } = ConnectionInfo.DEFAULT_REQUEST_TIMEOUT;
+        public long RequestTimeout { get; set; } = NmsConnectionInfo.DEFAULT_REQUEST_TIMEOUT;
         
         /// <summary>
         /// Timeout value that controls how long the client waits on completion of a synchronous message send before returning an error.
         /// By default the client will wait indefinitely for a send to complete.
         /// </summary>
-        public long SendTimeout { get; set; } = ConnectionInfo.DEFAULT_SEND_TIMEOUT;
+        public long SendTimeout { get; set; } = NmsConnectionInfo.DEFAULT_SEND_TIMEOUT;
+
+        /// <summary>
+        /// Gets and sets the close timeout used to control how long a Connection close will wait for
+        /// clean shutdown of the connection before giving up.  A negative value means wait
+        /// forever.
+        ///
+        /// Care should be taken in that a very short close timeout can cause the client to
+        /// not cleanly shutdown the connection and it's resources.
+        ///
+        /// Time in milliseconds to wait for a clean connection close.
+        /// </summary>
+        public long CloseTimeout { get; set; } = NmsConnectionInfo.DEFAULT_CLOSE_TIMEOUT;
 
         /// <summary>
         /// Optional prefix value that is used for generated Connection ID values when a new Connection is created for the NMS ConnectionFactory.
@@ -159,7 +171,7 @@ namespace Apache.NMS.AMQP
         {
             try
             {
-                ConnectionInfo connectionInfo = ConfigureConnectionInfo(userName, password);
+                NmsConnectionInfo connectionInfo = ConfigureConnectionInfo(userName, password);
                 IProvider provider = ProviderFactory.Create(BrokerUri);
                 return new NmsConnection(connectionInfo, provider);
             }
@@ -214,15 +226,16 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        private ConnectionInfo ConfigureConnectionInfo(string userName, string password)
+        private NmsConnectionInfo ConfigureConnectionInfo(string userName, string password)
         {
-            ConnectionInfo connectionInfo = new ConnectionInfo(ConnectionIdGenerator.GenerateId())
+            var connectionInfo = new NmsConnectionInfo(new NmsConnectionId(ConnectionIdGenerator.GenerateId()))
             {
-                username = userName,
-                password = password,
-                remoteHost = BrokerUri,
-                requestTimeout = RequestTimeout,
+                UserName = userName,
+                Password = password,
+                ConfiguredUri = BrokerUri,
+                RequestTimeout = RequestTimeout,
                 SendTimeout = SendTimeout,
+                CloseTimeout = CloseTimeout,
                 LocalMessageExpiry = LocalMessageExpiry
             };
 

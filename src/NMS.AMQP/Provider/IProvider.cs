@@ -28,20 +28,20 @@ namespace Apache.NMS.AMQP.Provider
         long SendTimeout { get; }
         Uri RemoteUri { get; }
         void Start();
-        Task Connect(ConnectionInfo connectionInfo);
+        Task Connect(NmsConnectionInfo connectionInfo);
         void Close();
         void SetProviderListener(IProviderListener providerListener);
-        Task CreateResource(ResourceInfo resourceInfo);
-        Task DestroyResource(ResourceInfo resourceInfo);
-        Task StartResource(ResourceInfo resourceInfo);
-        Task StopResource(ResourceInfo resourceInfo);
-        Task Recover(Id sessionId);
-        Task Acknowledge(Id sessionId, AckType ackType);
+        Task CreateResource(INmsResource resourceInfo);
+        Task DestroyResource(INmsResource resourceInfo);
+        Task StartResource(INmsResource resourceInfo);
+        Task StopResource(INmsResource resourceInfo);
+        Task Recover(NmsSessionId sessionId);
+        Task Acknowledge(NmsSessionId sessionId, AckType ackType);
         Task Acknowledge(InboundMessageDispatch envelope, AckType ackType);
         INmsMessageFactory MessageFactory { get; }
         Task Send(OutboundMessageDispatch envelope);
         Task Unsubscribe(string name);
-        Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo);
-        Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo);
+        Task Rollback(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo);
+        Task Commit(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo);
     }
 }

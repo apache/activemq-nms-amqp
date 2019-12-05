@@ -36,11 +36,11 @@ namespace Apache.NMS.AMQP
 
         private Exception failureCause;
 
-        public NmsMessageConsumer(Id consumerId, NmsSession session, IDestination destination, string selector, bool noLocal) : this(consumerId, session, destination, null, selector, noLocal)
+        public NmsMessageConsumer(NmsConsumerId consumerId, NmsSession session, IDestination destination, string selector, bool noLocal) : this(consumerId, session, destination, null, selector, noLocal)
         {
         }
 
-        protected NmsMessageConsumer(Id consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal)
+        protected NmsMessageConsumer(NmsConsumerId consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal)
         {
             Session = session;
             acknowledgementMode = session.AcknowledgementMode;
@@ -50,7 +50,7 @@ namespace Apache.NMS.AMQP
                 session.Connection.CheckConsumeFromTemporaryDestination((NmsTemporaryDestination) destination);
             }
 
-            Info = new ConsumerInfo(consumerId, Session.SessionInfo.Id)
+            Info = new NmsConsumerInfo(consumerId)
             {
                 Destination = destination,
                 Selector = selector,
@@ -70,7 +70,7 @@ namespace Apache.NMS.AMQP
         }
 
         public NmsSession Session { get; }
-        public ConsumerInfo Info { get; }
+        public NmsConsumerInfo Info { get; }
         public IDestination Destination => Info.Destination;
 
         protected virtual bool IsDurableSubscription => false;

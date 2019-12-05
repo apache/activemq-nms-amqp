@@ -30,11 +30,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 {
     public class AmqpSession
     {
-        private readonly ConcurrentDictionary<Id, AmqpConsumer> consumers = new ConcurrentDictionary<Id, AmqpConsumer>();
-        private readonly ConcurrentDictionary<Id, AmqpProducer> producers = new ConcurrentDictionary<Id, AmqpProducer>();
-        protected readonly SessionInfo SessionInfo;
+        private readonly ConcurrentDictionary<NmsConsumerId, AmqpConsumer> consumers = new ConcurrentDictionary<NmsConsumerId, AmqpConsumer>();
+        private readonly ConcurrentDictionary<NmsProducerId, AmqpProducer> producers = new ConcurrentDictionary<NmsProducerId, AmqpProducer>();
+        protected readonly NmsSessionInfo SessionInfo;
 
-        public AmqpSession(AmqpConnection connection, SessionInfo sessionInfo)
+        public AmqpSession(AmqpConnection connection, NmsSessionInfo sessionInfo)
         {
             Connection = connection;
             SessionInfo = sessionInfo;
@@ -51,7 +51,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public Session UnderlyingSession { get; private set; }
 
         public IEnumerable<AmqpConsumer> Consumers => consumers.Values.ToArray();
-        public Id SessionId => SessionInfo.Id;
+        public NmsSessionId SessionId => SessionInfo.Id;
 
         internal bool IsTransacted => SessionInfo.IsTransacted;
 
@@ -61,16 +61,16 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            if (SessionInfo.requestTimeout > 0)
+            var requestTimeout = Connection.Provider.RequestTimeout;
+            if (requestTimeout > 0)
             {
-                CancellationTokenSource ct = new CancellationTokenSource(TimeSpan.FromMilliseconds(SessionInfo.requestTimeout));
+                CancellationTokenSource ct = new CancellationTokenSource(TimeSpan.FromMilliseconds(requestTimeout));
                 ct.Token.Register(() => tcs.TrySetCanceled(), false);
             }
 
             UnderlyingSession = new Session(Connection.UnderlyingConnection, CreateBeginFrame(),
                 (session, begin) =>
                 {
-                    SessionInfo.remoteChannel = begin.RemoteChannel;
                     tcs.TrySetResult(true);
                 });
             UnderlyingSession.AddClosedCallback((sender, error) =>
@@ -85,12 +85,13 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         public void Close()
         {
-            TimeSpan timeout = TimeSpan.FromMilliseconds(SessionInfo.closeTimeout);
+            long closeTimeout = Connection.Provider.CloseTimeout;
+            TimeSpan timeout = TimeSpan.FromMilliseconds(closeTimeout);
             UnderlyingSession.Close(timeout);
             Connection.RemoveSession(SessionInfo.Id);
         }
 
-        public Task BeginTransaction(TransactionInfo transactionInfo)
+        public Task BeginTransaction(NmsTransactionInfo transactionInfo)
         {
             if (!SessionInfo.IsTransacted)
             {
@@ -105,27 +106,27 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             return new Begin
             {
                 HandleMax = Connection.Provider.MaxHandle,
-                IncomingWindow = SessionInfo.incomingWindow,
-                OutgoingWindow = SessionInfo.outgoingWindow,
-                NextOutgoingId = SessionInfo.nextOutgoingId
+                IncomingWindow = int.MaxValue, // value taken from qpid-jms
+                OutgoingWindow = Connection.Provider.SessionOutgoingWindow,
+                NextOutgoingId = 1
             };
         }
 
-        public async Task CreateConsumer(ConsumerInfo consumerInfo)
+        public async Task CreateConsumer(NmsConsumerInfo consumerInfo)
         {
             AmqpConsumer amqpConsumer = new AmqpConsumer(this, consumerInfo);
             await amqpConsumer.Attach();
             consumers.TryAdd(consumerInfo.Id, amqpConsumer);
         }
 
-        public async Task CreateProducer(ProducerInfo producerInfo)
+        public async Task CreateProducer(NmsProducerInfo producerInfo)
         {
             var amqpProducer = new AmqpProducer(this, producerInfo);
             await amqpProducer.Attach();
             producers.TryAdd(producerInfo.Id, amqpProducer);
         }
 
-        public AmqpConsumer GetConsumer(Id consumerId)
+        public AmqpConsumer GetConsumer(NmsConsumerId consumerId)
         {
             if (consumers.TryGetValue(consumerId, out var consumer))
             {
@@ -135,7 +136,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             throw new Exception();
         }
 
-        public AmqpProducer GetProducer(Id producerId)
+        public AmqpProducer GetProducer(NmsProducerId producerId)
         {
             if (producers.TryGetValue(producerId, out var producer))
             {
@@ -145,12 +146,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             throw new Exception();
         }
 
-        public void RemoveConsumer(Id consumerId)
+        public void RemoveConsumer(NmsConsumerId consumerId)
         {
             consumers.TryRemove(consumerId, out _);
         }
 
-        public void RemoveProducer(Id producerId)
+        public void RemoveProducer(NmsProducerId producerId)
         {
             producers.TryRemove(producerId, out _);
         }
@@ -178,7 +179,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         /// <param name="transactionInfo">The TransactionInfo describing the transaction being rolled back.</param>
         /// <param name="nextTransactionInfo">The TransactionInfo describing the transaction that should be started immediately.</param>
         /// <exception cref="Exception">throws Exception if an error occurs while performing the operation.</exception>
-        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Rollback(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             if (!SessionInfo.IsTransacted)
             {
@@ -194,7 +195,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         /// <param name="transactionInfo">the TransactionInfo describing the transaction being committed.</param>
         /// <param name="nextTransactionInfo">the TransactionInfo describing the transaction that should be started immediately.</param>
         /// <exception cref="Exception">throws Exception if an error occurs while performing the operation.</exception>
-        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Commit(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             if (!SessionInfo.IsTransacted)
             {

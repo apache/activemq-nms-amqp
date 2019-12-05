@@ -21,8 +21,8 @@ namespace Apache.NMS.AMQP.Message
 {
     public class InboundMessageDispatch
     {
-        public Id ConsumerId { get; set; }
-        public ConsumerInfo ConsumerInfo { get; set; }
+        public NmsConsumerId ConsumerId { get; set; }
+        public NmsConsumerInfo ConsumerInfo { get; set; }
         public NmsMessage Message { get; set; }
         public bool IsDelivered { get; set; }
 

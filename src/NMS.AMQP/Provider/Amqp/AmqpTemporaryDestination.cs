@@ -49,7 +49,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 RcvSettleMode = ReceiverSettleMode.First,
             };
 
-            string linkDestinationName = "apache-nms:" + ((destination.IsTopic) ? CREATOR_TOPIC : CREATOR_QUEUE) + destination.Id;
+            string linkDestinationName = "apache-nms:" + ((destination.IsTopic) ? CREATOR_TOPIC : CREATOR_QUEUE) + destination.Address;
             var taskCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             senderLink = new SenderLink(session.UnderlyingSession, linkDestinationName, result, (link, attach) =>
             {
@@ -68,7 +68,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             senderLink.AddClosedCallback((sender, error) =>
             {
-                NMSException exception = ExceptionSupport.GetException(error, $"Received attach response for Temporary creator link. Link = {destination.Id}");
+                NMSException exception = ExceptionSupport.GetException(error, $"Received attach response for Temporary creator link. Link = {destination}");
                 taskCompletionSource.TrySetException(exception);
             });
             return taskCompletionSource.Task;
@@ -107,7 +107,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
             catch (Exception ex)
             {
-                throw ExceptionSupport.Wrap(ex, "Failed to close Link {0}", destination.Id);
+                throw ExceptionSupport.Wrap(ex, "Failed to close Link {0}", destination);
             }
         }
     }

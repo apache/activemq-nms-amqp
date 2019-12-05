@@ -33,9 +33,9 @@ namespace Apache.NMS.AMQP
     internal sealed class NmsLocalTransactionContext : INmsTransactionContext
     {
         private readonly NmsConnection connection;
-        private readonly HashSet<Id> participants = new HashSet<Id>();
+        private readonly HashSet<INmsResourceId> participants = new HashSet<INmsResourceId>();
         private readonly NmsSession session;
-        private TransactionInfo transactionInfo;
+        private NmsTransactionInfo transactionInfo;
 
         public NmsLocalTransactionContext(NmsSession session)
         {
@@ -124,7 +124,7 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        public bool IsActiveInThisContext(Id infoId)
+        public bool IsActiveInThisContext(INmsResourceId infoId)
         {
             return this.participants.Contains(infoId);
         }
@@ -236,10 +236,10 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        private TransactionInfo GetNextTransactionInfo()
+        private NmsTransactionInfo GetNextTransactionInfo()
         {
-            var transactionId = this.connection.TransactionIdGenerator.GenerateId();
-            return new TransactionInfo(transactionId, this.session.SessionInfo.Id);
+            NmsTransactionId transactionId = this.connection.GetNextTransactionId();
+            return new NmsTransactionInfo(this.session.SessionInfo.Id, transactionId);
         }
 
         private bool IsInDoubt()

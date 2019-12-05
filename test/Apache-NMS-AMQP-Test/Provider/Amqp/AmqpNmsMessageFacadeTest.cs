@@ -25,7 +25,6 @@ using Apache.NMS.AMQP.Message.Facade;
 using Apache.NMS.AMQP.Provider.Amqp;
 using Apache.NMS.AMQP.Provider.Amqp.Message;
 using Apache.NMS.AMQP.Util;
-using Moq;
 using NUnit.Framework;
 
 namespace NMS.AMQP.Test.Provider.Amqp
@@ -953,6 +952,47 @@ namespace NMS.AMQP.Test.Provider.Amqp
             Assert.AreEqual(expected, result, "Incorrect messageId value received");
         }
 
+        [Test]
+        public void TestGetProviderMessageIdObjectOnNewMessage()
+        {
+            var amqpMessageFacade = CreateNewMessageFacade();
+            Assert.IsNull(amqpMessageFacade.ProviderMessageIdObject);
+        }
+
+        [Test]
+        public void TestSetGetProviderMessageIdObjectOnNewMessageWithString()
+        {
+            var testMessageId = "ID:myStringMessageId";
+            var amqpMessageFacade = CreateNewMessageFacade();
+            amqpMessageFacade.ProviderMessageIdObject = testMessageId;
+            
+            Assert.AreEqual(testMessageId, amqpMessageFacade.ProviderMessageIdObject);
+            Assert.AreEqual(testMessageId, amqpMessageFacade.NMSMessageId);
+        }
+
+        [Test]
+        public void TestSetProviderMessageIdObjectNullClearsProperty()
+        {
+            var testMessageId = "ID:myStringMessageId";
+            var amqpMessageFacade = CreateNewMessageFacade();
+            amqpMessageFacade.ProviderMessageIdObject = testMessageId;
+            Assert.AreEqual(testMessageId, amqpMessageFacade.ProviderMessageIdObject);
+
+            amqpMessageFacade.ProviderMessageIdObject = null;
+            Assert.IsNull(amqpMessageFacade.ProviderMessageIdObject);
+        }
+
+        [Test]
+        public void TestSetProviderMessageIdObjectNullDoesNotCreateProperties()
+        {
+            var amqpMessageFacade = CreateNewMessageFacade();
+            Assert.IsNull(amqpMessageFacade.Message.Properties);
+
+            amqpMessageFacade.ProviderMessageIdObject = null;
+            Assert.IsNull(amqpMessageFacade.Message.Properties);
+            Assert.IsNull(amqpMessageFacade.ProviderMessageIdObject);
+        }
+
         // --- creation-time field  ---
 
         [Test]
@@ -1320,7 +1360,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             source.SetMessageAnnotation("test-annotation", "value");
 
             var queue = new NmsQueue("Test-Queue");
-            var temporaryQueue = new NmsTemporaryQueue(new Id("Test-Temp-Queue")) { Address = "Test-Temp-Queue" };
+            var temporaryQueue = new NmsTemporaryQueue("Test-Temp-Queue");
             source.NMSDestination = queue;
             source.NMSReplyTo = temporaryQueue;
             source.ContentType = "Test-ContentType";

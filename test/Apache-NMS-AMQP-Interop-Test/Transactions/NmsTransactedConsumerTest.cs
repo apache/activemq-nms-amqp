@@ -460,7 +460,7 @@ namespace NMS.AMQP.Test.Transactions
             consumer.Close();
         }
 
-        [Test, Timeout(60_000), Repeat(5)]
+        [Test, Timeout(60_000)]
         public void TestConsumerMessagesInOrder()
         {
             int messageCount = 4;
