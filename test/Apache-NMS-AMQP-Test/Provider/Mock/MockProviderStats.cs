@@ -39,11 +39,11 @@ namespace NMS.AMQP.Test.Provider.Mock
         public int CloseAttempts { get; private set; }
         public int RecoverCalls { get; set; }
 
-        public int GetCreateResourceCalls<T>() where T:ResourceInfo => createResourceCalls[typeof(T)];
+        public int GetCreateResourceCalls<T>() where T : INmsResource => createResourceCalls[typeof(T)];
 
-        public int GetDestroyResourceCalls<T>() where T : ResourceInfo => destroyResourceCalls[typeof(T)];
+        public int GetDestroyResourceCalls<T>() where T : INmsResource => destroyResourceCalls[typeof(T)];
 
-        public int GetStartResourceCalls<T>() where T : ResourceInfo => destroyResourceCalls[typeof(T)];
+        public int GetStartResourceCalls<T>() where T : INmsResource => destroyResourceCalls[typeof(T)];
 
         public void RecordProviderCreated()
         {

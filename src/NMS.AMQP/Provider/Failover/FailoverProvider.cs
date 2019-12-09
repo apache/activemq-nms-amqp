@@ -52,7 +52,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
         private long sendTimeout;
 
         private Uri connectedUri;
-        private ConnectionInfo connectionInfo;
+        private NmsConnectionInfo connectionInfo;
         private IProvider provider;
         private IProviderListener listener;
 
@@ -86,11 +86,11 @@ namespace Apache.NMS.AMQP.Provider.Failover
             }
         }
 
-        public Task Connect(ConnectionInfo info)
+        public Task Connect(NmsConnectionInfo info)
         {
             CheckClosed();
 
-            requestTimeout = info.requestTimeout;
+            requestTimeout = info.RequestTimeout;
             sendTimeout = info.SendTimeout;
 
             connectionInfo = info;
@@ -273,7 +273,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             listener = providerListener;
         }
 
-        public Task CreateResource(ResourceInfo resourceInfo)
+        public Task CreateResource(INmsResource resourceInfo)
         {
             CheckClosed();
 
@@ -288,7 +288,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             return request.Task;
         }
 
-        public Task DestroyResource(ResourceInfo resourceInfo)
+        public Task DestroyResource(INmsResource resourceInfo)
         {
             CheckClosed();
 
@@ -306,7 +306,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             return request.Task;
         }
 
-        public Task StartResource(ResourceInfo resourceInfo)
+        public Task StartResource(INmsResource resourceInfo)
         {
             CheckClosed();
 
@@ -321,7 +321,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             return request.Task;
         }
 
-        public Task StopResource(ResourceInfo resourceInfo)
+        public Task StopResource(INmsResource resourceInfo)
         {
             CheckClosed();
 
@@ -336,7 +336,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             return request.Task;
         }
 
-        public Task Recover(Id sessionId)
+        public Task Recover(NmsSessionId sessionId)
         {
             CheckClosed();
 
@@ -352,7 +352,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             return request.Task;
         }
 
-        public Task Acknowledge(Id sessionId, AckType ackType)
+        public Task Acknowledge(NmsSessionId sessionId, AckType ackType)
         {
             CheckClosed();
 
@@ -418,7 +418,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             return request.Task;
         }
 
-        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Rollback(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             CheckClosed();
 
@@ -434,7 +434,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             return request.Task;
         }
 
-        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Commit(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             CheckClosed();
 
@@ -486,7 +486,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
         {
         }
 
-        public void OnResourceClosed(ResourceInfo resourceInfo, Exception error)
+        public void OnResourceClosed(INmsResource resourceInfo, Exception error)
         {
             if (closed)
                 return;

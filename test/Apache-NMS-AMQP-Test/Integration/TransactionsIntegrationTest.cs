@@ -1098,7 +1098,7 @@ namespace NMS.AMQP.Test.Integration
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
+                IConnection connection = EstablishConnection(testPeer, "nms.closeTimeout=100");
                 connection.Start();
 
                 testPeer.ExpectBegin();
@@ -1125,7 +1125,7 @@ namespace NMS.AMQP.Test.Integration
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
+                IConnection connection = EstablishConnection(testPeer, "nms.closeTimeout=100");
                 connection.Start();
 
                 testPeer.ExpectBegin();

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,32 +15,23 @@
  * limitations under the License.
  */
 
-using System;
+using System.Threading.Tasks;
 using Apache.NMS.AMQP.Util;
+using NUnit.Framework;
 
-namespace Apache.NMS.AMQP.Meta
+namespace NMS.AMQP.Test
 {
-    public sealed class TransactionInfo : ResourceInfo
+    [TestFixture]
+    public class AtomicLongTest
     {
-        public TransactionInfo(Id transactionId, Id sessionId) : base(transactionId)
+        [Test]
+        public void TestIncrementAndGetIsThreadSafe()
         {
-            if (transactionId == null)
-                throw new ArgumentNullException(nameof(transactionId), "Transaction Id cannot be null");
+            var atomicLong = new AtomicLong(1);
 
-            if (sessionId == null)
-                throw new ArgumentNullException(nameof(sessionId), "Session Id cannot be null");
+            Parallel.For(1, 10_000, l => atomicLong.IncrementAndGet());
 
-            SessionId = sessionId;
+            Assert.AreEqual(10_000, (long) atomicLong);
         }
-
-        public Id SessionId { get; }
-        public bool IsInDoubt { get; private set; }
-
-        public void SetInDoubt()
-        {
-            IsInDoubt = true;
-        }
-
-        public byte[] ProviderTxId { get; set; }
     }
 }

@@ -39,11 +39,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         private DateTime? syntheticExpiration;
         public global::Amqp.Message Message { get; private set; }
 
-        public virtual bool HasBody()
-        {
-            return Message.BodySection != null;
-        }
-
         public int RedeliveryCount
         {
             get => Convert.ToInt32(Header.DeliveryCount);
@@ -85,6 +80,23 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
                 }
                 else
                     Message.Properties?.SetMessageId(null);
+            }
+        }
+
+        public object ProviderMessageIdObject
+        {
+            get => Message.Properties?.GetMessageId();
+            set
+            {
+                if (Message.Properties == null)
+                {
+                    if (value == null)
+                    {
+                        return;
+                    }
+                    LazyCreateProperties();
+                }
+                Message.Properties?.SetMessageId(value);
             }
         }
 

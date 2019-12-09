@@ -17,6 +17,7 @@
 
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
+using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
 
@@ -74,7 +75,7 @@ namespace Apache.NMS.AMQP
             return Task.CompletedTask;
         }
 
-        public bool IsActiveInThisContext(Id infoId)
+        public bool IsActiveInThisContext(INmsResourceId infoId)
         {
             return false;
         }

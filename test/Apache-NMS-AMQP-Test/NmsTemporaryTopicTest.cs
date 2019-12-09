@@ -16,6 +16,7 @@
  */
 
 using Apache.NMS.AMQP;
+using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Util;
 using NUnit.Framework;
 
@@ -27,19 +28,19 @@ namespace NMS.AMQP.Test
         [Test]
         public void TestTwoTemporaryTopicsWithTheSameAddressesAreEqual()
         {
-            NmsTemporaryTopic nmsTopic1 = new NmsTemporaryTopic(new Id("test")) { Address = "myTopic" };
-            NmsTemporaryTopic nmsTopic2 = new NmsTemporaryTopic(new Id("test")) { Address = "myTopic" };
+            var nmsTopic1 = new NmsTemporaryTopic("myTopic");
+            var nmsTopic2 = new NmsTemporaryTopic("myTopic");
 
             Assert.AreEqual(nmsTopic1, nmsTopic2);
             Assert.AreNotSame(nmsTopic1, nmsTopic2);
             Assert.AreEqual(nmsTopic1.GetHashCode(), nmsTopic2.GetHashCode());
         }
-        
+
         [Test]
         public void TestTwoTemporaryTopicsWithDifferentAddressesAreNotEqual()
         {
-            NmsTemporaryTopic nmsTopic1 = new NmsTemporaryTopic(new Id("test")) { Address = "myTopic" };
-            NmsTemporaryTopic nmsTopic2 = new NmsTemporaryTopic(new Id("test")) { Address = "myTopic1" };
+            var nmsTopic1 = new NmsTemporaryTopic("myTopic");
+            var nmsTopic2 = new NmsTemporaryTopic("myTopic2");
 
             Assert.AreNotEqual(nmsTopic1, nmsTopic2);
             Assert.AreNotEqual(nmsTopic1.GetHashCode(), nmsTopic2.GetHashCode());

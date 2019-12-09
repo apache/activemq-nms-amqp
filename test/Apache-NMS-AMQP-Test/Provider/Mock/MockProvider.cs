@@ -51,7 +51,7 @@ namespace NMS.AMQP.Test.Provider.Mock
                 throw new Exception();
         }
 
-        public async Task Connect(ConnectionInfo connectionInfo)
+        public async Task Connect(NmsConnectionInfo connectionInfo)
         {
             Stats.RecordConnectAttempt();
 
@@ -77,35 +77,35 @@ namespace NMS.AMQP.Test.Provider.Mock
             listener = providerListener;
         }
 
-        public Task CreateResource(ResourceInfo resourceInfo)
+        public Task CreateResource(INmsResource resourceInfo)
         {
             Stats.RecordCreateResourceCall(resourceInfo.GetType());
             return Task.CompletedTask;
         }
 
-        public Task DestroyResource(ResourceInfo resourceInfo)
+        public Task DestroyResource(INmsResource resourceInfo)
         {
             Stats.RecordDestroyResourceCall(resourceInfo.GetType());
             return Task.CompletedTask;
         }
 
-        public Task StartResource(ResourceInfo resourceInfo)
+        public Task StartResource(INmsResource resourceInfo)
         {
             return Task.CompletedTask;
         }
 
-        public Task StopResource(ResourceInfo resourceInfo)
+        public Task StopResource(INmsResource resourceInfo)
         {
             throw new NotImplementedException();
         }
 
-        public Task Recover(Id sessionId)
+        public Task Recover(NmsSessionId sessionId)
         {
             Stats.RecordRecoverCalls();
             return Task.CompletedTask;
         }
 
-        public Task Acknowledge(Id sessionId, AckType ackType)
+        public Task Acknowledge(NmsSessionId sessionId, AckType ackType)
         {
             throw new NotImplementedException();
         }
@@ -126,17 +126,17 @@ namespace NMS.AMQP.Test.Provider.Mock
             throw new NotImplementedException();
         }
 
-        public Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Rollback(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             throw new NotImplementedException();
         }
 
-        public Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public Task Commit(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             throw new NotImplementedException();
         }
 
-        public InboundMessageDispatch ReceiveMessage(ConsumerInfo consumerInfo, TimeSpan timeout)
+        public InboundMessageDispatch ReceiveMessage(NmsConsumerInfo consumerInfo, TimeSpan timeout)
         {
             throw new NotImplementedException();
         }

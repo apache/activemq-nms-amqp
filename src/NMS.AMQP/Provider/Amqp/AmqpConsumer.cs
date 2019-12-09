@@ -21,7 +21,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
-using Amqp.Transactions;
 using Amqp.Types;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
@@ -39,7 +38,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
     public class AmqpConsumer : IAmqpConsumer
     {
-        private readonly ConsumerInfo info;
+        private readonly NmsConsumerInfo info;
         private ReceiverLink receiverLink;
         private readonly LinkedList<InboundMessageDispatch> messages;
         private readonly object syncRoot = new object();
@@ -48,7 +47,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public IDestination Destination => info.Destination;
         public IAmqpConnection Connection => session.Connection;
 
-        public AmqpConsumer(AmqpSession amqpSession, ConsumerInfo info)
+        public AmqpConsumer(AmqpSession amqpSession, NmsConsumerInfo info)
         {
             session = amqpSession;
             this.info = info;
@@ -56,7 +55,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             messages = new LinkedList<InboundMessageDispatch>();
         }
 
-        public Id ConsumerId => this.info.Id;
+        public NmsConsumerId ConsumerId => this.info.Id;
 
         public Task Attach()
         {
@@ -158,7 +157,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 filters.Add(SymbolUtil.ATTACH_FILTER_NO_LOCAL, AmqpNmsNoLocalType.NO_LOCAL);
             }
 
-            if (info.HasSelector)
+            if (info.HasSelector())
             {
                 filters.Add(SymbolUtil.ATTACH_FILTER_SELECTOR, new AmqpNmsSelectorType(info.Selector));
             }

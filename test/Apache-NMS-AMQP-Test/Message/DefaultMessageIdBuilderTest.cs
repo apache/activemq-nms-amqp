@@ -15,20 +15,25 @@
  * limitations under the License.
  */
 
-using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Message;
+using NUnit.Framework;
 
-namespace Apache.NMS.AMQP.Meta
+namespace NMS.AMQP.Test.Message
 {
-    public abstract class ResourceInfo
+    [TestFixture]
+    public class DefaultMessageIdBuilderTest
     {
-
-        private readonly Id resourceId;
-
-        protected ResourceInfo(Id resourceId)
+        [Test]
+        public void TestCreateMessageId()
         {
-            this.resourceId = resourceId;
+            // Arrange
+            var messageIdBuilder = new DefaultMessageIdBuilder();
+            
+            // Act
+            object messageId = messageIdBuilder.CreateMessageId("ID:c29c38a8-cad1-4328-af6c-dcc940cdfc2d:1:1:1", 1);
+            
+            // Assert
+            Assert.AreEqual("ID:c29c38a8-cad1-4328-af6c-dcc940cdfc2d:1:1:1-1", messageId.ToString());
         }
-
-        public virtual Id Id { get { return resourceId; } }
     }
 }

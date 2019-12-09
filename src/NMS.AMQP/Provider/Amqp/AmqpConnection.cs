@@ -38,8 +38,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
     public class AmqpConnection : IAmqpConnection
     {
-        private readonly ConcurrentDictionary<Id, AmqpSession> sessions = new ConcurrentDictionary<Id, AmqpSession>();
-        private readonly ConcurrentDictionary<Id, AmqpTemporaryDestination> temporaryDestinations = new ConcurrentDictionary<Id, AmqpTemporaryDestination>();
+        private readonly ConcurrentDictionary<NmsSessionId, AmqpSession> sessions = new ConcurrentDictionary<NmsSessionId, AmqpSession>();
+        private readonly ConcurrentDictionary<NmsTemporaryDestination, AmqpTemporaryDestination> temporaryDestinations = new ConcurrentDictionary<NmsTemporaryDestination, AmqpTemporaryDestination>();
 
         public AmqpProvider Provider { get; }
         private readonly ITransportContext transport;
@@ -49,7 +49,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         private AmqpConnectionSession connectionSession;
         private TaskCompletionSource<bool> tsc;
 
-        public AmqpConnection(AmqpProvider provider, ITransportContext transport, ConnectionInfo info)
+        public AmqpConnection(AmqpProvider provider, ITransportContext transport, NmsConnectionInfo info)
         {
             this.Provider = provider;
             this.transport = transport;
@@ -62,13 +62,13 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public string QueuePrefix => Info.QueuePrefix;
         public string TopicPrefix => Info.TopicPrefix;
         public bool ObjectMessageUsesAmqpTypes { get; set; } = false;
-        public ConnectionInfo Info { get; }
+        public NmsConnectionInfo Info { get; }
 
         public INmsMessageFactory MessageFactory => messageFactory;
 
         internal async Task Start()
         {
-            Address address = UriUtil.ToAddress(remoteUri, Info.username, Info.password);
+            Address address = UriUtil.ToAddress(remoteUri, Info.UserName, Info.Password);
             this.tsc = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             underlyingConnection = await transport.CreateAsync(address, new AmqpHandler(this)).ConfigureAwait(false);
             underlyingConnection.AddClosedCallback(OnClosed);
@@ -78,8 +78,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             // Create a Session for this connection that is used for Temporary Destinations
             // and perhaps later on management and advisory monitoring.
-            // TODO: change the way how connection session id is obtained
-            SessionInfo sessionInfo = new SessionInfo(Info.Id);
+            NmsSessionInfo sessionInfo = new NmsSessionInfo(Info, -1);
             sessionInfo.AcknowledgementMode = AcknowledgementMode.AutoAcknowledge;
 
             connectionSession = new AmqpConnectionSession(this, sessionInfo);
@@ -107,10 +106,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         internal void OnLocalOpen(Open open)
         {
             open.ContainerId = Info.ClientId;
-            open.ChannelMax = Info.channelMax;
-            open.MaxFrameSize = Convert.ToUInt32(Info.maxFrameSize);
+            open.ChannelMax = Info.ChannelMax;
+            open.MaxFrameSize = (uint) Info.MaxFrameSize;
             open.HostName = remoteUri.Host;
-            open.IdleTimeOut = Convert.ToUInt32(Info.idleTimout);
+            open.IdleTimeOut = (uint) Info.IdleTimeOut;
             open.DesiredCapabilities = new[]
             {
                 SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER,
@@ -145,7 +144,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public async Task CreateSession(SessionInfo sessionInfo)
+        public async Task CreateSession(NmsSessionInfo sessionInfo)
         {
             var amqpSession = new AmqpSession(this, sessionInfo);
             await amqpSession.Start().ConfigureAwait(false);
@@ -166,7 +165,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public AmqpSession GetSession(Id sessionId)
+        public AmqpSession GetSession(NmsSessionId sessionId)
         {
             if (sessions.TryGetValue(sessionId, out AmqpSession session))
             {
@@ -175,24 +174,24 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             throw new InvalidOperationException($"Amqp Session {sessionId} doesn't exist and cannot be retrieved.");
         }
 
-        public void RemoveSession(Id sessionId)
+        public void RemoveSession(NmsSessionId sessionId)
         {
-            sessions.TryRemove(sessionId, out AmqpSession removedSession);
+            sessions.TryRemove(sessionId, out AmqpSession _);
         }
 
         public async Task CreateTemporaryDestination(NmsTemporaryDestination destination)
         {
             AmqpTemporaryDestination amqpTemporaryDestination = new AmqpTemporaryDestination(connectionSession, destination);
             await amqpTemporaryDestination.Attach();
-            temporaryDestinations.TryAdd(destination.Id, amqpTemporaryDestination);
+            temporaryDestinations.TryAdd(destination, amqpTemporaryDestination);
         }
 
         public AmqpTemporaryDestination GetTemporaryDestination(NmsTemporaryDestination destination)
         {
-            return temporaryDestinations.TryGetValue(destination.Id, out AmqpTemporaryDestination amqpTemporaryDestination) ? amqpTemporaryDestination : null;
+            return temporaryDestinations.TryGetValue(destination, out AmqpTemporaryDestination amqpTemporaryDestination) ? amqpTemporaryDestination : null;
         }
 
-        public void RemoveTemporaryDestination(Id destinationId)
+        public void RemoveTemporaryDestination(NmsTemporaryDestination destinationId)
         {
             temporaryDestinations.TryRemove(destinationId, out _);
         }

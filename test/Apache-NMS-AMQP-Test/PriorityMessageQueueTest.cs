@@ -231,7 +231,7 @@ namespace NMS.AMQP.Test
         {
             NmsTestMessageFacade facade = new NmsTestMessageFacade();
             facade.NMSPriority = priority;
-            facade.NMSMessageId = messageId.generateID();
+            facade.NMSMessageId = messageId.GenerateId();
             return new NmsMessage(facade);
         }
     }

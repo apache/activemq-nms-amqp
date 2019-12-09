@@ -44,7 +44,13 @@ namespace Apache.NMS.AMQP.Message.Facade
         /// True if this message is tagged as being persistent
         /// </summary>
         bool IsPersistent { get; set; }
-        
+
+        /// <summary>
+        /// Gets and sets the underlying providers message ID object for this message if one exists, null otherwise.
+        /// In the case the returned value is a string, it is not defined whether the NMS mandated 'ID:' prefix will be present.
+        /// </summary>
+        object ProviderMessageIdObject { get; set; }
+
         INmsMessageFacade Copy();
     }
 }

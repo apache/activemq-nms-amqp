@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,12 +15,22 @@
  * limitations under the License.
  */
 
-namespace NMS.AMQP.Test.TestAmqp
+using Apache.NMS.AMQP.Meta;
+using Apache.NMS.AMQP.Util;
+
+namespace NMS.AMQP.Test.Meta
 {
-    public enum TerminusDurability
+    public abstract class NmsResourceIdTestBase
     {
-        NONE = 0,
-        CONFIGURATION = 1,
-        UNSETTLED_STATE = 2,
+        protected static NmsConnectionId CreateNmsConnectionId()
+        {
+            var generator = new IdGenerator();
+            return new NmsConnectionId(generator.GenerateId());
+        }
+        
+        protected static NmsSessionId CreateSessionId(NmsConnectionId connectionId, long value = 1)
+        {
+            return new NmsSessionId(connectionId, value);
+        }
     }
 }

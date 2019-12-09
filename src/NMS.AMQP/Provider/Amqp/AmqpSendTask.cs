@@ -31,7 +31,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         
         public AmqpSendTask(SenderLink link, global::Amqp.Message message, DeliveryState deliveryState, long timeoutMillis)
         {
-            if (timeoutMillis != ConnectionInfo.INFINITE)
+            if (timeoutMillis != NmsConnectionInfo.INFINITE)
             {
                 this.timer = new Timer(OnTimer, this, timeoutMillis, -1);
             }

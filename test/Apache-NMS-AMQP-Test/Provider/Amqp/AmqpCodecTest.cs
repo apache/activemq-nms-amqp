@@ -573,9 +573,9 @@ namespace NMS.AMQP.Test.Provider.Amqp
                 case MessageSupport.JMS_DEST_TYPE_TOPIC:
                     return new NmsTopic("test");
                 case MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE:
-                    return new NmsTemporaryQueue(new Id("test"));
+                    return new NmsTemporaryQueue("test");
                 case MessageSupport.JMS_DEST_TYPE_TEMP_TOPIC:
-                    return new NmsTemporaryTopic(new Id("test"));
+                    return new NmsTemporaryTopic("test");
                 default:
                     return null;
             }

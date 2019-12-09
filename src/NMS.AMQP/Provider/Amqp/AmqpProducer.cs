@@ -30,10 +30,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
     public class AmqpProducer
     {
         private readonly AmqpSession session;
-        private readonly ProducerInfo info;
+        private readonly NmsProducerInfo info;
         private SenderLink senderLink;
 
-        public AmqpProducer(AmqpSession session, ProducerInfo info)
+        public AmqpProducer(AmqpSession session, NmsProducerInfo info)
         {
             this.session = session;
             this.info = info;
@@ -92,7 +92,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         private Source CreateSource() => new Source
         {
             Address = info.Id.ToString(),
-            Timeout = (uint) info.sendTimeout,
             Outcomes = new[]
             {
                 SymbolUtil.ATTACH_OUTCOME_ACCEPTED,
@@ -104,8 +103,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             Target target = new Target();
             target.Address = AmqpDestinationHelper.GetDestinationAddress(info.Destination, session.Connection);
-
-            target.Timeout = (uint) info.sendTimeout;
 
             // Durable is used for a durable subscription
             target.Durable = (uint) TerminusDurability.NONE;
@@ -200,7 +197,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             try
             {
-                senderLink.Close(TimeSpan.FromMilliseconds(info.closeTimeout));
+                var closeTimeout = session.Connection.Provider.CloseTimeout;
+                senderLink.Close(TimeSpan.FromMilliseconds(closeTimeout));
             }
             catch (NMSException)
             {

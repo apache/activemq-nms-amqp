@@ -28,11 +28,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
     public class AmqpTransactionContext
     {
         private readonly AmqpSession session;
-        private readonly Dictionary<Id, AmqpConsumer> txConsumers = new Dictionary<Id, AmqpConsumer>();
+        private readonly Dictionary<NmsConsumerId, AmqpConsumer> txConsumers = new Dictionary<NmsConsumerId, AmqpConsumer>();
         private TransactionalState cachedAcceptedState;
         private TransactionalState cachedTransactedState;
         private AmqpTransactionCoordinator coordinator;
-        private Id current;
+        private NmsTransactionId current;
         private byte[] txnId;
 
         public AmqpTransactionContext(AmqpSession session)
@@ -52,7 +52,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             return this.cachedAcceptedState;
         }
 
-        public async Task Rollback(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public async Task Rollback(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             if (!Equals(transactionInfo.Id, this.current))
             {
@@ -87,7 +87,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             this.txConsumers.Clear();
         }
 
-        public async Task Commit(TransactionInfo transactionInfo, TransactionInfo nextTransactionInfo)
+        public async Task Commit(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             if (!Equals(transactionInfo.Id, this.current))
             {
@@ -113,7 +113,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             this.txConsumers.Clear();
         }
 
-        public async Task Begin(TransactionInfo transactionInfo)
+        public async Task Begin(NmsTransactionInfo transactionInfo)
         {
             if (this.current != null)
                 throw new NMSException("Begin called while a TX is still Active.");

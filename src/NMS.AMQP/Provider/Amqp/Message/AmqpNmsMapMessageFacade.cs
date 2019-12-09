@@ -67,7 +67,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             }
         }
 
-        public override bool HasBody()
+        public virtual bool HasBody()
         {
             return Map.Count > 0;
         }

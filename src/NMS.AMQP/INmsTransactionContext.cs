@@ -17,6 +17,7 @@
 
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
+using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
 
@@ -89,7 +90,7 @@ namespace Apache.NMS.AMQP
         /// Allows a resource to query the transaction context to determine if it has pending
         /// work in the current transaction.
         /// </summary>
-        bool IsActiveInThisContext(Id infoId);
+        bool IsActiveInThisContext(INmsResourceId infoId);
         
         event SessionTxEventDelegate TransactionStartedListener;
         event SessionTxEventDelegate TransactionCommittedListener;

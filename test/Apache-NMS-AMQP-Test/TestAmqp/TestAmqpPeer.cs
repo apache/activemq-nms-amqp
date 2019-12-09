@@ -28,6 +28,7 @@ using Amqp.Framing;
 using Amqp.Sasl;
 using Amqp.Transactions;
 using Amqp.Types;
+using Apache.NMS.AMQP;
 using Apache.NMS.AMQP.Util;
 using NLog;
 using NMS.AMQP.Test.TestAmqp.BasicTypes;

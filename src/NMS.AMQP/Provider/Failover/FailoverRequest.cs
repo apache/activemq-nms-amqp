@@ -86,7 +86,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
         
         public void ScheduleTimeout()
         {
-            if (cancellationTokenSource == null && requestTimeout != ConnectionInfo.INFINITE)
+            if (cancellationTokenSource == null && requestTimeout != NmsConnectionInfo.INFINITE)
             {
                 TimeSpan timeout = TimeSpan.FromMilliseconds(requestTimeout) - (DateTime.UtcNow - requestStarted);
                 if (timeout > TimeSpan.Zero)

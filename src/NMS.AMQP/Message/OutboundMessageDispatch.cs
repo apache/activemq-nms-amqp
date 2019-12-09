@@ -22,8 +22,8 @@ namespace Apache.NMS.AMQP.Message
 {
     public class OutboundMessageDispatch
     {
-        public Id ProducerId { get; set; }
-        public ProducerInfo ProducerInfo { get; set; }
+        public NmsProducerId ProducerId { get; set; }
+        public NmsProducerInfo ProducerInfo { get; set; }
         public NmsMessage Message { get; set; }
         public bool SendAsync { get; set; }
     }

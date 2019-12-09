@@ -29,14 +29,14 @@ namespace NMS.AMQP.Test
     public class NmsConnectionTest
     {
         private NmsConnection connection;
-        private ConnectionInfo connectionInfo;
+        private NmsConnectionInfo connectionInfo;
         private MockProvider provider;
 
         [SetUp]
         public void SetUp()
         {
             provider = (MockProvider)new MockProviderFactory().CreateProvider(new Uri("mock://localhost"));
-            connectionInfo = new ConnectionInfo(new Id("ID:TEST:1"));
+            connectionInfo = new NmsConnectionInfo(new NmsConnectionId("ID:TEST:1"));
         }
 
         [TearDown]

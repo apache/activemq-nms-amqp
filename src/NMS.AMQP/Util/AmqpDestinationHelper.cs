@@ -159,11 +159,11 @@ namespace Apache.NMS.AMQP.Util
                 case MessageSupport.JMS_DEST_TYPE_TOPIC:
                     return new NmsTopic(address);
                 case MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE:
-                    NmsTemporaryQueue temporaryQueue = new NmsTemporaryQueue(new CustomIdGenerator(true, address).GenerateId());
+                    NmsTemporaryQueue temporaryQueue = new NmsTemporaryQueue(address);
                     temporaryQueue.Address = address;
                     return temporaryQueue;
                 case MessageSupport.JMS_DEST_TYPE_TEMP_TOPIC:
-                    NmsTemporaryTopic temporaryTopic = new NmsTemporaryTopic(new CustomIdGenerator(true, address).GenerateId());
+                    NmsTemporaryTopic temporaryTopic = new NmsTemporaryTopic(address);
                     temporaryTopic.Address = address;
                     return temporaryTopic;
             }
@@ -182,14 +182,14 @@ namespace Apache.NMS.AMQP.Util
             if (consumerDestination.IsQueue)
             {
                 if (consumerDestination.IsTemporary)
-                    return new NmsTemporaryQueue(new CustomIdGenerator(true, address).GenerateId()) { Address = address };
+                    return new NmsTemporaryQueue(address);
                 else
                     return new NmsQueue(address);
             }
             else if (consumerDestination.IsTopic)
             {
                 if (consumerDestination.IsTemporary)
-                    return new NmsTemporaryTopic(new CustomIdGenerator(true, address).GenerateId()) { Address = address };
+                    return new NmsTemporaryTopic(address);
                 else
                     return new NmsTopic(address);
             }

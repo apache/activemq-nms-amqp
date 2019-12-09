@@ -14,42 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Apache.NMS.Util;
 
-namespace Apache.NMS.AMQP.Util
+namespace Apache.NMS.AMQP.Meta
 {
-    /// <summary>
-    /// Simple utility class used mainly for Id generation.
-    /// </summary>
-    public class AtomicSequence : Atomic<ulong>
+    public interface INmsResource
     {
-        public AtomicSequence() : base()
-        {
-        }
+    }
 
-        public AtomicSequence(ulong defaultValue) : base(defaultValue)
-        {
-        }
-
-        public ulong getAndIncrement()
-        {
-            ulong val = 0;
-            lock (this)
-            {
-                val = atomicValue;
-                atomicValue++;
-            }
-            return val;
-        }
-
-        public override string ToString()
-        {
-            return Value.ToString();
-        }
+    /// <summary>
+    /// Base class for the NMS object representing NMS resources such as Connection, Session, etc.
+    /// </summary>
+    public interface INmsResource<out TResourceId> : INmsResource where TResourceId : INmsResourceId
+    {
+        TResourceId Id { get; }
     }
 }
