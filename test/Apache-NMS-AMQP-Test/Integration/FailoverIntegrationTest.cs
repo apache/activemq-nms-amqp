@@ -1060,6 +1060,59 @@ namespace NMS.AMQP.Test.Integration
             }
         }
 
+        [Test, Timeout(20_000), Category("Windows")]
+        public void TestConnectionInterruptedInvokedWhenConnectionToBrokerLost()
+        {
+            using (TestAmqpPeer originalPeer = new TestAmqpPeer())
+            {
+                ManualResetEvent connectionInterruptedInvoked = new ManualResetEvent(false);
+
+                originalPeer.ExpectSaslAnonymous();
+                originalPeer.ExpectOpen();
+                originalPeer.ExpectBegin();
+                originalPeer.ExpectBegin();
+
+                NmsConnection connection = EstablishAnonymousConnection(originalPeer);
+
+                connection.ConnectionInterruptedListener += () => connectionInterruptedInvoked.Set();
+
+                connection.Start();
+                
+                originalPeer.Close();
+
+                Assert.IsTrue(connectionInterruptedInvoked.WaitOne(TimeSpan.FromSeconds(10)));
+            }
+        }
+        
+        [Test, Timeout(20_000), Category("Windows")]
+        public void TestConnectionResumedInvokedWhenConnectionToBrokerLost()
+        {
+            using (TestAmqpPeer originalPeer = new TestAmqpPeer())
+            using (TestAmqpPeer finalPeer = new TestAmqpPeer())
+            {
+                ManualResetEvent connectionResumedInvoked = new ManualResetEvent(false);
+
+                originalPeer.ExpectSaslAnonymous();
+                originalPeer.ExpectOpen();
+                originalPeer.ExpectBegin();
+                originalPeer.ExpectBegin();
+
+                finalPeer.ExpectSaslAnonymous();
+                finalPeer.ExpectOpen();
+                finalPeer.ExpectBegin();
+                finalPeer.ExpectBegin();
+
+                NmsConnection connection = EstablishAnonymousConnection(originalPeer, finalPeer);
+
+                connection.ConnectionResumedListener += () => connectionResumedInvoked.Set();
+
+                connection.Start();
+                
+                originalPeer.Close();
+                Assert.IsTrue(connectionResumedInvoked.WaitOne(TimeSpan.FromSeconds(10)));
+            }
+        }
+
         private NmsConnection EstablishAnonymousConnection(params TestAmqpPeer[] peers)
         {
             return EstablishAnonymousConnection(null, null, peers);
