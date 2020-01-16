@@ -416,24 +416,28 @@ namespace Apache.NMS.AMQP
 
             lock (syncRoot)
             {
-                if (!closed && connected.CompareAndSet(false, true))
+                if (closed || connected)
+                {
+                    return;
+                }
+                
+                try
+                {
+                    provider.Connect(ConnectionInfo).ConfigureAwait(false).GetAwaiter().GetResult();
+                    connected.Set(true);
+                }
+                catch (Exception e)
                 {
                     try
                     {
-                        provider.Connect(ConnectionInfo).ConfigureAwait(false).GetAwaiter().GetResult();
+                        provider.Close();
                     }
-                    catch (Exception e)
+                    catch
                     {
-                        try
-                        {
-                            provider.Close();
-                        }
-                        catch
-                        {
-                        }
-
-                        throw NMSExceptionSupport.Create(e);
+                        // ignored
                     }
+
+                    throw NMSExceptionSupport.Create(e);
                 }
             }
         }
