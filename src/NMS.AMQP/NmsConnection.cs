@@ -326,6 +326,8 @@ namespace Apache.NMS.AMQP
             {
                 listener.OnConnectionRestored(remoteUri);
             }
+            
+            ConnectionResumedListener?.Invoke();
         }
 
         public void OnResourceClosed(INmsResource resource, Exception error)
@@ -370,6 +372,8 @@ namespace Apache.NMS.AMQP
             
             foreach (INmsConnectionListener listener in connectionListeners)
                 listener.OnConnectionInterrupted(failedUri);
+            
+            ConnectionInterruptedListener?.Invoke();
         }
 
         private void CheckClosedOrFailed()
