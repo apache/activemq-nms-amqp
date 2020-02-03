@@ -34,7 +34,7 @@ namespace Apache.NMS.AMQP
         private MsgDeliveryMode deliveryMode = MsgDeliveryMode.Persistent;
         private TimeSpan timeToLive = NMSConstants.defaultTimeToLive;
         private TimeSpan requestTimeout;
-        private MsgPriority priority = NMSConstants.defaultPriority;
+        private MsgPriority priority = NMSConstants.defaultPriority - 1;
         private bool disableMessageId;
         private bool disableMessageTimestamp;
 

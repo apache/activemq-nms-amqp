@@ -399,6 +399,37 @@ namespace NMS.AMQP.Test.Integration
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
+        
+        [Test, Timeout(20_000)]
+        public void TestMessagesAreProducedWithProperDefaultPriorityWhenNoPrioritySpecified()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = EstablishConnection(testPeer);
+                testPeer.ExpectBegin();
+                testPeer.ExpectSenderAttach();
+
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                IQueue destination = session.GetQueue("myQueue");
+                IMessageProducer producer = session.CreateProducer(destination);
+
+                byte priority = 4;
+
+                testPeer.ExpectTransfer(m => Assert.AreEqual(priority, m.Header.Priority));
+                testPeer.ExpectClose();
+
+                ITextMessage message = session.CreateTextMessage();
+                Assert.AreEqual(MsgPriority.BelowNormal, message.NMSPriority);
+
+                producer.Send(message);
+
+                Assert.AreEqual((MsgPriority) priority, message.NMSPriority);
+
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
 
         [Test, Timeout(20_000)]
         public void TestNonDefaultPriorityProducesMessagesWithPriorityFieldAndSetsNMSPriority()
