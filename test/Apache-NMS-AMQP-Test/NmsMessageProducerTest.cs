@@ -77,7 +77,7 @@ namespace NMS.AMQP.Test
         public void TestPriorityConfiguration()
         {
             IMessageProducer producer = session.CreateProducer(null);
-            Assert.AreEqual(NMSConstants.defaultPriority, producer.Priority);
+            Assert.AreEqual(MsgPriority.BelowNormal, producer.Priority);
             producer.Priority = MsgPriority.Highest;
             Assert.AreEqual(MsgPriority.Highest, producer.Priority);
         }
