@@ -33,7 +33,7 @@ with the License.  You may obtain a copy of the License at
     <PropertyGroup>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageId>Apache.NMS.AMQP</PackageId>
-        <Version>1.8.1</Version>
+        <Version>1.8.2</Version>
         <Authors>Apache ActiveMQ</Authors>
         <Company>Apache Software Foundation</Company>
         <Product>Apache ActiveMQ NMS AMQP Client</Product>
@@ -47,6 +47,20 @@ with the License.  You may obtain a copy of the License at
         <PackageTags>apache;activemq;nms;amqp;net;messaging</PackageTags>
         <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     </PropertyGroup>
+
+    <!-- SourceLink Start -->
+    <PropertyGroup>
+        <!-- Embed source files that are not tracked by the source control manager in the PDB -->
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <!-- Build symbol package (.snupkg) to distribute the PDB containing Source Link -->
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- Add PackageReference specific for your source control provider (see below) -->
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+    </ItemGroup>
+    <!-- SourceLink End -->
 
     <ItemGroup>
         <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
