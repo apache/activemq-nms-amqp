@@ -56,6 +56,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         }
 
         public NmsConsumerId ConsumerId => this.info.Id;
+        
 
         public Task Attach()
         {
@@ -148,7 +149,25 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 source.DistributionMode = SymbolUtil.ATTACH_DISTRIBUTION_MODE_COPY;
             }
 
-            source.Capabilities = new[] { SymbolUtil.GetTerminusCapabilitiesForDestination(info.Destination) };
+            
+            IList<Symbol> capabilities = new List<Symbol>();
+            Symbol typeCapability = SymbolUtil.GetTerminusCapabilitiesForDestination(info.Destination);
+            if (typeCapability != null)
+            {
+                capabilities.Add(typeCapability);
+            }
+            
+            if (info.IsShared) {
+                capabilities.Add(SymbolUtil.SHARED);
+
+                if(!info.IsExplicitClientId) {
+                    capabilities.Add(SymbolUtil.GLOBAL);
+                }
+            }
+
+            if (capabilities.Any()) {
+                source.Capabilities = capabilities.ToArray();
+            }
 
             Map filters = new Map();
             

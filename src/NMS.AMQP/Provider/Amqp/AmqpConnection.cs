@@ -114,7 +114,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             {
                 SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER,
                 SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY,
-                SymbolUtil.OPEN_CAPABILITY_ANONYMOUS_RELAY
+                SymbolUtil.OPEN_CAPABILITY_ANONYMOUS_RELAY,
+                SymbolUtil.OPEN_CAPABILITY_SHARED_SUBS
             };
         }
 

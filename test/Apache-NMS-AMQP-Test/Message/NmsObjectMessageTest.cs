@@ -39,7 +39,7 @@ namespace NMS.AMQP.Test.Message
         {
             string content = "myStringContent";
             NmsTestObjectMessageFacade facade = new NmsTestObjectMessageFacade();
-            facade.Body = content;
+            facade.Object = content;
             NmsObjectMessage objectMessage = new NmsObjectMessage(facade);
             objectMessage.OnDispatch();
 
@@ -51,7 +51,7 @@ namespace NMS.AMQP.Test.Message
         {
             string content = "myStringContent";
             NmsTestObjectMessageFacade facade = new NmsTestObjectMessageFacade();
-            facade.Body = content;
+            facade.Object = content;
             NmsObjectMessage objectMessage = new NmsObjectMessage(facade);
             objectMessage.OnDispatch();
 
@@ -65,14 +65,14 @@ namespace NMS.AMQP.Test.Message
         {
             string content = "myStringContent";
             NmsTestObjectMessageFacade facade = new NmsTestObjectMessageFacade();
-            facade.Body = content;
+            facade.Object = content;
             NmsObjectMessage objectMessage = new NmsObjectMessage(facade);
             objectMessage.OnDispatch();
 
             Assert.NotNull(objectMessage.Body);
             objectMessage.ClearBody();
 
-            Assert.Null(facade.Body);
+            Assert.Null(facade.Object);
         }
 
         [Test]

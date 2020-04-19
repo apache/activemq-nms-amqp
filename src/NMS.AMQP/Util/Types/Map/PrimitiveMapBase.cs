@@ -52,25 +52,25 @@ namespace Apache.NMS.AMQP.Util.Types.Map
 
         public object this[string key]
         {
-            get { return GetObjectProperty(key); }
+            get { return GetObject(key); }
 
             set
             {
                 CheckValidType(value);
-                SetObjectProperty(key, value);
+                SetObject(key, value);
             }
         }
 
         public bool GetBool(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(bool));
             return (bool) value;
         }
 
         public byte GetByte(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(byte));
             return (byte) value;
         }
@@ -79,7 +79,7 @@ namespace Apache.NMS.AMQP.Util.Types.Map
 
         public char GetChar(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(char));
             return (char) value;
         }
@@ -88,21 +88,21 @@ namespace Apache.NMS.AMQP.Util.Types.Map
 
         public double GetDouble(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(double));
             return (double) value;
         }
 
         public float GetFloat(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(float));
             return (float) value;
         }
 
         public int GetInt(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(int));
             return (int) value;
         }
@@ -111,7 +111,7 @@ namespace Apache.NMS.AMQP.Util.Types.Map
 
         private T GetComplexType<T>(string key) where T : class
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             if (value is null)
                 return null;
             if (value is T complexValue)
@@ -122,90 +122,90 @@ namespace Apache.NMS.AMQP.Util.Types.Map
 
         public long GetLong(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(long));
             return (long) value;
         }
 
         public short GetShort(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(short));
             return (short) value;
         }
 
         public string GetString(string key)
         {
-            object value = GetObjectProperty(key);
+            object value = GetObject(key);
             CheckValueType(value, typeof(string));
             return (string) value;
         }
 
         public void SetBool(string key, bool value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetByte(string key, byte value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetBytes(string key, byte[] value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetBytes(string key, byte[] value, int offset, int length)
         {
             byte[] copy = new byte[length];
             Array.Copy(value, offset, copy, 0, length);
-            SetObjectProperty(key, copy);
+            SetObject(key, copy);
         }
 
         public void SetChar(string key, char value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetDictionary(string key, IDictionary dictionary)
         {
-            SetObjectProperty(key, dictionary);
+            SetObject(key, dictionary);
         }
 
         public void SetDouble(string key, double value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetFloat(string key, float value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetInt(string key, int value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetList(string key, IList list)
         {
-            SetObjectProperty(key, list);
+            SetObject(key, list);
         }
 
         public void SetLong(string key, long value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetShort(string key, short value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         public void SetString(string key, string value)
         {
-            SetObjectProperty(key, value);
+            SetObject(key, value);
         }
 
         #endregion
@@ -213,8 +213,8 @@ namespace Apache.NMS.AMQP.Util.Types.Map
         #region Protected Abstract Methods
 
         internal abstract object SyncRoot { get; }
-        protected abstract object GetObjectProperty(string key);
-        protected abstract void SetObjectProperty(string key, object value);
+        public abstract object GetObject(string key);
+        public abstract void SetObject(string key, object value);
 
         #endregion
 
@@ -262,7 +262,7 @@ namespace Apache.NMS.AMQP.Util.Types.Map
                     }
 
                     first = false;
-                    object value = GetObjectProperty(key);
+                    object value = GetObject(key);
                     result = key + "=" + value;
                 }
             }

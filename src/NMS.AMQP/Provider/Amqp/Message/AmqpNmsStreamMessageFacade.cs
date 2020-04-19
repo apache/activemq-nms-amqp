@@ -138,7 +138,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             return emptyList;
         }
 
-        public virtual bool HasBody() => !IsEmpty;
+        public override bool HasBody() => !IsEmpty;
 
         public override void ClearBody()
         {

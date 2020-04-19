@@ -465,5 +465,11 @@ namespace Apache.NMS.AMQP.Message
             CopyInto(copy);
             return copy;
         }
+        
+        public override bool IsBodyAssignableTo(Type type)
+        {
+            return false;
+        }
+
     }
 }

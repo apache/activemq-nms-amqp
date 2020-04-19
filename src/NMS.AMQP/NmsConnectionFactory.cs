@@ -181,6 +181,26 @@ namespace Apache.NMS.AMQP
             }
         }
 
+        public INMSContext CreateContext()
+        {
+            return new NmsContext((NmsConnection)CreateConnection(), AcknowledgementMode.AutoAcknowledge);
+        }
+
+        public INMSContext CreateContext(AcknowledgementMode acknowledgementMode)
+        {
+            return new NmsContext((NmsConnection)CreateConnection(), acknowledgementMode);
+        }
+
+        public INMSContext CreateContext(string userName, string password)
+        {
+            return new NmsContext((NmsConnection)CreateConnection(userName, password), AcknowledgementMode.AutoAcknowledge);
+        }
+
+        public INMSContext CreateContext(string userName, string password, AcknowledgementMode acknowledgementMode)
+        {
+            return new NmsContext((NmsConnection)CreateConnection(userName, password), acknowledgementMode);
+        }
+
         public Uri BrokerUri
         {
             get => brokerUri;
@@ -247,7 +267,7 @@ namespace Apache.NMS.AMQP
             }
             else
             {
-                connectionInfo.SetClientId(ClientIdGenerator.GenerateId().ToString(), false);
+                connectionInfo.SetClientId(ClientIdGenerator.GenerateId(), false);
             }
 
             return connectionInfo;
