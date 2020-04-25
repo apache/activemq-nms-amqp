@@ -1,7 +1,13 @@
 language: csharp
+services:
+  - docker
 solution: apache-nms-amqp.sln
+dist: xenial
 mono: none
 dotnet: 2.2.401
+before_install:
+  - docker run -d --rm -p 5672:5672 -e ARTEMIS_USERNAME=admin -e ARTEMIS_PASSWORD=admin vromero/activemq-artemis:2.10.1
 script:
  - dotnet build -p:AppTargetFramework=netcoreapp2.2 -c Release
  - dotnet test ./test/Apache-NMS-AMQP-Test/Apache-NMS-AMQP-Test.csproj -f netcoreapp2.2 -c Release --filter Category!=Windows
+ - dotnet test ./test/Apache-NMS-AMQP-Interop-Test/Apache-NMS-AMQP-Interop-Test.csproj -f netcoreapp2.2 -c Release
