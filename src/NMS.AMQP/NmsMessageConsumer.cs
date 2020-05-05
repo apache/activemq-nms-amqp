@@ -63,6 +63,7 @@ namespace Apache.NMS.AMQP
             
             Session.Connection.CreateResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
             
+
             Session.Add(this);
 
             if (Session.IsStarted)
@@ -222,7 +223,7 @@ namespace Apache.NMS.AMQP
         {
             if (Tracer.IsDebugEnabled)
             {
-                Tracer.Debug($"{Info.Id} is about to deliver next pending message.");
+                Tracer.Debug($"{Info.Id} is about to deliver next pending message. Session.IsStarted={Session.IsStarted} started={started} Listener!=null={Listener != null}");
             }
             
             if (Session.IsStarted && started && Listener != null)
@@ -275,10 +276,25 @@ namespace Apache.NMS.AMQP
 
                                 try
                                 {
+                                    if (Tracer.IsDebugEnabled)
+                                    {
+                                        Tracer.Debug("About invoke listener.");
+                                    }
+
                                     Listener.Invoke(envelope.Message.Copy());
+
+                                    if (Tracer.IsDebugEnabled)
+                                    {
+                                        Tracer.Debug("Listener invoked.");
+                                    }
                                 }
-                                catch (Exception)
+                                catch (Exception e)
                                 {
+                                    if (Tracer.IsDebugEnabled)
+                                    {
+                                        Tracer.ErrorFormat("Delivery failed, cause: {0}", e);
+                                    }
+
                                     deliveryFailed = true;
                                 }
 
