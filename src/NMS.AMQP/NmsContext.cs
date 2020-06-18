@@ -86,6 +86,7 @@ namespace Apache.NMS.AMQP
             return new NmsProducer(GetSession(), sharedProducer);
         }
 
+
         public INMSConsumer CreateConsumer(IDestination destination)
         {
             return StartIfNeeded(new NmsConsumer(GetSession(), (NmsMessageConsumer) GetSession().CreateConsumer(destination)));

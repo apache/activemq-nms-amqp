@@ -64,6 +64,12 @@ namespace Apache.NMS.AMQP.Meta
         public int MaxFrameSize { get; set; } = DEFAULT_MAX_FRAME_SIZE;
         public int IdleTimeOut { get; set; } = DEFAULT_IDLE_TIMEOUT;
         
+        public bool AnonymousRelaySupported { get; set; }
+        
+        public bool DelayedDeliverySupported { get; set; }
+        
+        public bool SharedSubsSupported { get; set; }
+        
 
         public void SetClientId(string clientId, bool explicitClientId)
         {

@@ -85,73 +85,30 @@ namespace Apache.NMS.AMQP
 
         public void Send(IDestination destination, IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority, TimeSpan timeToLive)
         {
-            Send(destination, message, deliveryMode, priority, timeToLive, null);
-        }
-
-        public void Send(IMessage message, CompletionListener completionListener)
-        {
-            Send(Info.Destination, message, deliveryMode, priority, timeToLive, completionListener);        
-        }
-
-        public void Send(IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority, TimeSpan timeToLive,
-            CompletionListener completionListener)
-        {
-            Send(Info.Destination, message, deliveryMode, priority, timeToLive, completionListener);        
-        }
-
-        public void Send(IDestination destination, IMessage message, CompletionListener completionListener)
-        {
-            Send(destination, message, deliveryMode, priority, timeToLive, completionListener);        
-        }
-
-        public void Send(IDestination destination, IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority,
-            TimeSpan timeToLive, CompletionListener completionListener)
-        {
             CheckClosed();
-            session.Send(this, destination, message, deliveryMode, priority, timeToLive, DisableMessageID, DisableMessageTimestamp, deliveryDelay, completionListener);
+            session.Send(this, destination, message, deliveryMode, priority, timeToLive, DisableMessageID, DisableMessageTimestamp, deliveryDelay);
         }
 
         public Task SendAsync(IMessage message)
         {
             return SendAsync(Info.Destination, message, deliveryMode, priority, timeToLive);
         }
-        
-        public Task SendAsync(IMessage message, CompletionListener completionListener)
-        {
-            return SendAsync(Info.Destination, message, deliveryMode, priority, timeToLive, completionListener);
-        }
 
         public Task SendAsync(IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority, TimeSpan timeToLive)
         {
             return SendAsync(Info.Destination, message, deliveryMode, priority, timeToLive);
-        }
-        
-        public Task SendAsync(IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority, TimeSpan timeToLive, CompletionListener completionListener)
-        {
-            return SendAsync(Info.Destination, message, deliveryMode, priority, timeToLive, completionListener);
         }
 
         public Task SendAsync(IDestination destination, IMessage message)
         {
             return SendAsync(destination, message, deliveryMode, priority, timeToLive);
         }
-        
-        public Task SendAsync(IDestination destination, IMessage message, CompletionListener completionListener)
-        {
-            return SendAsync(destination, message, deliveryMode, priority, timeToLive, completionListener);
-        }
-        
+
         public Task SendAsync(IDestination destination, IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority,
             TimeSpan timeToLive)
         {
-            return SendAsync(destination, message, deliveryMode, priority, timeToLive, null);
-        }
-
-        public Task SendAsync(IDestination destination, IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority,
-            TimeSpan timeToLive, CompletionListener completionListener)
-        {
             CheckClosed();
-            return session.SendAsync(this, destination, message, deliveryMode, priority, timeToLive, DisableMessageID, DisableMessageTimestamp, deliveryDelay, null);
+            return session.SendAsync(this, destination, message, deliveryMode, priority, timeToLive, DisableMessageID, DisableMessageTimestamp, deliveryDelay);
         }
 
         public void Close()

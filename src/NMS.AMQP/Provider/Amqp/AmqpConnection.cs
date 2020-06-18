@@ -21,6 +21,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Amqp;
 using Amqp.Framing;
+using Amqp.Types;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider.Amqp.Message;
@@ -63,6 +64,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public string TopicPrefix => Info.TopicPrefix;
         public bool ObjectMessageUsesAmqpTypes { get; set; } = false;
         public NmsConnectionInfo Info { get; }
+        
+        public AmqpSubscriptionTracker SubscriptionTracker { get; } = new AmqpSubscriptionTracker();
 
         public INmsMessageFactory MessageFactory => messageFactory;
 
@@ -128,6 +131,30 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
             else
             {
+                Symbol[] capabilities = open.OfferedCapabilities;
+                if (capabilities != null)
+                {
+                    if (Array.Exists(capabilities,
+                        symbol => Equals(symbol, SymbolUtil.OPEN_CAPABILITY_ANONYMOUS_RELAY)))
+                    {
+                        Info.AnonymousRelaySupported = true;
+                    }
+
+                    if (Array.Exists(capabilities,
+                        symbol => Equals(symbol, SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY)))
+                    {
+                        Info.DelayedDeliverySupported = true;
+                    }
+
+                    if (Array.Exists(capabilities,
+                        symbol => Equals(symbol, SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY)))
+                    {
+                        Info.DelayedDeliverySupported = true;
+                    }
+                }
+
+
+
                 object value = SymbolUtil.GetFromFields(open.Properties, SymbolUtil.CONNECTION_PROPERTY_TOPIC_PREFIX);
                 if (value is string topicPrefix)
                 {
@@ -139,7 +166,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 {
                     Info.QueuePrefix = queuePrefix;
                 }
-
                 this.tsc.TrySetResult(true);
                 Provider.FireConnectionEstablished();
             }

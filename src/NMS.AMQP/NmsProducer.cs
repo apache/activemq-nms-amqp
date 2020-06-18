@@ -28,9 +28,7 @@ namespace Apache.NMS.AMQP
         
         private readonly ISession session;
         private readonly NmsMessageProducer producer;
-
-        private CompletionListener completionListener;
-
+        
         // Message Headers
         private String correlationId;
         private String type;
@@ -79,7 +77,7 @@ namespace Apache.NMS.AMQP
                 message.NMSReplyTo = replyTo;
             }
             
-            producer.Send(destination, message, completionListener);
+            producer.Send(destination, message);
             
             return this;
         }
@@ -106,12 +104,12 @@ namespace Apache.NMS.AMQP
             return Send(destination, CreateObjectMessage(body));
         }
 
-        public Task<INMSProducer> SendAsync(IDestination destination, IMessage message)
+        public async Task<INMSProducer> SendAsync(IDestination destination, IMessage message)
         {
             if (message == null) {
                 throw new MessageFormatException("Message must not be null");
             }
-            
+
             NmsMessageTransformation.CopyMap(messageProperties, message.Properties);
             
             if (correlationId != null) {
@@ -124,8 +122,8 @@ namespace Apache.NMS.AMQP
                 message.NMSReplyTo = replyTo;
             }
 
-            Task task = producer.SendAsync(destination, message, completionListener);
-            return task.ContinueWith(t => (INMSProducer) this);
+            await producer.SendAsync(destination, message);
+            return this;
         }
 
         public Task<INMSProducer> SendAsync(IDestination destination, string body)
@@ -148,18 +146,6 @@ namespace Apache.NMS.AMQP
         public Task<INMSProducer> SendAsync(IDestination destination, object body)
         {
             return SendAsync(destination, CreateObjectMessage(body));
-        }
-        
-        public CompletionListener CompletionListener
-        {
-            get => completionListener;
-            set => completionListener = value;
-        }
-
-        public INMSProducer SetCompletionListener(CompletionListener completionListener)
-        {
-            CompletionListener = completionListener;
-            return this;
         }
 
         public INMSProducer ClearProperties()

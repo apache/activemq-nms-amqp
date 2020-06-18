@@ -452,18 +452,16 @@ namespace Apache.NMS.AMQP
 
         public void Send(NmsMessageProducer producer, IDestination destination, IMessage original,
             MsgDeliveryMode deliveryMode,
-            MsgPriority priority, TimeSpan timeToLive, bool disableMessageId, bool disableMessageTimestamp, TimeSpan deliveryDelay, CompletionListener completionListener)
+            MsgPriority priority, TimeSpan timeToLive, bool disableMessageId, bool disableMessageTimestamp, TimeSpan deliveryDelay)
         {
-            Task task = SendAsync(producer, destination, original, deliveryMode, priority, timeToLive, disableMessageId,
-                disableMessageTimestamp, deliveryDelay, completionListener);
-            if (completionListener == null)
-            {
-                task.ConfigureAwait(false).GetAwaiter().GetResult();
-            }
+
+            SendAsync(producer, destination, original, deliveryMode, priority, timeToLive, disableMessageId,
+                disableMessageTimestamp, deliveryDelay).ConfigureAwait(false).GetAwaiter().GetResult();
+            
         }
 
         public Task SendAsync(NmsMessageProducer producer, IDestination destination, IMessage original, MsgDeliveryMode deliveryMode,
-            MsgPriority priority, TimeSpan timeToLive, bool disableMessageId, bool disableMessageTimestamp, TimeSpan deliveryDelay, CompletionListener completionListener)
+            MsgPriority priority, TimeSpan timeToLive, bool disableMessageId, bool disableMessageTimestamp, TimeSpan deliveryDelay)
         {
             if (destination == null)
                 throw new InvalidDestinationException("Destination must not be null");
@@ -525,34 +523,15 @@ namespace Apache.NMS.AMQP
 
             outbound.OnSend(timeToLive);
 
-            bool sync = deliveryMode == MsgDeliveryMode.Persistent;
+            bool fireAndForget = deliveryMode == MsgDeliveryMode.NonPersistent;
 
-            Task task = TransactionContext.Send(new OutboundMessageDispatch
+            return TransactionContext.Send(new OutboundMessageDispatch
             {
                 Message = outbound,
                 ProducerId = producer.Info.Id,
                 ProducerInfo = producer.Info,
-                SendAsync = !sync
+                FireAndForget = fireAndForget
             });
-
-            if (completionListener == null)
-            {
-                return task;
-            }
-            else
-            {
-                return task.ContinueWith(t =>
-                {
-                    if (t.IsFaulted)
-                        completionListener.Invoke(original, t.Exception.InnerException);
-                    else if (t.IsCanceled)
-                        completionListener.Invoke(original, new TaskCanceledException());
-                    else
-                        completionListener.Invoke(original, null);
-
-                });
-            }
-
         }
 
         internal void EnqueueForDispatch(NmsMessageConsumer.MessageDeliveryTask task)

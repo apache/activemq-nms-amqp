@@ -136,13 +136,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
                     var transactionalState = session.TransactionContext?.GetTxnEnrolledState();
 
-                    if (envelope.SendAsync)
-                        return SendAsync(message, transactionalState);
-                    else
+                    if (envelope.FireAndForget)
                     {
                         SendSync(message, transactionalState);
                         return Task.CompletedTask;
                     }
+                    return SendAsync(message, transactionalState);
                 }
                 catch (TimeoutException tex)
                 {
@@ -160,6 +159,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     throw ExceptionSupport.Wrap(ex);
                 }
             }
+            throw ExceptionSupport.GetException(this.senderLink, "unexpected enveloper");
         }
 
         private void SendSync(global::Amqp.Message message, DeliveryState deliveryState)
@@ -167,11 +167,24 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             senderLink.Send(message, deliveryState, null, null);
         }
         
-        private Task SendAsync(global::Amqp.Message message, DeliveryState deliveryState)
+        private async Task SendAsync(global::Amqp.Message message, DeliveryState deliveryState)
         {
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            senderLink.Send(message, deliveryState, _onOutcome, tcs);
-            return tcs.Task;
+            CancellationTokenSource cts = null;
+            if (session.Connection.Provider.SendTimeout != NmsConnectionInfo.INFINITE)
+            {
+                cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(session.Connection.Provider.SendTimeout));
+                cts.Token.Register(_ => tcs.TrySetCanceled(), null);
+            }
+            try
+            {
+                senderLink.Send(message, deliveryState, _onOutcome, tcs);
+                await tcs.Task.ConfigureAwait(false);
+            }
+            finally
+            {
+                cts?.Dispose();
+            }
         }
         
         private static void OnOutcome(ILink sender, global::Amqp.Message message, Outcome outcome, object state)
