@@ -147,9 +147,9 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     }
 
                     if (Array.Exists(capabilities,
-                        symbol => Equals(symbol, SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY)))
+                        symbol => Equals(symbol, SymbolUtil.OPEN_CAPABILITY_SHARED_SUBS)))
                     {
-                        Info.DelayedDeliverySupported = true;
+                        Info.SharedSubsSupported = true;
                     }
                 }
 

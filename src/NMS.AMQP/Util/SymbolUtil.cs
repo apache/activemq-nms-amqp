@@ -39,7 +39,7 @@ namespace Apache.NMS.AMQP.Util
         public static readonly Symbol OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER = new Symbol("sole-connection-for-container");
         public static readonly Symbol OPEN_CAPABILITY_ANONYMOUS_RELAY = new Symbol("ANONYMOUS-RELAY");
         public static readonly Symbol OPEN_CAPABILITY_DELAYED_DELIVERY = new Symbol("DELAYED_DELIVERY");
-        public static readonly Symbol OPEN_CAPABILITY_SHARED_SUBS = new Symbol("SHARED_SUBS");
+        public static readonly Symbol OPEN_CAPABILITY_SHARED_SUBS = new Symbol("SHARED-SUBS");
 
         // Attach Frame 
         public readonly static Symbol ATTACH_EXPIRY_POLICY_LINK_DETACH = new Symbol("link-detach");

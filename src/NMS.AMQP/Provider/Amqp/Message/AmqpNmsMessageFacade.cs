@@ -38,7 +38,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         private IDestination consumerDestination;
         private IAmqpConnection connection;
         private DateTime? syntheticExpiration;
-        private DateTime syntheticDeliveryTime;
+        // private DateTime syntheticDeliveryTime;
         public global::Amqp.Message Message { get; private set; }
 
         public int RedeliveryCount
@@ -271,13 +271,13 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
                     case uint _:
                         return new DateTime(621355968000000000L + (long) deliveryTime * 10000L, DateTimeKind.Utc);
                     default:
-                        return syntheticDeliveryTime;
+                        return DateTime.UtcNow; // syntheticDeliveryTime;
                 }
             }
             set
             {
-                syntheticDeliveryTime = value;
-                RemoveMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME);
+                // syntheticDeliveryTime = value;
+                SetMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME, new DateTimeOffset(value).ToUnixTimeMilliseconds());
             }
         }
 
@@ -423,10 +423,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
                 syntheticExpiration = DateTime.UtcNow + ttl;
             }
 
-            if (GetMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME) == null)
-            {
-                syntheticDeliveryTime = DateTime.UtcNow;
-            }
+            // if (GetMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME) == null)
+            // {
+            //     syntheticDeliveryTime = DateTime.UtcNow;
+            // }
             
         }
 
@@ -488,6 +488,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             target.connection = connection;
             target.consumerDestination = consumerDestination;
             target.syntheticExpiration = syntheticExpiration;
+            // target.syntheticDeliveryTime = syntheticDeliveryTime;
             target.amqpTimeToLiveOverride = amqpTimeToLiveOverride;
             target.destination = destination;
             target.replyTo = replyTo;
@@ -508,7 +509,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             return MessageAnnotations != null && MessageAnnotations.Map.ContainsKey(annotationName);
         }
 
-        public void SetMessageAnnotation(Symbol symbolKeyName, string value)
+        public void SetMessageAnnotation(Symbol symbolKeyName, object value)
         {
             LazyCreateMessageAnnotations();
             MessageAnnotations.Map.Add(symbolKeyName, value);

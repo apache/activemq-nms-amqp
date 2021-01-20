@@ -130,7 +130,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 bool supported = false;
                 if (remoteOfferedCapabilities != null)
                 {
-                    if (Array.Exists(remoteOfferedCapabilities, symbol => symbol == SymbolUtil.OPEN_CAPABILITY_SHARED_SUBS))
+                    if (Array.Exists(remoteOfferedCapabilities, symbol => SymbolUtil.OPEN_CAPABILITY_SHARED_SUBS.Equals(symbol)))
                     {
                         supported = true;
                     }

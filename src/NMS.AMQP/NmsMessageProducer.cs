@@ -263,6 +263,11 @@ namespace Apache.NMS.AMQP
             }
             set
             {
+                if (!session.Connection.ConnectionInfo.DelayedDeliverySupported)
+                {
+                    throw new NotSupportedException("Delayed Delivery is not supported");
+                }
+                
                 CheckClosed();
                 deliveryDelay = value;
             }

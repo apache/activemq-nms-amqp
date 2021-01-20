@@ -21,27 +21,20 @@ using NUnit.Framework;
 
 namespace NMS.AMQP.Test.Integration
 {
+    // Adapted from SessionIntegrationTest to use NMSContext
     [TestFixture]
-    public class SessionIntegrationTest : IntegrationTestFixture
+    public class NMSContextIntegrationTest : IntegrationTestFixture
     {
         [Test, Timeout(20_000)]
-        public void TestCloseSession()
+        public void TestClose()
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                testPeer.ExpectBegin();
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                Assert.NotNull(session, "Session should not be null");
-                testPeer.ExpectEnd();
+                INMSContext context = EstablishNMSContext(testPeer);
+
                 testPeer.ExpectClose();
 
-                session.Close();
-
-                // Should send nothing and throw no error.
-                session.Close();
-
-                connection.Close();
+                context.Close();
 
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
@@ -52,18 +45,19 @@ namespace NMS.AMQP.Test.Integration
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
+                var context = EstablishNMSContext(testPeer);
                 testPeer.ExpectBegin();
 
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-
                 testPeer.ExpectSenderAttach();
+
+                var producer = context.CreateProducer();
+
+                testPeer.ExpectDetach(true, true, true);
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
 
-                IQueue queue = session.GetQueue("myQueue");
-                session.CreateProducer(queue);
-
-                connection.Close();
+                producer.Close();
+                context.Close();
 
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
@@ -74,21 +68,19 @@ namespace NMS.AMQP.Test.Integration
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                connection.Start();
+                var context = EstablishNMSContext(testPeer);
+                context.Start();
 
                 testPeer.ExpectBegin();
 
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlow();
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
 
-                IQueue queue = session.GetQueue("myQueue");
-                session.CreateConsumer(queue);
+                var consumer = context.CreateConsumer(context.GetQueue("myQueue"));
 
-                connection.Close();
+                context.Close();
 
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
@@ -99,25 +91,24 @@ namespace NMS.AMQP.Test.Integration
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                connection.Start();
+                var context = EstablishNMSContext(testPeer);
+                context.Start();
 
                 testPeer.ExpectBegin();
 
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlow();
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlow();
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
 
-                IQueue queue = session.GetQueue("myQueue");
-                session.CreateConsumer(queue, "");
-                session.CreateConsumer(queue, "", noLocal: false);
-                
-                connection.Close();
-                
+                IQueue queue = context.GetQueue("myQueue");
+                context.CreateConsumer(queue, "");
+                context.CreateConsumer(queue, "", noLocal: false);
+
+                context.Close();
+
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
@@ -127,25 +118,24 @@ namespace NMS.AMQP.Test.Integration
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                connection.Start();
+                var context = EstablishNMSContext(testPeer);
+                context.Start();
 
                 testPeer.ExpectBegin();
 
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlow();
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlow();
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
 
-                IQueue queue = session.GetQueue("myQueue");
-                session.CreateConsumer(queue, null);
-                session.CreateConsumer(queue, null, noLocal: false);
-                
-                connection.Close();
-                
+                IQueue queue = context.GetQueue("myQueue");
+                context.CreateConsumer(queue, null);
+                context.CreateConsumer(queue, null, noLocal: false);
+
+                context.Close();
+
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
@@ -155,132 +145,132 @@ namespace NMS.AMQP.Test.Integration
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                connection.Start();
+                var context = EstablishNMSContext(testPeer);
+                context.Start();
 
                 testPeer.ExpectBegin();
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                
+
                 string topicName = "myTopic";
-                ITopic topic = session.GetTopic(topicName);
+                ITopic topic = context.GetTopic(topicName);
                 string subscriptionName = "mySubscription";
 
                 testPeer.ExpectDurableSubscriberAttach(topicName, subscriptionName);
                 testPeer.ExpectLinkFlow();
-                
-                IMessageConsumer durableConsumer = session.CreateDurableConsumer(topic, subscriptionName, null, false);
+
+                var durableConsumer = context.CreateDurableConsumer(topic, subscriptionName, null, false);
                 Assert.NotNull(durableConsumer, "MessageConsumer object was null");
-                
+
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
-                connection.Close();
-                
+                context.Close();
+
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
-        
+
+
         [Test, Timeout(20_000)]
         public void TestCreateTemporaryQueue()
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                
+                var context = EstablishNMSContext(testPeer);
+
                 testPeer.ExpectBegin();
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                
+
                 string dynamicAddress = "myTempQueueAddress";
                 testPeer.ExpectTempQueueCreationAttach(dynamicAddress);
-                
-                ITemporaryQueue temporaryQueue = session.CreateTemporaryQueue();
+
+                ITemporaryQueue temporaryQueue = context.CreateTemporaryQueue();
                 Assert.NotNull(temporaryQueue, "TemporaryQueue object was null");
                 Assert.NotNull(temporaryQueue.QueueName, "TemporaryQueue queue name was null");
                 Assert.AreEqual(dynamicAddress, temporaryQueue.QueueName, "TemporaryQueue name not as expected");
-                
+
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
-                connection.Close();
-                
+                context.Close();
+
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
-        
+
         [Test, Timeout(20_000)]
         public void TestCreateTemporaryTopic()
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                
+                var context = EstablishNMSContext(testPeer);
+
                 testPeer.ExpectBegin();
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                
+
                 string dynamicAddress = "myTempTopicAddress";
                 testPeer.ExpectTempTopicCreationAttach(dynamicAddress);
-                
-                ITemporaryTopic temporaryTopic = session.CreateTemporaryTopic();
+
+                ITemporaryTopic temporaryTopic = context.CreateTemporaryTopic();
                 Assert.NotNull(temporaryTopic, "TemporaryTopic object was null");
                 Assert.NotNull(temporaryTopic.TopicName, "TemporaryTopic name was null");
                 Assert.AreEqual(dynamicAddress, temporaryTopic.TopicName, "TemporaryTopic name not as expected");
-                
+
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
-                connection.Close();
-                
+                context.Close();
+
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
-       
+
         [Test, Timeout(20_000)]
         public void TestCreateSharedConsumer()
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                connection.Start();
+                var context = EstablishNMSContext(testPeer);
+                context.Start();
 
                 testPeer.ExpectBegin();
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                
+
                 string topicName = "myTopic";
-                ITopic topic = session.GetTopic(topicName);
+                ITopic topic = context.GetTopic(topicName);
                 string subscriptionName = "mySubscription";
 
                 testPeer.ExpectSharedSubscriberAttach(topicName, subscriptionName);
                 testPeer.ExpectLinkFlow();
-                
-                IMessageConsumer durableConsumer = session.CreateSharedConsumer(topic, subscriptionName, null);//, false);
-                // IMessageConsumer durableConsumer = session.CreateDurableConsumer(topic, subscriptionName, null, false);
+
+                var durableConsumer = context.CreateSharedConsumer(topic, subscriptionName, null); //, false);
                 Assert.NotNull(durableConsumer, "MessageConsumer object was null");
-                
+
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
-                connection.Close();
-                
+                context.Close();
+
                 testPeer.WaitForAllMatchersToComplete(20000);
             }
         }
-        
+
         [Test, Timeout(20_000)]
         public void TestCreateSharedDurableConsumer()
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                IConnection connection = EstablishConnection(testPeer);
-                connection.Start();
+                var context = EstablishNMSContext(testPeer);
+                context.Start();
 
                 testPeer.ExpectBegin();
-                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-                
+
                 string topicName = "myTopic";
-                ITopic topic = session.GetTopic(topicName);
+                ITopic topic = context.GetTopic(topicName);
                 string subscriptionName = "mySubscription";
 
                 testPeer.ExpectSharedDurableSubscriberAttach(topicName, subscriptionName);
                 testPeer.ExpectLinkFlow();
-                
-                IMessageConsumer durableConsumer = session.CreateSharedDurableConsumer(topic, subscriptionName, null); //, false);
+
+                var durableConsumer = context.CreateSharedDurableConsumer(topic, subscriptionName, null); //, false);
                 Assert.NotNull(durableConsumer, "MessageConsumer object was null");
-                
+
+                testPeer.ExpectEnd();
                 testPeer.ExpectClose();
-                connection.Close();
-                
+                context.Close();
+
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
