@@ -25,7 +25,7 @@ using NUnit.Framework;
 namespace NMS.AMQP.Test.Integration
 {
     [TestFixture]
-    public class ProducerIntegrationTest2 : IntegrationTestFixture
+    public class ProducerDeliveryDelayTest : IntegrationTestFixture
     {
         [Test, Timeout(20_000)]
         public void TestDeliveryDelayNotSupportedThrowsException()
