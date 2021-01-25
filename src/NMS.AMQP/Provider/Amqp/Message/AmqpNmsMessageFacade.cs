@@ -269,15 +269,16 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
                     case ulong _:
                     case int _:
                     case uint _:
-                        return new DateTime(621355968000000000L + (long) deliveryTime * 10000L, DateTimeKind.Utc);
+                        return new DateTime(621355968000000000L + Convert.ToInt64(deliveryTime) * 10000L, DateTimeKind.Utc);
                     default:
                         return syntheticDeliveryTime;
                 }
             }
             set
             {
+                // Assumption that if it is being set through property, then it is with purpose of send out this value 
                 syntheticDeliveryTime = value;
-                RemoveMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME);
+                SetMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME, new DateTimeOffset(value).ToUnixTimeMilliseconds());
             }
         }
 
@@ -488,6 +489,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             target.connection = connection;
             target.consumerDestination = consumerDestination;
             target.syntheticExpiration = syntheticExpiration;
+            target.syntheticDeliveryTime = syntheticDeliveryTime;
             target.amqpTimeToLiveOverride = amqpTimeToLiveOverride;
             target.destination = destination;
             target.replyTo = replyTo;
@@ -508,7 +510,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             return MessageAnnotations != null && MessageAnnotations.Map.ContainsKey(annotationName);
         }
 
-        public void SetMessageAnnotation(Symbol symbolKeyName, string value)
+        public void SetMessageAnnotation(Symbol symbolKeyName, object value)
         {
             LazyCreateMessageAnnotations();
             MessageAnnotations.Map.Add(symbolKeyName, value);
