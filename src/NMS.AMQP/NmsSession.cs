@@ -144,22 +144,67 @@ namespace Apache.NMS.AMQP
             return messageConsumer;
         }
 
-        private NmsConsumerId GetNextConsumerId()
+        public IMessageConsumer CreateDurableConsumer(ITopic destination, string name)
         {
-            return new NmsConsumerId(SessionInfo.Id, consumerIdGenerator.IncrementAndGet());
+            return CreateDurableConsumer(destination, name, null, false);
+        }
+
+        public IMessageConsumer CreateDurableConsumer(ITopic destination, string name, string selector)
+        {
+            return CreateDurableConsumer(destination, name, selector, false);
         }
 
         public IMessageConsumer CreateDurableConsumer(ITopic destination, string name, string selector, bool noLocal)
         {
             CheckClosed();
 
-            NmsMessageConsumer messageConsumer = new NmsDurableTopicSubscriber(GetNextConsumerId(), this, destination, name, selector, noLocal);
+            NmsMessageConsumer messageConsumer = new NmsDurableMessageConsumer(GetNextConsumerId(), this, destination, name, selector, noLocal);
             messageConsumer.Init().ConfigureAwait(false).GetAwaiter().GetResult();
 
             return messageConsumer;
         }
 
+        public IMessageConsumer CreateSharedConsumer(ITopic destination, string name)
+        {
+            return CreateSharedConsumer(destination, name, null);
+        }
+
+        public IMessageConsumer CreateSharedConsumer(ITopic destination, string name, string selector)
+        {
+            CheckClosed();
+
+            NmsMessageConsumer messageConsumer = new NmsSharedMessageConsumer(GetNextConsumerId(), this, destination, name, selector, false);
+            messageConsumer.Init().ConfigureAwait(false).GetAwaiter().GetResult();
+            
+            return messageConsumer;
+        }
+
+        public IMessageConsumer CreateSharedDurableConsumer(ITopic destination, string name)
+        {
+            return CreateSharedDurableConsumer(destination, name, null);
+        }
+
+        public IMessageConsumer CreateSharedDurableConsumer(ITopic destination, string name, string selector)
+        {
+            CheckClosed();
+
+            NmsMessageConsumer messageConsumer = new NmsSharedDurableMessageConsumer(GetNextConsumerId(), this, destination, name, selector, false);
+            messageConsumer.Init().ConfigureAwait(false).GetAwaiter().GetResult();
+            
+            return messageConsumer;
+        }
+
+        public NmsConsumerId GetNextConsumerId()
+        {
+            return new NmsConsumerId(SessionInfo.Id, consumerIdGenerator.IncrementAndGet());
+        }
+
         public void DeleteDurableConsumer(string name)
+        {
+            Unsubscribe(name);
+        }
+
+        public void Unsubscribe(string name)
         {
             CheckClosed();
 
@@ -168,12 +213,14 @@ namespace Apache.NMS.AMQP
 
         public IQueueBrowser CreateBrowser(IQueue queue)
         {
-            throw new NotImplementedException();
+            return CreateBrowser(queue, null);
         }
 
         public IQueueBrowser CreateBrowser(IQueue queue, string selector)
         {
-            throw new NotImplementedException();
+            CheckClosed();
+
+            return new NmsQueueBrowser(this, queue, selector);
         }
 
         public IQueue GetQueue(string name)
@@ -288,6 +335,13 @@ namespace Apache.NMS.AMQP
                 Start();
         }
 
+        public void Acknowledge()
+        {
+            if (acknowledgementMode == AcknowledgementMode.ClientAcknowledge) {
+                Acknowledge(AckType.ACCEPTED);
+            }
+        }
+
         public void Commit()
         {
             CheckClosed();
@@ -396,8 +450,18 @@ namespace Apache.NMS.AMQP
             Connection.Acknowledge(envelope, ackType).ConfigureAwait(false).GetAwaiter().GetResult();
         }
 
-        public void Send(NmsMessageProducer producer, IDestination destination, IMessage original, MsgDeliveryMode deliveryMode,
-            MsgPriority priority, TimeSpan timeToLive, bool disableMessageId, bool disableMessageTimestamp)
+        public void Send(NmsMessageProducer producer, IDestination destination, IMessage original,
+            MsgDeliveryMode deliveryMode,
+            MsgPriority priority, TimeSpan timeToLive, bool disableMessageId, bool disableMessageTimestamp, TimeSpan deliveryDelay)
+        {
+
+            SendAsync(producer, destination, original, deliveryMode, priority, timeToLive, disableMessageId,
+                disableMessageTimestamp, deliveryDelay).ConfigureAwait(false).GetAwaiter().GetResult();
+            
+        }
+
+        public Task SendAsync(NmsMessageProducer producer, IDestination destination, IMessage original, MsgDeliveryMode deliveryMode,
+            MsgPriority priority, TimeSpan timeToLive, bool disableMessageId, bool disableMessageTimestamp, TimeSpan deliveryDelay)
         {
             if (destination == null)
                 throw new InvalidDestinationException("Destination must not be null");
@@ -416,6 +480,7 @@ namespace Apache.NMS.AMQP
             DateTime timeStamp = DateTime.UtcNow;
 
             bool hasTTL = timeToLive > TimeSpan.Zero;
+            bool hasDelay = deliveryDelay > TimeSpan.Zero;
 
             if (!disableMessageTimestamp)
             {
@@ -446,6 +511,11 @@ namespace Apache.NMS.AMQP
                 original.NMSMessageId = outbound.NMSMessageId;
             }
 
+            if (hasDelay)
+            {
+                outbound.Facade.DeliveryTime = timeStamp + deliveryDelay;
+            }
+
             if (hasTTL)
                 outbound.Facade.Expiration = timeStamp + timeToLive;
             else
@@ -453,15 +523,15 @@ namespace Apache.NMS.AMQP
 
             outbound.OnSend(timeToLive);
 
-            bool sync = deliveryMode == MsgDeliveryMode.Persistent;
+            bool fireAndForget = deliveryMode == MsgDeliveryMode.NonPersistent;
 
-            TransactionContext.Send(new OutboundMessageDispatch
+            return TransactionContext.Send(new OutboundMessageDispatch
             {
                 Message = outbound,
                 ProducerId = producer.Info.Id,
                 ProducerInfo = producer.Info,
-                SendAsync = !sync
-            }).ConfigureAwait(false).GetAwaiter().GetResult();
+                FireAndForget = fireAndForget
+            });
         }
 
         internal void EnqueueForDispatch(NmsMessageConsumer.MessageDeliveryTask task)

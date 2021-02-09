@@ -50,6 +50,26 @@ namespace NMS.AMQP.Test.Integration
             return connection;
         }
 
+        protected INMSContext EstablishNMSContext(TestAmqpPeer testPeer, string optionsString = null, Symbol[] serverCapabilities = null, Fields serverProperties = null, bool setClientId = true, AcknowledgementMode acknowledgementMode = AcknowledgementMode.AutoAcknowledge)
+        {
+            testPeer.ExpectSaslPlain("guest", "guest");
+            testPeer.ExpectOpen(serverCapabilities: serverCapabilities, serverProperties: serverProperties);
+
+            // Each connection creates a session for managing temporary destinations etc.
+            testPeer.ExpectBegin();
+
+            var remoteUri = BuildUri(testPeer, optionsString);
+            var connectionFactory = new NmsConnectionFactory(remoteUri);
+            var context = connectionFactory.CreateContext("guest", "guest", acknowledgementMode);
+            if (setClientId)
+            {
+                // Set a clientId to provoke the actual AMQP connection process to occur.
+                context.ClientId = "ClientName";
+            }
+            
+            return context;
+        }
+        
         private static string BuildUri(TestAmqpPeer testPeer, string optionsString)
         {
             string baseUri = "amqp://127.0.0.1:" + testPeer.ServerPort.ToString();

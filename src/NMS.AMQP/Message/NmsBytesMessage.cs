@@ -449,5 +449,19 @@ namespace Apache.NMS.AMQP.Message
             CopyInto(copy);
             return copy;
         }
+        
+        public override bool IsBodyAssignableTo(Type type)
+        {
+            return !facade.HasBody() || type.IsAssignableFrom(typeof(byte[]));
+        }
+        
+        protected override T DoGetBody<T>() {
+            if (!facade.HasBody()) {
+                return default;
+            }
+
+            object o = Content;
+            return (T) o;
+        }
     }
 }

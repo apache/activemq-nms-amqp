@@ -25,6 +25,6 @@ namespace Apache.NMS.AMQP.Message
         public NmsProducerId ProducerId { get; set; }
         public NmsProducerInfo ProducerInfo { get; set; }
         public NmsMessage Message { get; set; }
-        public bool SendAsync { get; set; }
+        public bool FireAndForget { get; set; }
     }
 }

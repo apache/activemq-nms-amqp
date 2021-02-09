@@ -18,6 +18,7 @@
 using System;
 using Apache.NMS;
 using Apache.NMS.AMQP;
+using NMS.AMQP.Test.TestAmqp;
 using NUnit.Framework;
 
 namespace NMS.AMQP.Test
@@ -30,19 +31,32 @@ namespace NMS.AMQP.Test
 
         protected string TestName => TestContext.CurrentContext.Test.Name;
 
+        static AmqpTestSupport()
+        {
+            Tracer.Trace = new NLogAdapter();
+        }
+        
         [TearDown]
         public void TearDown()
         {
             Connection?.Close();
         }
 
-        protected IConnection CreateAmqpConnection()
+        protected IConnection CreateAmqpConnectionStarted(string clientId = null)
+        {
+            var connection = CreateAmqpConnection(clientId);
+            connection.Start();
+            return connection;
+        }
+        
+        protected IConnection CreateAmqpConnection(string clientId = null)
         {
             string brokerUri = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_URI") ?? "amqp://127.0.0.1:5672";
             string userName = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_CU") ?? "admin";
             string password = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_CPWD") ?? "admin";
 
             NmsConnectionFactory factory = new NmsConnectionFactory(brokerUri);
+            factory.ClientId = clientId;
             return factory.CreateConnection(userName, password);
         }
 
@@ -108,11 +122,7 @@ namespace NMS.AMQP.Test
             IQueue queue = session.GetQueue(TestName);
             IMessageConsumer consumer = session.CreateConsumer(queue);
 
-            IMessage message;
-            do
-            {
-                message = consumer.Receive(timeout);
-            } while (message != null);
+            PurgeConsumer(consumer, timeout);
 
             amqpConnection.Close();
         }
@@ -125,13 +135,18 @@ namespace NMS.AMQP.Test
             ITopic queue = session.GetTopic(TestName);
             IMessageConsumer consumer = session.CreateConsumer(queue);
 
+            PurgeConsumer(consumer, timeout);
+
+            amqpConnection.Close();
+        }
+
+        protected void PurgeConsumer(IMessageConsumer consumer, TimeSpan timeout)
+        {
             IMessage message;
             do
             {
                 message = consumer.Receive(timeout);
             } while (message != null);
-
-            amqpConnection.Close();
         }
     }
 }

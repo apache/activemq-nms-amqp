@@ -55,9 +55,13 @@ namespace Apache.NMS.AMQP
                 Destination = destination,
                 Selector = selector,
                 NoLocal = noLocal,
+                IsExplicitClientId = Session.Connection.ConnectionInfo.IsExplicitClientId,
                 SubscriptionName = name,
-                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry,
-                IsDurable = IsDurableSubscription
+                IsShared = IsSharedSubscription,
+                IsDurable = IsDurableSubscription,
+                IsBrowser =  IsBrowser,
+                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry
+
             };
             deliveryTask = new MessageDeliveryTask(this);
             
@@ -74,6 +78,10 @@ namespace Apache.NMS.AMQP
         public IDestination Destination => Info.Destination;
 
         protected virtual bool IsDurableSubscription => false;
+        
+        protected virtual bool IsSharedSubscription => false;
+        
+        protected virtual bool IsBrowser => false;
 
         public void Dispose()
         {
@@ -100,6 +108,8 @@ namespace Apache.NMS.AMQP
         }
 
         public ConsumerTransformerDelegate ConsumerTransformer { get; set; }
+
+        public string MessageSelector => Info.Selector;
 
         event MessageListener IMessageConsumer.Listener
         {
@@ -134,6 +144,21 @@ namespace Apache.NMS.AMQP
                 }
             }
         }
+        
+        public T ReceiveBody<T>()
+        {
+            CheckClosed();
+            CheckMessageListener();
+
+            while (true)
+            {
+                if (started)
+                {
+                    return ReceiveBodyInternal<T>(-1);
+                }
+            }
+        }
+
 
         public IMessage ReceiveNoWait()
         {
@@ -141,6 +166,14 @@ namespace Apache.NMS.AMQP
             CheckMessageListener();
 
             return started ? ReceiveInternal(0) : null;
+        }
+        
+        public T ReceiveBodyNoWait<T>()
+        {
+            CheckClosed();
+            CheckMessageListener();
+
+            return started ? ReceiveBodyInternal<T>(0) : default;
         }
 
         public IMessage Receive(TimeSpan timeout)
@@ -168,6 +201,35 @@ namespace Apache.NMS.AMQP
                 if (started)
                 {
                     return ReceiveInternal(timeoutInMilliseconds);
+                }
+            }
+        }
+        
+        public T ReceiveBody<T>(TimeSpan timeout)
+        {
+            CheckClosed();
+            CheckMessageListener();
+
+            int timeoutInMilliseconds = (int) timeout.TotalMilliseconds;
+
+            if (started)
+            {
+                return ReceiveBodyInternal<T>(timeoutInMilliseconds);
+            }
+
+            long deadline = GetDeadline(timeoutInMilliseconds);
+
+            while (true)
+            {
+                timeoutInMilliseconds = (int) (deadline - DateTime.UtcNow.Ticks / 10_000L);
+                if (timeoutInMilliseconds < 0)
+                {
+                    return default;
+                }
+
+                if (started)
+                {
+                    return ReceiveBodyInternal<T>(timeoutInMilliseconds);
                 }
             }
         }
@@ -331,6 +393,42 @@ namespace Apache.NMS.AMQP
 
         private IMessage ReceiveInternal(int timeout)
         {
+            return ReceiveInternal(timeout, envelope =>
+            {
+                IMessage message = envelope.Message.Copy();
+                AckFromReceive(envelope);
+                return message;
+            });
+        }
+        
+        private T ReceiveBodyInternal<T>(int timeout)
+        {
+            return ReceiveInternal<T>(timeout, envelope =>
+            {
+                try
+                {
+                    T body = envelope.Message.Body<T>();
+                    AckFromReceive(envelope);
+                    return body;
+                }
+                catch (MessageFormatException mfe)
+                {
+                    // Should behave as if receiveBody never happened in these modes.
+                    if (acknowledgementMode == AcknowledgementMode.AutoAcknowledge ||
+                        acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge) {
+
+                        envelope.EnqueueFirst = true;
+                        OnInboundMessage(envelope);
+                    }
+
+                    throw mfe;
+                }
+            });
+        }
+
+
+        private T ReceiveInternal<T>(int timeout, Func<InboundMessageDispatch, T> func)
+        {
             try
             {
                 long deadline = 0;
@@ -352,7 +450,7 @@ namespace Apache.NMS.AMQP
                         throw NMSExceptionSupport.Create(failureCause);
 
                     if (envelope == null)
-                        return null;
+                        return default;
 
                     if (IsMessageExpired(envelope))
                     {
@@ -383,8 +481,7 @@ namespace Apache.NMS.AMQP
                             Tracer.Debug($"{Info.Id} received message {envelope.Message.NMSMessageId}.");
                         }
 
-                        AckFromReceive(envelope);
-                        return envelope.Message.Copy();
+                        return func.Invoke(envelope);
                     }
                 }
             }
@@ -397,6 +494,7 @@ namespace Apache.NMS.AMQP
                 throw ExceptionSupport.Wrap(ex, "Receive failed");
             }
         }
+        
 
         private static long GetDeadline(int timeout)
         {

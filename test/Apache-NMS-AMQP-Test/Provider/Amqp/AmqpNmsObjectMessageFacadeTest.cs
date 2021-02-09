@@ -57,7 +57,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
         private void DoNewMessageToSendReturnsNullObjectTestImpl(bool amqpTyped)
         {
             AmqpNmsObjectMessageFacade amqpObjectMessageFacade = CreateNewObjectMessageFacade(amqpTyped);
-            Assert.Null(amqpObjectMessageFacade.Body);
+            Assert.Null(amqpObjectMessageFacade.Object);
         }
 
         [Test]
@@ -96,7 +96,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             String content = "myStringContent";
 
             AmqpNmsObjectMessageFacade amqpObjectMessageFacade = CreateNewObjectMessageFacade();
-            amqpObjectMessageFacade.Body = content;
+            amqpObjectMessageFacade.Object = content;
 
             var bytes = GetSerializedBytes(content);
 
@@ -118,7 +118,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             String content = "myStringContent";
 
             AmqpNmsObjectMessageFacade amqpObjectMessageFacade = CreateNewObjectMessageFacade(true);
-            amqpObjectMessageFacade.Body = content;
+            amqpObjectMessageFacade.Object = content;
 
             // retrieve the body from the underlying message, check it matches expectation
             RestrictedDescribed section = amqpObjectMessageFacade.Message.BodySection;
@@ -149,9 +149,9 @@ namespace NMS.AMQP.Test.Provider.Amqp
             AmqpNmsObjectMessageFacade facade = CreateReceivedObjectMessageFacade(message);
 
             Assert.NotNull(facade.Message.BodySection, "Expected existing body section to be found");
-            facade.Body = null;
+            facade.Object = null;
             Assert.AreSame(AmqpSerializedObjectDelegate.NULL_OBJECT_BODY, facade.Message.BodySection, "Expected existing body section to be replaced");
-            Assert.Null(facade.Body);
+            Assert.Null(facade.Object);
         }
 
         /*
@@ -179,7 +179,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             facade.ClearBody();
 
             Assert.AreSame(AmqpSerializedObjectDelegate.NULL_OBJECT_BODY, facade.Message.BodySection, "Expected existing body section to be replaced");
-            Assert.Null(facade.Body);
+            Assert.Null(facade.Object);
         }
 
         /*
@@ -195,12 +195,12 @@ namespace NMS.AMQP.Test.Provider.Amqp
             };
 
             AmqpNmsObjectMessageFacade facade = CreateNewObjectMessageFacade(false);
-            facade.Body = origMap;
+            facade.Object = origMap;
 
             Dictionary<string, string> d = new Dictionary<string, string>();
 
             // verify we get a different-but-equal object back
-            object body = facade.Body;
+            object body = facade.Object;
             Assert.IsInstanceOf<Dictionary<string, string>>(body);
             Dictionary<string, string> returnedObject1 = (Dictionary<string, string>) body;
             Assert.AreNotSame(origMap, returnedObject1, "Expected different objects, due to snapshot being taken");
@@ -210,7 +210,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             origMap.Add("key2", "value2");
 
             // verify we get a different-but-equal object back when compared to the previously retrieved object
-            object body2 = facade.Body;
+            object body2 = facade.Object;
             Assert.IsInstanceOf<Dictionary<string, string>>(body2);
             Dictionary<string, string> returnedObject2 = (Dictionary<string, string>) body2;
             Assert.AreNotSame(origMap, returnedObject2, "Expected different objects, due to snapshot being taken");
@@ -246,7 +246,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
 
             AmqpNmsObjectMessageFacade facade = CreateReceivedObjectMessageFacade(message);
 
-            Assert.Null(facade.Body, "Expected null object");
+            Assert.Null(facade.Object, "Expected null object");
         }
 
         [Test]
@@ -265,7 +265,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
 
             Assert.Catch<IllegalStateException>(() =>
             {
-                object body = facade.Body;
+                object body = facade.Object;
             });
         }
 
@@ -289,7 +289,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             AmqpNmsObjectMessageFacade facade = CreateReceivedObjectMessageFacade(message);
 
             // verify we get a different-but-equal object back
-            object body = facade.Body;
+            object body = facade.Object;
             Assert.IsInstanceOf<Dictionary<string, string>>(body);
             Dictionary<string, string> returnedObject1 = (Dictionary<string, string>) body;
             Assert.AreNotSame(origMap, returnedObject1, "Expected different objects, due to snapshot being taken");
@@ -297,7 +297,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
 
 
             // verify we get a different-but-equal object back when compared to the previously retrieved object
-            object body2 = facade.Body;
+            object body2 = facade.Object;
             Assert.IsInstanceOf<Dictionary<string, string>>(body2);
             Dictionary<string, string> returnedObject2 = (Dictionary<string, string>) body2;
             Assert.AreNotSame(origMap, returnedObject2, "Expected different objects, due to snapshot being taken");
@@ -323,7 +323,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             AmqpNmsObjectMessageFacade facade = CreateReceivedObjectMessageFacade(message);
 
             // verify we get a different-but-equal object back
-            object body = facade.Body;
+            object body = facade.Object;
             Assert.IsInstanceOf<Map>(body);
             Map returnedObject1 = (Map) body;
             Assert.AreNotSame(origMap, returnedObject1, "Expected different objects, due to snapshot being taken");
@@ -331,7 +331,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
 
 
             // verify we get a different-but-equal object back when compared to the previously retrieved object
-            object body2 = facade.Body;
+            object body2 = facade.Object;
             Assert.IsInstanceOf<Map>(body2);
             Map returnedObject2 = (Map) body2;
             Assert.AreNotSame(origMap, returnedObject2, "Expected different objects, due to snapshot being taken");
@@ -351,11 +351,11 @@ namespace NMS.AMQP.Test.Provider.Amqp
             String content = "myStringContent";
 
             AmqpNmsObjectMessageFacade amqpObjectMessageFacade = CreateNewObjectMessageFacade();
-            amqpObjectMessageFacade.Body = content;
+            amqpObjectMessageFacade.Object = content;
 
             AmqpNmsObjectMessageFacade copy = amqpObjectMessageFacade.Copy() as AmqpNmsObjectMessageFacade;
             Assert.IsNotNull(copy);
-            Assert.AreEqual(amqpObjectMessageFacade.Body, copy.Body);
+            Assert.AreEqual(amqpObjectMessageFacade.Object, copy.Object);
         }
 
         private static byte[] GetSerializedBytes(object content)

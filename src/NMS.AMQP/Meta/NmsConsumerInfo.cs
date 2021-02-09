@@ -34,7 +34,9 @@ namespace Apache.NMS.AMQP.Meta
         public string Selector { get; set; }
         public bool NoLocal { get; set; }
         public string SubscriptionName { get; set; }
+        public bool IsExplicitClientId { get; set; }
         public bool IsDurable { get; set; }
+        public bool IsShared { get; set; }
         public bool LocalMessageExpiry { get; set; }
         public bool IsBrowser { get; set; }
         public int LinkCredit { get; set; } = DEFAULT_CREDIT;

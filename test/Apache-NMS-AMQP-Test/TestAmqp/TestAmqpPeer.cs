@@ -51,6 +51,7 @@ namespace NMS.AMQP.Test.TestAmqp
             SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER,
             SymbolUtil.OPEN_CAPABILITY_DELAYED_DELIVERY,
             SymbolUtil.OPEN_CAPABILITY_ANONYMOUS_RELAY,
+            SymbolUtil.OPEN_CAPABILITY_SHARED_SUBS
         };
 
         private const int CONNECTION_CHANNEL = 0;
@@ -554,6 +555,7 @@ namespace NMS.AMQP.Test.TestAmqp
                         Handle = context.Command.Handle,
                         LinkName = context.Command.LinkName,
                         Target = context.Command.Target,
+                        OfferedCapabilities = new []{ SymbolUtil.OPEN_CAPABILITY_SHARED_SUBS }
                     };
 
                     if (refuseLink)
@@ -604,7 +606,49 @@ namespace NMS.AMQP.Test.TestAmqp
 
             ExpectReceiverAttach(linkNameMatcher: linkNameMatcher, sourceMatcher: sourceMatcher, targetMatcher: targetMatcher, settled: false, errorType: null, errorMessage: null);
         }
+        
+        public void ExpectSharedDurableSubscriberAttach(string topicName, string subscriptionName)
+        {
+            Action<string> linkNameMatcher = linkName => Assert.AreEqual(subscriptionName, linkName);
 
+            Action<object> sourceMatcher = o =>
+            {
+                Assert.IsInstanceOf<Source>(o);
+                var source = (Source) o;
+                Assert.AreEqual(topicName, source.Address);
+                Assert.IsFalse(source.Dynamic);
+                Assert.AreEqual(TerminusDurability.UNSETTLED_STATE, (TerminusDurability) source.Durable);
+                Assert.AreEqual(TerminusExpiryPolicy.NEVER, source.ExpiryPolicy);
+                CollectionAssert.Contains(source.Capabilities, SymbolUtil.ATTACH_CAPABILITIES_TOPIC);
+                CollectionAssert.Contains(source.Capabilities, SymbolUtil.SHARED);
+            };
+
+            Action<Target> targetMatcher = Assert.IsNotNull;
+
+            ExpectReceiverAttach(linkNameMatcher: linkNameMatcher, sourceMatcher: sourceMatcher, targetMatcher: targetMatcher, settled: false, errorType: null, errorMessage: null);
+        }
+
+        public void ExpectSharedSubscriberAttach(string topicName, string subscriptionName)
+        {
+            Action<string> linkNameMatcher = linkName => Assert.AreEqual(subscriptionName+"|volatile1", linkName);
+
+            Action<object> sourceMatcher = o =>
+            {
+                Assert.IsInstanceOf<Source>(o);
+                var source = (Source) o;
+                Assert.AreEqual(topicName, source.Address);
+                Assert.IsFalse(source.Dynamic);
+                // Assert.AreEqual(TerminusDurability.UNSETTLED_STATE, (TerminusDurability) source.Durable);
+                // Assert.AreEqual(TerminusExpiryPolicy.NEVER, source.ExpiryPolicy);
+                CollectionAssert.Contains(source.Capabilities, SymbolUtil.ATTACH_CAPABILITIES_TOPIC);
+                CollectionAssert.Contains(source.Capabilities, SymbolUtil.SHARED);
+            };
+
+            Action<Target> targetMatcher = Assert.IsNotNull;
+
+            ExpectReceiverAttach(linkNameMatcher: linkNameMatcher, sourceMatcher: sourceMatcher, targetMatcher: targetMatcher, settled: false, errorType: null, errorMessage: null);
+        }
+        
         public void ExpectDetach(bool expectClosed, bool sendResponse, bool replyClosed, Symbol errorType = null, String errorMessage = null)
         {
             var detachMatcher = new FrameMatcher<Detach>()

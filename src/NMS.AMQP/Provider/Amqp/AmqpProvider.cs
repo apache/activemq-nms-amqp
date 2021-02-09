@@ -266,13 +266,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         public INmsMessageFactory MessageFactory => connection.MessageFactory;
 
-        public Task Send(OutboundMessageDispatch envelope)
+        public async Task Send(OutboundMessageDispatch envelope)
         {
             AmqpSession session = connection.GetSession(envelope.ProducerInfo.SessionId);
             AmqpProducer producer = session.GetProducer(envelope.ProducerId);
-            producer.Send(envelope);
+            await producer.Send(envelope).ConfigureAwait(false);
             envelope.Message.IsReadOnly = false;
-            return Task.CompletedTask;
         }
 
         public Task Unsubscribe(string subscriptionName)

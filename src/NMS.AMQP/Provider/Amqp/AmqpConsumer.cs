@@ -42,6 +42,9 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         private ReceiverLink receiverLink;
         private readonly LinkedList<InboundMessageDispatch> messages;
         private readonly object syncRoot = new object();
+        
+        private bool validateSharedSubsLinkCapability;
+        private bool sharedSubsNotSupported;
 
         private readonly AmqpSession session;
         public IDestination Destination => info.Destination;
@@ -56,6 +59,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         }
 
         public NmsConsumerId ConsumerId => this.info.Id;
+        
 
         public Task Attach()
         {
@@ -69,38 +73,95 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 RcvSettleMode = ReceiverSettleMode.First,
                 SndSettleMode = (info.IsBrowser) ? SenderSettleMode.Settled : SenderSettleMode.Unsettled,
             };
-            string name;
-            if (info.IsDurable)
+
+            string receiverLinkName = null;
+
+            string subscriptionName = info.SubscriptionName;
+            if (!string.IsNullOrEmpty(subscriptionName))
             {
-                name = info.SubscriptionName;
+                AmqpConnection connection = session.Connection;
+
+                if (info.IsShared && !connection.Info.SharedSubsSupported) {
+                    validateSharedSubsLinkCapability = true;
+                }
+
+                AmqpSubscriptionTracker subTracker = connection.SubscriptionTracker;
+
+                // Validate subscriber type allowed given existing active subscriber types.
+                if (info.IsShared && info.IsDurable) {
+                    if(subTracker.IsActiveExclusiveDurableSub(subscriptionName)) {
+                        // Don't allow shared sub if there is already an active exclusive durable sub
+                        throw new NMSException("A non-shared durable subscription is already active with name '" + subscriptionName + "'");
+                    }
+                } else if (!info.IsShared && info.IsDurable) {
+                    if (subTracker.IsActiveExclusiveDurableSub(subscriptionName)) {
+                        // Exclusive durable sub is already active
+                        throw new NMSException("A non-shared durable subscription is already active with name '" + subscriptionName + "'");
+                    } else if (subTracker.IsActiveSharedDurableSub(subscriptionName)) {
+                        // Don't allow exclusive durable sub if there is already an active shared durable sub
+                        throw new NMSException("A shared durable subscription is already active with name '" + subscriptionName + "'");
+                    }
+                }
+
+                // Get the link name for the subscription. Throws if certain further validations fail.
+                receiverLinkName = subTracker.ReserveNextSubscriptionLinkName(subscriptionName, info);
             }
-            else
-            {
+
+            
+            if (receiverLinkName == null) {
                 string destinationAddress = source.Address ?? "";
-                name = "nms:receiver:" + info.Id
-                                       + (destinationAddress.Length == 0 ? "" : (":" + destinationAddress));
+                receiverLinkName = "nms:receiver:" + info.Id
+                                                   + (destinationAddress.Length == 0 ? "" : (":" + destinationAddress));
             }
 
             // TODO: Add timeout
             var tsc = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            receiverLink = new ReceiverLink(session.UnderlyingSession, name, attach, HandleOpened(tsc));
+            receiverLink = new ReceiverLink(session.UnderlyingSession, receiverLinkName, attach, HandleOpened(tsc));
             receiverLink.AddClosedCallback(HandleClosed(tsc));
             return tsc.Task;
         }
 
         private OnAttached HandleOpened(TaskCompletionSource<bool> tsc) => (link, attach) =>
         {
+            if (validateSharedSubsLinkCapability)
+            {
+                Symbol[] remoteOfferedCapabilities = attach.OfferedCapabilities;
+
+                bool supported = false;
+                if (remoteOfferedCapabilities != null)
+                {
+                    if (Array.Exists(remoteOfferedCapabilities, symbol => SymbolUtil.OPEN_CAPABILITY_SHARED_SUBS.Equals(symbol)))
+                    {
+                        supported = true;
+                    }
+                }
+
+                if (!supported)
+                {
+                    sharedSubsNotSupported = true;
+
+                    if (info.IsDurable)
+                    {
+                        link.Detach(null);
+                    }
+                    else
+                    {
+                        link.Close();
+                    }
+                }
+            }
+
             if (IsClosePending(attach))
                 return;
 
             tsc.SetResult(true);
         };
 
-        private static bool IsClosePending(Attach attach)
+        private bool IsClosePending(Attach attach)
         {
             // When no link terminus was created, the peer will now detach/close us otherwise
             // we need to validate the returned remote source prior to open completion.
-            return attach.Source == null;
+            return sharedSubsNotSupported || attach.Source == null;
         }
 
         private ClosedCallback HandleClosed(TaskCompletionSource<bool> tsc) => (sender, error) =>
@@ -108,6 +169,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             NMSException exception = ExceptionSupport.GetException(error, "Received Amqp link detach with Error for link {0}", info.Id);
             if (!tsc.TrySetException(exception))
             {
+                session.Connection.SubscriptionTracker.ConsumerRemoved(info);
                 session.RemoveConsumer(info.Id);
 
                 // If session is not closed it means that the link was remotely detached 
@@ -142,13 +204,33 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 source.ExpiryPolicy = SymbolUtil.ATTACH_EXPIRY_POLICY_SESSION_END;
                 source.Durable = (int) TerminusDurability.NONE;
             }
+            
+            
 
             if (info.IsBrowser)
             {
                 source.DistributionMode = SymbolUtil.ATTACH_DISTRIBUTION_MODE_COPY;
             }
 
-            source.Capabilities = new[] { SymbolUtil.GetTerminusCapabilitiesForDestination(info.Destination) };
+            
+            IList<Symbol> capabilities = new List<Symbol>();
+            Symbol typeCapability = SymbolUtil.GetTerminusCapabilitiesForDestination(info.Destination);
+            if (typeCapability != null)
+            {
+                capabilities.Add(typeCapability);
+            }
+            
+            if (info.IsShared) {
+                capabilities.Add(SymbolUtil.SHARED);
+
+                if(!info.IsExplicitClientId) {
+                    capabilities.Add(SymbolUtil.GLOBAL);
+                }
+            }
+
+            if (capabilities.Any()) {
+                source.Capabilities = capabilities.ToArray();
+            }
 
             Map filters = new Map();
             
@@ -344,7 +426,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         public bool HasSubscription(string subscriptionName)
         {
-            return info.IsDurable && info.SubscriptionName.Equals(subscriptionName);
+            return (info.IsDurable || info.IsShared) && info.SubscriptionName.Equals(subscriptionName);
         }
 
         public void PostRollback()

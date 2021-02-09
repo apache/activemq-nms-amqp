@@ -29,6 +29,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 {
     public class AmqpProducer
     {
+        private static readonly OutcomeCallback _onOutcome = OnOutcome;
+        
         private readonly AmqpSession session;
         private readonly NmsProducerInfo info;
         private SenderLink senderLink;
@@ -117,7 +119,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             return target;
         }
 
-        public void Send(OutboundMessageDispatch envelope)
+        public async Task Send(OutboundMessageDispatch envelope)
         {
             if (envelope.Message.Facade is AmqpNmsMessageFacade facade)
             {
@@ -134,14 +136,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
                     var transactionalState = session.TransactionContext?.GetTxnEnrolledState();
 
-                    if (envelope.SendAsync)
-                        SendAsync(message, transactionalState);
-                    else
+                    if (envelope.FireAndForget)
+                    {
                         SendSync(message, transactionalState);
-                }
-                catch (TimeoutException tex)
-                {
-                    throw ExceptionSupport.GetTimeoutException(this.senderLink, tex.Message);
+                        return;
+                    }
+                    await SendAsync(message, transactionalState).ConfigureAwait(false);
                 }
                 catch (AmqpException amqpEx)
                 {
@@ -157,39 +157,56 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        private void SendAsync(global::Amqp.Message message, DeliveryState deliveryState)
+        private void SendSync(global::Amqp.Message message, DeliveryState deliveryState)
         {
             senderLink.Send(message, deliveryState, null, null);
         }
-
-        private void SendSync(global::Amqp.Message message, DeliveryState deliveryState)
+        
+        private async Task SendAsync(global::Amqp.Message message, DeliveryState deliveryState)
         {
-            ManualResetEvent manualResetEvent = new ManualResetEvent(false);
-            Outcome outcome = null;
-
-            senderLink.Send(message, deliveryState, Callback, manualResetEvent);
-            if (!manualResetEvent.WaitOne((int) session.Connection.Provider.SendTimeout))
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            CancellationTokenSource cts = null;
+            if (session.Connection.Provider.SendTimeout != NmsConnectionInfo.INFINITE)
             {
-                throw new TimeoutException(Fx.Format(SRAmqp.AmqpTimeout, "send", session.Connection.Provider.SendTimeout, nameof(message)));
+                cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(session.Connection.Provider.SendTimeout));
+                cts.Token.Register(_ =>
+                {
+                    var timeoutException = ExceptionSupport.GetTimeoutException(this.senderLink, $"The operation did not complete within the allocated time {session.Connection.Provider.SendTimeout}ms.");
+                    tcs.TrySetException(timeoutException);
+                }, null);
             }
-            if (outcome == null)
-                return;
-            
-            if (outcome.Descriptor.Name.Equals(MessageSupport.RELEASED_INSTANCE.Descriptor.Name))
+            try
             {
-                Error error = new Error(ErrorCode.MessageReleased);
-                throw ExceptionSupport.GetException(error, $"Message {message.Properties.GetMessageId()} released");
+                senderLink.Send(message, deliveryState, _onOutcome, tcs);
+                await tcs.Task.ConfigureAwait(false);
             }
-            if (outcome.Descriptor.Name.Equals(MessageSupport.REJECTED_INSTANCE.Descriptor.Name))
+            finally
+            {
+                cts?.Dispose();
+            }
+        }
+        
+        private static void OnOutcome(ILink sender, global::Amqp.Message message, Outcome outcome, object state)
+        {
+            var tcs = (TaskCompletionSource<bool>) state;
+            if (outcome.Descriptor.Code == MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code)
+            {
+                tcs.TrySetResult(true);
+            }
+            else if (outcome.Descriptor.Code == MessageSupport.REJECTED_INSTANCE.Descriptor.Code)
             {
                 Rejected rejected = (Rejected) outcome;
-                throw ExceptionSupport.GetException(rejected.Error, $"Message {message.Properties.GetMessageId()} rejected");
+                tcs.TrySetException(ExceptionSupport.GetException(rejected.Error, $"Message {message.Properties.GetMessageId()} rejected"));
             }
-            
-            void Callback(ILink l, global::Amqp.Message m, Outcome o, object s)
+            else if (outcome.Descriptor.Code == MessageSupport.RELEASED_INSTANCE.Descriptor.Code)
             {
-                outcome = o;
-                manualResetEvent.Set();
+                Error error = new Error(ErrorCode.MessageReleased);
+                tcs.TrySetException(ExceptionSupport.GetException(error, $"Message {message.Properties.GetMessageId()} released"));
+            }
+            else
+            {
+                Error error = new Error(ErrorCode.InternalError);
+                tcs.TrySetException(ExceptionSupport.GetException(error, outcome.ToString()));
             }
         }
 

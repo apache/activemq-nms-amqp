@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,37 +15,23 @@
  * limitations under the License.
  */
 
-using System.Threading;
+using Apache.NMS.AMQP.Meta;
 
-namespace Apache.NMS.AMQP.Util
+namespace Apache.NMS.AMQP
 {
-    internal class AtomicLong
+    public class NmsSharedDurableMessageConsumer : NmsMessageConsumer
     {
-        private long value;
-
-        public AtomicLong(long initialValue = 0)
+        public NmsSharedDurableMessageConsumer(NmsConsumerId consumerId, NmsSession session, IDestination destination, string selector, bool noLocal) : base(consumerId, session, destination, selector, noLocal)
         {
-            this.value = initialValue;
         }
 
-        public long IncrementAndGet()
+        public NmsSharedDurableMessageConsumer(NmsConsumerId consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal) : base(consumerId, session, destination, name, selector, noLocal)
         {
-            return Interlocked.Increment(ref value);
         }
+
+        protected override bool IsDurableSubscription => true;
         
-        public long DecrementAndGet()
-        {
-            return Interlocked.Decrement(ref value);
-        }
-        
-        public long Get()
-        {
-            return Interlocked.Read(ref value);
-        }
+        protected override bool IsSharedSubscription => true;
 
-        public static implicit operator long(AtomicLong atomicLong)
-        {
-            return atomicLong.value;
-        }
     }
 }

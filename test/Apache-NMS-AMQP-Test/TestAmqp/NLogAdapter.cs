@@ -20,7 +20,7 @@ using NLog;
 
 namespace NMS.AMQP.Test.TestAmqp
 {
-    class NLogAdapter : ITrace
+    public class NLogAdapter : ITrace
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 

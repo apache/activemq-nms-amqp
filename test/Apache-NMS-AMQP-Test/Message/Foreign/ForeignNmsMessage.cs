@@ -41,6 +41,16 @@ namespace NMS.AMQP.Test.Message.Foreign
             message.ClearProperties();
         }
 
+        public T Body<T>()
+        {
+            return message.Body<T>();
+        }
+
+        public bool IsBodyAssignableTo(Type type)
+        {
+            return message.IsBodyAssignableTo(type);
+        }
+
         public IPrimitiveMap Properties => message.Properties;
 
         public string NMSCorrelationID
@@ -101,6 +111,12 @@ namespace NMS.AMQP.Test.Message.Foreign
         {
             get => message.NMSType;
             set => message.NMSType = value;
+        }
+
+        public DateTime NMSDeliveryTime
+        {
+            get => message.NMSDeliveryTime;
+            set => message.NMSDeliveryTime = value;
         }
     }
 }

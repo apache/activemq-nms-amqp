@@ -33,7 +33,9 @@ namespace Apache.NMS.AMQP.Message
 
         public INmsMessageFacade Facade { get; }
 
-        public IPrimitiveMap Properties => properties ?? (properties = new MessagePropertyIntercepter(this, Facade.Properties, IsReadOnlyProperties));
+        public IPrimitiveMap Properties => properties ??
+                                           (properties = new MessagePropertyIntercepter(this, Facade.Properties,
+                                               IsReadOnlyProperties));
 
         public string NMSCorrelationID
         {
@@ -107,6 +109,12 @@ namespace Apache.NMS.AMQP.Message
         {
             get => Facade.NMSType;
             set => Facade.NMSType = value;
+        }
+
+        public DateTime NMSDeliveryTime
+        {
+            get => Facade.DeliveryTime;
+            set => Facade.DeliveryTime = value;
         }
 
         public string NMSXGroupId
@@ -254,6 +262,26 @@ namespace Apache.NMS.AMQP.Message
             target.IsReadOnlyBody = IsReadOnlyBody;
             target.IsReadOnlyProperties = IsReadOnlyProperties;
             target.NmsAcknowledgeCallback = NmsAcknowledgeCallback;
+        }
+
+        public virtual bool IsBodyAssignableTo(Type type)
+        {
+            return true;
+        }
+
+        public T Body<T>()
+        {
+            if (IsBodyAssignableTo(typeof(T)))
+            {
+                return DoGetBody<T>();
+            }
+
+            throw new MessageFormatException("Message body cannot be read as type: " + typeof(T));
+        }
+
+        protected virtual T DoGetBody<T>()
+        {
+            return default;
         }
     }
 }

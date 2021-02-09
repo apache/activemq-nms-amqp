@@ -163,7 +163,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             Message.BodySection = EMPTY_DATA;
         }
 
-        public virtual bool HasBody()
+        public override bool HasBody()
         {
             if (byteOut != null)
                 return byteOut.BaseStream.Length > 0;
