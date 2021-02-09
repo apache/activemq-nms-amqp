@@ -27,6 +27,7 @@ using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider.Amqp.Filters;
 using Apache.NMS.AMQP.Provider.Amqp.Message;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -391,15 +392,15 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public void Close()
+        public async Task CloseAsync()
         {
             if (info.IsDurable)
             {
-                receiverLink?.Detach();
+                if (receiverLink != null) await receiverLink.DetachAsync().AwaitRunContinuationAsync();
             }
             else
             {
-                receiverLink?.Close();
+                if (receiverLink != null) await receiverLink.CloseAsync().AwaitRunContinuationAsync();
             }
         }
 

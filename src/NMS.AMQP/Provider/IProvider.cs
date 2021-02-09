@@ -30,6 +30,7 @@ namespace Apache.NMS.AMQP.Provider
         void Start();
         Task Connect(NmsConnectionInfo connectionInfo);
         void Close();
+        Task CloseAsync();
         void SetProviderListener(IProviderListener providerListener);
         Task CreateResource(INmsResource resourceInfo);
         Task DestroyResource(INmsResource resourceInfo);

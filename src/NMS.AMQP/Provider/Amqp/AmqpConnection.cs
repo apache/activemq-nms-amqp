@@ -27,6 +27,7 @@ using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider.Amqp.Message;
 using Apache.NMS.AMQP.Transport;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -73,11 +74,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             Address address = UriUtil.ToAddress(remoteUri, Info.UserName, Info.Password);
             this.tsc = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            underlyingConnection = await transport.CreateAsync(address, new AmqpHandler(this)).ConfigureAwait(false);
+            underlyingConnection = await transport.CreateAsync(address, new AmqpHandler(this)).AwaitRunContinuationAsync();
             underlyingConnection.AddClosedCallback(OnClosed);
 
             // Wait for connection to be opened
-            await this.tsc.Task.ConfigureAwait(false);
+            await this.tsc.Task.Await();
 
             // Create a Session for this connection that is used for Temporary Destinations
             // and perhaps later on management and advisory monitoring.
@@ -85,7 +86,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             sessionInfo.AcknowledgementMode = AcknowledgementMode.AutoAcknowledge;
 
             connectionSession = new AmqpConnectionSession(this, sessionInfo);
-            await connectionSession.Start().ConfigureAwait(false);
+            await connectionSession.Start().Await();
         }
 
         private void OnClosed(IAmqpObject sender, Error error)
@@ -174,7 +175,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public async Task CreateSession(NmsSessionInfo sessionInfo)
         {
             var amqpSession = new AmqpSession(this, sessionInfo);
-            await amqpSession.Start().ConfigureAwait(false);
+            await amqpSession.Start().Await();
             sessions.TryAdd(sessionInfo.Id, amqpSession);
         }
 
@@ -183,6 +184,20 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             try
             {
                 UnderlyingConnection?.Close();
+            }
+            catch (Exception ex)
+            {
+                // log network errors
+                NMSException nmse = ExceptionSupport.Wrap(ex, "Amqp Connection close failure for NMS Connection {0}", this.Info.Id);
+                Tracer.DebugFormat("Caught Exception while closing Amqp Connection {0}. Exception {1}", this.Info.Id, nmse);
+            }
+        }
+
+        public async Task CloseAsync()
+        {
+            try
+            {
+                if (UnderlyingConnection != null) await UnderlyingConnection.CloseAsync().AwaitRunContinuationAsync();
             }
             catch (Exception ex)
             {
@@ -209,7 +224,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public async Task CreateTemporaryDestination(NmsTemporaryDestination destination)
         {
             AmqpTemporaryDestination amqpTemporaryDestination = new AmqpTemporaryDestination(connectionSession, destination);
-            await amqpTemporaryDestination.Attach();
+            await amqpTemporaryDestination.Attach().Await();
             temporaryDestinations.TryAdd(destination, amqpTemporaryDestination);
         }
 

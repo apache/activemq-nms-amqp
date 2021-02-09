@@ -16,7 +16,9 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message.Facade;
+using Apache.NMS.AMQP.Util.Synchronization;
 using Apache.NMS.Util;
 
 namespace Apache.NMS.AMQP.Message
@@ -150,11 +152,16 @@ namespace Apache.NMS.AMQP.Message
 
         public void Acknowledge()
         {
+            AcknowledgeAsync().GetAsyncResult();
+        }
+
+        public async Task AcknowledgeAsync()
+        {
             if (NmsAcknowledgeCallback != null)
             {
                 try
                 {
-                    NmsAcknowledgeCallback.Acknowledge();
+                    await NmsAcknowledgeCallback.Acknowledge().Await();
                     NmsAcknowledgeCallback = null;
                 }
                 catch (Exception e)

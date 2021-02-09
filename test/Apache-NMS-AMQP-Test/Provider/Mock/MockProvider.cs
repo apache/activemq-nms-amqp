@@ -72,6 +72,11 @@ namespace NMS.AMQP.Test.Provider.Mock
             }
         }
 
+        public async Task CloseAsync()
+        {
+            Close();
+        }
+
         public void SetProviderListener(IProviderListener providerListener)
         {
             listener = providerListener;

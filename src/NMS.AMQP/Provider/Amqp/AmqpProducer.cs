@@ -24,6 +24,7 @@ using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider.Amqp.Message;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -55,7 +56,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             };
 
             string linkName = info.Id + ":" + target.Address;
-            var taskCompletionSource = new TaskCompletionSource<bool>();
+            var taskCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             senderLink = new SenderLink(session.UnderlyingSession, linkName, frame, HandleOpened(taskCompletionSource));
 
             senderLink.AddClosedCallback((sender, error) =>
@@ -75,7 +76,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             return taskCompletionSource.Task;
         }
-        
+
         private OnAttached HandleOpened(TaskCompletionSource<bool> tsc) => (link, attach) =>
         {
             if (IsClosePending(attach))
@@ -141,7 +142,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         SendSync(message, transactionalState);
                         return;
                     }
-                    await SendAsync(message, transactionalState).ConfigureAwait(false);
+                    await SendAsync(message, transactionalState).Await();
                 }
                 catch (AmqpException amqpEx)
                 {
@@ -178,7 +179,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             try
             {
                 senderLink.Send(message, deliveryState, _onOutcome, tcs);
-                await tcs.Task.ConfigureAwait(false);
+                await tcs.Task.Await();
             }
             finally
             {
@@ -210,12 +211,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public void Close()
+        public async Task CloseAsync()
         {
             try
             {
                 var closeTimeout = session.Connection.Provider.CloseTimeout;
-                senderLink.Close(TimeSpan.FromMilliseconds(closeTimeout));
+                await senderLink.CloseAsync(TimeSpan.FromMilliseconds(closeTimeout)).AwaitRunContinuationAsync();
             }
             catch (NMSException)
             {

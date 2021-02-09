@@ -78,7 +78,7 @@ namespace NMS.AMQP.Test.Integration
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
             {
-                var connection = EstablishConnection(testPeer, "amqp.traceFrames=true");
+                var connection = EstablishConnection(testPeer);
                 connection.Start();
                 testPeer.ExpectBegin();
                 var session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);

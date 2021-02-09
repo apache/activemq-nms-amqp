@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Threading.Tasks;
 
 namespace Apache.NMS.AMQP
 {
@@ -40,9 +41,19 @@ namespace Apache.NMS.AMQP
             return consumer.Receive();
         }
 
+        public Task<IMessage> ReceiveAsync()
+        {
+            return consumer.ReceiveAsync();
+        }
+
         public IMessage Receive(TimeSpan timeout)
         {
             return consumer.Receive(timeout);
+        }
+
+        public Task<IMessage> ReceiveAsync(TimeSpan timeout)
+        {
+            return consumer.ReceiveAsync(timeout);
         }
 
         public IMessage ReceiveNoWait()
@@ -55,9 +66,19 @@ namespace Apache.NMS.AMQP
             return consumer.ReceiveBody<T>();
         }
 
+        public Task<T> ReceiveBodyAsync<T>()
+        {
+            return consumer.ReceiveBodyAsync<T>();
+        }
+
         public T ReceiveBody<T>(TimeSpan timeout)
         {
             return consumer.ReceiveBody<T>(timeout);
+        }
+
+        public Task<T> ReceiveBodyAsync<T>(TimeSpan timeout)
+        {
+            return consumer.ReceiveBodyAsync<T>(timeout);
         }
 
         public T ReceiveBodyNoWait<T>()
@@ -68,6 +89,11 @@ namespace Apache.NMS.AMQP
         public void Close()
         {
             consumer.Close();
+        }
+
+        public Task CloseAsync()
+        {
+            return consumer.CloseAsync();
         }
 
         public string MessageSelector => consumer.MessageSelector;

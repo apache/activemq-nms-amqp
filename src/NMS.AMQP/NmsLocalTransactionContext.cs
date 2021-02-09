@@ -23,6 +23,7 @@ using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 using Apache.NMS.Util;
 
 namespace Apache.NMS.AMQP
@@ -47,7 +48,7 @@ namespace Apache.NMS.AMQP
         {
             if (!IsInDoubt())
             {
-                await this.connection.Send(envelope);
+                await this.connection.Send(envelope).Await();
                 this.participants.Add(envelope.ProducerId);
             }
         }
@@ -59,7 +60,7 @@ namespace Apache.NMS.AMQP
             {
                 try
                 {
-                    await this.connection.Acknowledge(envelope, ackType).ConfigureAwait(false);
+                    await this.connection.Acknowledge(envelope, ackType).Await();
                     this.participants.Add(envelope.ConsumerId);
                     Tracer.Debug($"TX:{this.transactionInfo.Id} has performed an acknowledge.");
                 }
@@ -72,7 +73,7 @@ namespace Apache.NMS.AMQP
             }
             else
             {
-                await this.connection.Acknowledge(envelope, ackType).ConfigureAwait(false);
+                await this.connection.Acknowledge(envelope, ackType).Await();
             }
         }
 
@@ -83,7 +84,7 @@ namespace Apache.NMS.AMQP
             try
             {
                 Reset();
-                await this.session.Connection.CreateResource(this.transactionInfo);
+                await this.session.Connection.CreateResource(this.transactionInfo).Await();
                 OnTransactionStarted();
                 Tracer.Debug($"Begin: {this.transactionInfo.Id}");
             }
@@ -120,7 +121,7 @@ namespace Apache.NMS.AMQP
             {
                 this.transactionInfo = GetNextTransactionInfo();
                 Tracer.Debug($"Transaction recovery creating new TX:{this.transactionInfo.Id} after failover.");
-                await provider.CreateResource(this.transactionInfo).ConfigureAwait(false);
+                await provider.CreateResource(this.transactionInfo).Await();
             }
         }
 
@@ -141,7 +142,7 @@ namespace Apache.NMS.AMQP
             {
                 try
                 {
-                    await Rollback();
+                    await Rollback().Await();
                 }
                 catch (Exception e)
                 {
@@ -157,7 +158,7 @@ namespace Apache.NMS.AMQP
 
             try
             {
-                await this.connection.Commit(this.transactionInfo, nextTx).ConfigureAwait(false);
+                await this.connection.Commit(this.transactionInfo, nextTx).Await();
                 OnTransactionCommitted();
                 Reset();
                 this.transactionInfo = nextTx;
@@ -180,7 +181,7 @@ namespace Apache.NMS.AMQP
                     // one to recover our state.
                     if (nextTx.ProviderTxId == null)
                     {
-                        await Begin().ConfigureAwait(false);
+                        await Begin().Await();
                     }
                 }
                 catch (Exception e)
@@ -202,7 +203,7 @@ namespace Apache.NMS.AMQP
 
             try
             {
-                await this.connection.Rollback(this.transactionInfo, nextTx);
+                await this.connection.Rollback(this.transactionInfo, nextTx).Await();
                 OnTransactionRolledBack();
                 Reset();
                 this.transactionInfo = nextTx;
@@ -223,7 +224,7 @@ namespace Apache.NMS.AMQP
                     // one to recover our state.
                     if (startNewTransaction && nextTx.ProviderTxId == null)
                     {
-                        await Begin();
+                        await Begin().Await();
                     }
                 }
                 catch (Exception e)

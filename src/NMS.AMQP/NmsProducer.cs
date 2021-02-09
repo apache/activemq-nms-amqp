@@ -19,6 +19,7 @@ using System;
 using System.Collections;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
+using Apache.NMS.AMQP.Util.Synchronization;
 using Apache.NMS.Util;
 
 namespace Apache.NMS.AMQP
@@ -122,7 +123,7 @@ namespace Apache.NMS.AMQP
                 message.NMSReplyTo = replyTo;
             }
 
-            await producer.SendAsync(destination, message);
+            await producer.SendAsync(destination, message).Await();
             return this;
         }
 
@@ -198,6 +199,11 @@ namespace Apache.NMS.AMQP
         public void Close()
         {
             producer.Close();
+        }
+
+        public Task CloseAsync()
+        {
+            return producer.CloseAsync();
         }
 
 

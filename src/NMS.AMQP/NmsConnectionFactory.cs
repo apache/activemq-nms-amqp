@@ -17,9 +17,11 @@
 
 using System;
 using System.Collections.Specialized;
+using System.Threading.Tasks;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 using Apache.NMS.Util;
 using URISupport = Apache.NMS.AMQP.Util.URISupport;
 
@@ -166,7 +168,17 @@ namespace Apache.NMS.AMQP
         {
             return CreateConnection(UserName, Password);
         }
+        
+        public Task<IConnection> CreateConnectionAsync()
+        {
+            return CreateConnectionAsync(UserName, Password);
+        }
 
+        public Task<IConnection> CreateConnectionAsync(string userName, string password)
+        {
+            return Task.FromResult(CreateConnection(userName, password));
+        }
+       
         public IConnection CreateConnection(string userName, string password)
         {
             try
@@ -199,6 +211,26 @@ namespace Apache.NMS.AMQP
         public INMSContext CreateContext(string userName, string password, AcknowledgementMode acknowledgementMode)
         {
             return new NmsContext((NmsConnection)CreateConnection(userName, password), acknowledgementMode);
+        }
+
+        public async Task<INMSContext> CreateContextAsync()
+        {
+            return new NmsContext((NmsConnection)await CreateConnectionAsync().Await(), AcknowledgementMode.AutoAcknowledge);
+        }
+
+        public async Task<INMSContext> CreateContextAsync(AcknowledgementMode acknowledgementMode)
+        {
+            return new NmsContext((NmsConnection)await CreateConnectionAsync().Await(), acknowledgementMode);
+        }
+
+        public async Task<INMSContext> CreateContextAsync(string userName, string password)
+        {
+            return new NmsContext((NmsConnection)await CreateConnectionAsync(userName, password).Await(), AcknowledgementMode.AutoAcknowledge);
+        }
+
+        public async Task<INMSContext> CreateContextAsync(string userName, string password, AcknowledgementMode acknowledgementMode)
+        {
+            return new NmsContext((NmsConnection)await CreateConnectionAsync(userName, password).Await(), acknowledgementMode);
         }
 
         public Uri BrokerUri

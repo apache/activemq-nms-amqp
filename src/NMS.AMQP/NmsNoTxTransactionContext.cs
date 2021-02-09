@@ -19,7 +19,6 @@ using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
-using Apache.NMS.AMQP.Util;
 
 namespace Apache.NMS.AMQP
 {

@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using Apache.NMS;
 using Apache.NMS.AMQP.Message;
 using NMS.AMQP.Test.Message.Facade;
@@ -29,6 +30,11 @@ namespace NMS.AMQP.Test.Message.Foreign
         public void Acknowledge()
         {
             message.Acknowledge();
+        }
+
+        public Task AcknowledgeAsync()
+        {
+            return message.AcknowledgeAsync();
         }
 
         public void ClearBody()
