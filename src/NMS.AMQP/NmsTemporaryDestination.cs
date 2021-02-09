@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 
+using System.Threading.Tasks;
 using Apache.NMS.AMQP.Meta;
-using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP
 {
@@ -36,9 +37,14 @@ namespace Apache.NMS.AMQP
         
         public void Dispose()
         {
+            DeleteAsync().GetAsyncResult();
+        }
+
+        public async Task DeleteAsync()
+        {
             if (Connection != null)
             {
-                Connection.DeleteTemporaryDestination(this);
+                await Connection.DeleteTemporaryDestinationAsync(this).Await();
                 Connection = null;
             }
         }

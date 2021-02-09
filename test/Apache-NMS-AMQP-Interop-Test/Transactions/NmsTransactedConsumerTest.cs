@@ -46,6 +46,8 @@ namespace NMS.AMQP.Test.Transactions
         [Test, Timeout(60_000)]
         public void TestConsumedInTxAreAcked()
         {
+            PurgeQueue(TimeSpan.FromSeconds(2));
+            
             Connection = CreateAmqpConnection();
             Connection.Start();
 

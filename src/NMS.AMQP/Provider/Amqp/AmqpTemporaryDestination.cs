@@ -21,6 +21,7 @@ using Amqp;
 using Amqp.Framing;
 using Amqp.Types;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -94,12 +95,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
             return result;
         }
-
-        public void Close()
+        
+        public async Task CloseAsync()
         {
             try
             {
-                senderLink.Close();
+                await senderLink.CloseAsync().AwaitRunContinuationAsync();
             }
             catch (NMSException)
             {

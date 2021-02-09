@@ -16,14 +16,16 @@
  */
 
 using System.Collections;
+using System.Threading.Tasks;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP
 {
     public class NmsQueueBrowser : IQueueBrowser, IEnumerator
     {
-        private readonly object syncRoot = new object();
+        private readonly NmsSynchronizationMonitor syncRoot = new NmsSynchronizationMonitor();
 
         private readonly NmsSession session;
         private readonly IQueue destination;
@@ -103,8 +105,13 @@ namespace Apache.NMS.AMQP
 
         public void Close()
         {
+            CloseAsync().GetAsyncResult();
+        }
+
+        public async Task CloseAsync()
+        {
             if (closed.CompareAndSet(false, true)) {
-                DestroyConsumer();
+                await DestroyConsumerAsync().Await();
             }
         }
 
@@ -121,28 +128,33 @@ namespace Apache.NMS.AMQP
 
         private void CreateConsumer()
         {
-            lock (syncRoot)
+            using(syncRoot.Lock())
             {
                 if (consumer == null)
                 {
                     NmsMessageConsumer messageConsumer = new NmsQueueBrowserMessageConsumer(session.GetNextConsumerId(), session,
                         destination, selector, false);
 
-                    messageConsumer.Init().ConfigureAwait(false).GetAwaiter().GetResult();
+                    messageConsumer.Init().GetAsyncResult();
 
                     // Assign only after fully created and initialized.
                     consumer = messageConsumer;
                 }
             }
         }
-        
+
         private void DestroyConsumer()
         {
-            lock (syncRoot)
+            DestroyConsumerAsync().GetAsyncResult();
+        }
+        
+        private async Task DestroyConsumerAsync()
+        {
+            using(await syncRoot.LockAsync().Await())
             {
                 try
                 {
-                    consumer?.Close();
+                    await (consumer != null ? consumer.CloseAsync() : Task.CompletedTask).Await();
                 }
                 catch (NMSException e)
                 {

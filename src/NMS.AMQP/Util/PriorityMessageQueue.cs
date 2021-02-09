@@ -17,8 +17,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Util
 {
@@ -26,8 +27,8 @@ namespace Apache.NMS.AMQP.Util
     {
         private readonly LinkedList<InboundMessageDispatch>[] lists;
 
-        private readonly object syncRoot = new object();
-
+        private readonly NmsSynchronizationMonitor syncRoot = new NmsSynchronizationMonitor();
+        
         private bool disposed;
         private int count;
 
@@ -46,8 +47,10 @@ namespace Apache.NMS.AMQP.Util
         {
             get
             {
-                lock (syncRoot)
+                using(syncRoot.Lock())
+                {
                     return count;
+                }
             }
         }
 
@@ -78,22 +81,26 @@ namespace Apache.NMS.AMQP.Util
 
         public void Enqueue(InboundMessageDispatch envelope)
         {
-            lock (syncRoot)
+            using(syncRoot.Lock())
             {
                 GetList(envelope).AddLast(envelope);
                 this.count++;
-                Monitor.Pulse(syncRoot);
+
+                syncRoot.Pulse();
             }
+            
+            
         }
         
         public void EnqueueFirst(InboundMessageDispatch envelope)
         {
-            lock (syncRoot)
+            using(syncRoot.Lock())
             {
                 lists[(int) MsgPriority.Highest].AddFirst(envelope);
                 count++;
-                Monitor.Pulse(syncRoot);
-            }            
+                syncRoot.Pulse();
+            }
+            
         }
 
         private LinkedList<InboundMessageDispatch> GetList(InboundMessageDispatch envelope)
@@ -102,20 +109,20 @@ namespace Apache.NMS.AMQP.Util
             return lists[(int) priority];
         }
 
-        public InboundMessageDispatch Dequeue(int timeout)
+        public async Task<InboundMessageDispatch> DequeueAsync(int timeout)
         {
-            lock (syncRoot)
+            using(await syncRoot.LockAsync())
             {
                 while (timeout != 0 && IsEmpty && !disposed)
                 {
                     if (timeout == -1)
                     {
-                        Monitor.Wait(syncRoot);
+                        await syncRoot.WaitAsync();
                     }
                     else
                     {
                         long start = DateTime.UtcNow.Ticks / 10_000L;
-                        Monitor.Wait(syncRoot, timeout);
+                        await syncRoot.WaitAsync(timeout);
                         timeout = Math.Max(timeout + (int) (start - DateTime.UtcNow.Ticks / 10_000L), 0);
                     }
                 }
@@ -127,27 +134,61 @@ namespace Apache.NMS.AMQP.Util
 
                 return RemoveFirst();
             }
+
+        }
+
+
+        public InboundMessageDispatch Dequeue(int timeout)
+        {
+            using(syncRoot.Lock())
+            {
+                while (timeout != 0 && IsEmpty && !disposed)
+                {
+                    if (timeout == -1)
+                    {
+                        syncRoot.Wait();
+                    }
+                    else
+                    {
+                        long start = DateTime.UtcNow.Ticks / 10_000L;
+                        syncRoot.Wait(timeout);
+                        timeout = Math.Max(timeout + (int) (start - DateTime.UtcNow.Ticks / 10_000L), 0);
+                    }
+                }
+
+                if (IsEmpty || disposed)
+                {
+                    return null;
+                }
+
+                return RemoveFirst();
+            }
+            
         }
         
         public void Clear()
         {
-            lock (syncRoot)
-            {                
+            using(syncRoot.Lock())
+            {
                 for (int i = (int) MsgPriority.Highest; i >= 0; i--)
                 {
                     lists[i].Clear();
                 }
+
                 count = 0;
             }
+            
         }
 
         public void Dispose()
         {
-            lock (syncRoot)
+            
+            using(syncRoot.Lock())
             {
                 disposed = true;
-                Monitor.PulseAll(syncRoot);
+                syncRoot.PulseAll();
             }
+            
         }
     }
 }

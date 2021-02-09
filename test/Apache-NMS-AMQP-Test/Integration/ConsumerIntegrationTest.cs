@@ -459,6 +459,8 @@ namespace NMS.AMQP.Test.Integration
                 testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
+        
+       
 
         [Test, Timeout(20_000)]
         public void TestCreateProducerInOnMessage()

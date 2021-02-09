@@ -21,7 +21,7 @@ using System.Threading.Tasks;
 using Amqp.Framing;
 using Amqp.Transactions;
 using Apache.NMS.AMQP.Meta;
-using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -66,14 +66,14 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             Tracer.Debug($"TX Context{this} rolling back current TX[{this.current}]");
 
             this.current = null;
-            await this.coordinator.DischargeAsync(this.txnId, true).ConfigureAwait(false);
+            await this.coordinator.DischargeAsync(this.txnId, true).Await();
             
 
             PostRollback();
 
             if (nextTransactionInfo != null)
             {
-                await Begin(nextTransactionInfo).ConfigureAwait(false);
+                await Begin(nextTransactionInfo).Await();
             }
         }
 
@@ -101,11 +101,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             Tracer.Debug($"TX Context{this} committing back current TX[{this.current}]");
 
             this.current = null;
-            await this.coordinator.DischargeAsync(this.txnId, false).ConfigureAwait(false);
+            await this.coordinator.DischargeAsync(this.txnId, false).Await();
 
             PostCommit();
 
-            await Begin(nextTransactionInfo).ConfigureAwait(false);
+            await Begin(nextTransactionInfo).Await();
         }
 
         private void PostCommit()
@@ -123,7 +123,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 this.coordinator = new AmqpTransactionCoordinator(this.session);
             }
 
-            this.txnId = await this.coordinator.DeclareAsync().ConfigureAwait(false);
+            this.txnId = await this.coordinator.DeclareAsync().Await();
             this.current = transactionInfo.Id;
             transactionInfo.ProviderTxId = this.txnId;
             this.cachedTransactedState = new TransactionalState { TxnId = this.txnId };

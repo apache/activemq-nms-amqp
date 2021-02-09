@@ -18,11 +18,10 @@
 using System;
 using System.Threading.Tasks;
 using Amqp;
-using Amqp.Framing;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Transport;
-using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -135,6 +134,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             connection?.Close();
         }
 
+        public Task CloseAsync()
+        {
+            return connection?.CloseAsync();
+        }
+        
         public void SetProviderListener(IProviderListener providerListener)
         {
             Listener = providerListener;
@@ -166,49 +170,49 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
         }
 
-        public Task DestroyResource(INmsResource resourceInfo)
+        public async Task DestroyResource(INmsResource resourceInfo)
         {
             switch (resourceInfo)
             {
                 case NmsSessionInfo sessionInfo:
                 {
                     AmqpSession session = connection.GetSession(sessionInfo.Id);
-                    session.Close();
-                    return Task.CompletedTask;
+                    await session.CloseAsync().Await();
+                    return;
                 }
                 case NmsConsumerInfo consumerInfo:
                 {
                     AmqpSession session = connection.GetSession(consumerInfo.SessionId);
                     AmqpConsumer consumer = session.GetConsumer(consumerInfo.Id);
-                    consumer.Close();
+                    await consumer.CloseAsync().Await();;
                     session.RemoveConsumer(consumerInfo.Id);
-                    return Task.CompletedTask;
+                    return;
                 }
                 case NmsProducerInfo producerInfo:
                 {
                     AmqpSession session = connection.GetSession(producerInfo.SessionId);
                     AmqpProducer producer = session.GetProducer(producerInfo.Id);
-                    producer.Close();
+                    await producer.CloseAsync().Await();;
                     session.RemoveProducer(producerInfo.Id);
-                    return Task.CompletedTask;
+                    return;
                 }
                 case NmsTemporaryDestination temporaryDestination:
                 {
                     AmqpTemporaryDestination amqpTemporaryDestination = connection.GetTemporaryDestination(temporaryDestination);
                     if (amqpTemporaryDestination != null)
                     {
-                        amqpTemporaryDestination.Close();
+                        await amqpTemporaryDestination.CloseAsync().Await();;
                         connection.RemoveTemporaryDestination(temporaryDestination);
                     }
                     else
                         Tracer.Debug($"Could not find temporary destination {temporaryDestination} to delete.");
 
-                    return Task.CompletedTask;
+                    return;
                 }
                 default:
                     throw new ArgumentOutOfRangeException(nameof(resourceInfo), "Not supported resource type.");
             }
-        }
+          }
 
         public Task StartResource(INmsResource resourceInfo)
         {
@@ -270,7 +274,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             AmqpSession session = connection.GetSession(envelope.ProducerInfo.SessionId);
             AmqpProducer producer = session.GetProducer(envelope.ProducerId);
-            await producer.Send(envelope).ConfigureAwait(false);
+            await producer.Send(envelope).Await();
             envelope.Message.IsReadOnly = false;
         }
 

@@ -21,6 +21,7 @@ using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP
 {
@@ -39,19 +40,22 @@ namespace Apache.NMS.AMQP
         private bool disableMessageId;
         private bool disableMessageTimestamp;
 
-        public NmsMessageProducer(NmsProducerId producerId, NmsSession session, IDestination destination)
+        internal NmsMessageProducer(NmsProducerId producerId, NmsSession session, IDestination destination)
         {
             this.session = session;
             Info = new NmsProducerInfo(producerId)
             {
                 Destination = destination
             };
+        }
 
-            session.Connection.CreateResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+        internal async  Task Init()
+        {
+            await session.Connection.CreateResource(Info).Await();
 
             session.Add(this);
         }
-
+        
         public NmsProducerId ProducerId => Info.Id;
         public NmsProducerInfo Info { get; }
         public INmsMessageIdBuilder MessageIdBuilder { get; } = new DefaultMessageIdBuilder();
@@ -113,11 +117,16 @@ namespace Apache.NMS.AMQP
 
         public void Close()
         {
+            CloseAsync().GetAsyncResult();
+        }
+
+        public async Task CloseAsync()
+        {
             if (closed)
                 return;
 
             Shutdown();
-            session.Connection.DestroyResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+            await session.Connection.DestroyResource(Info).Await();
         }
 
         public IMessage CreateMessage()

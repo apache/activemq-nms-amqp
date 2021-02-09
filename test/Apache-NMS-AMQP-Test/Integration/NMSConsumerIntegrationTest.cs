@@ -16,10 +16,12 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Amqp.Framing;
+using Amqp.Types;
 using Apache.NMS;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Util;
@@ -72,7 +74,7 @@ namespace NMS.AMQP.Test.Integration
         //             .Setup(listener => listener.OnConsumerClosed(It.IsAny<IMessageConsumer>(), It.IsAny<Exception>()))
         //             .Callback(() => consumerClosed.Set());
         //
-        //         var context = (NmsContext) EstablishNMSContext(testPeer, "amqp.traceFrames=true");
+        //         var context = (NmsContext) EstablishNMSContext(testPeer);
         //         context.ConnectionInterruptedListener += () => { consumerClosed.Set(); };// AddConnectionListener(mockConnectionListener.Object);}
         //         // context.list ConnectionInterruptedListener += () => { consumerClosed.Set(); };// AddConnectionListener(mockConnectionListener.Object);}
         //         context.ExceptionListener += exception => { exceptionFired.Set(); };
@@ -970,6 +972,92 @@ namespace NMS.AMQP.Test.Integration
 
                 testPeer.WaitForAllMatchersToComplete(2000);
             }
+        }
+
+        [TestCaseSource("TestReceiveBodyCaseSource")]
+        [Timeout(20_000)]
+        public void TestReceiveBody<T>(T inputValue)
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                var context = EstablishNMSContext(testPeer);
+
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(CreateMessageWithValueContent(inputValue));
+                testPeer.ExpectDisposition(true, _ => { } );
+                
+
+                IQueue destination = context.GetQueue("myQueue");
+                var consumer = context.CreateConsumer(destination);
+
+                T body = consumer.ReceiveBody<T>();
+                Assert.AreEqual(inputValue, body);
+                Assert.AreNotSame(inputValue, body);
+
+
+                testPeer.ExpectEnd();
+                testPeer.ExpectClose();
+                
+                context.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
+            }
+        }
+        
+        [TestCaseSource("TestReceiveBodyCaseSource")]
+        [Timeout(20_000)]
+        public void TestReceiveBodyNoWait<T>(T inputValue)
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                var context = EstablishNMSContext(testPeer);
+
+                ManualResetEvent beforeFlow = new ManualResetEvent(false);
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(CreateMessageWithValueContent(inputValue), 1, false, false, false, false,
+                    (credit) => { beforeFlow.WaitOne(); }, 1);
+                testPeer.ExpectDisposition(true, _ => { } );
+                
+                IQueue destination = context.GetQueue("myQueue");
+                var consumer = context.CreateConsumer(destination);
+
+                T initialBody = consumer.ReceiveBodyNoWait<T>();
+                // Assert initially its null
+                Assert.AreEqual(default(T), initialBody);
+                
+                // Release and allow link to flow
+                beforeFlow.Set();
+                // Give short time to arrive
+                Thread.Sleep(100);
+                
+                T body = consumer.ReceiveBodyNoWait<T>();
+                Assert.AreEqual(inputValue, body);
+                Assert.AreNotSame(inputValue, body);
+
+
+                testPeer.ExpectEnd();
+                testPeer.ExpectClose();
+                
+                context.Close();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
+            }
+        }
+
+        public static IEnumerable<object> TestReceiveBodyCaseSource()
+        {
+            yield return new Map()
+            {
+                ["Parameter1"] = "test",
+                ["Parameter2"] = 23423
+            };
+            yield return 1233;
+            yield return "test";
+            yield return (uint) 1233;
+            yield return (ulong) 1233;
+            yield return (long) -1233;
         }
     }
 }
