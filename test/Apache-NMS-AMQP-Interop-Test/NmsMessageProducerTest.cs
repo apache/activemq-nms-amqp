@@ -58,8 +58,8 @@ namespace NMS.AMQP.Test
             
             
             DateTime sendTime = DateTime.Now;
-            ITextMessage message = session.CreateTextMessage("Hello");
-            producer.Send(message, MsgDeliveryMode.Persistent, MsgPriority.Normal, TimeSpan.Zero);
+            ITextMessage messageToSend = session.CreateTextMessage("Hello");
+            producer.Send(messageToSend, MsgDeliveryMode.Persistent, MsgPriority.Normal, TimeSpan.Zero);
 
             // Wait that delivery delay
             Thread.Sleep(deliveryDelay);
