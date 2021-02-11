@@ -135,10 +135,22 @@ namespace Apache.NMS.AMQP
             return session.CreateMessage();
         }
 
+        public async Task<IMessage> CreateMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateMessageAsync();
+        }
+
         public ITextMessage CreateTextMessage()
         {
             CheckClosed();
             return session.CreateTextMessage();
+        }
+
+        public async Task<ITextMessage> CreateTextMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateTextMessageAsync();
         }
 
         public ITextMessage CreateTextMessage(string text)
@@ -147,10 +159,22 @@ namespace Apache.NMS.AMQP
             return session.CreateTextMessage(text);
         }
 
+        public async Task<ITextMessage> CreateTextMessageAsync(string text)
+        {
+            CheckClosed();
+            return await session.CreateTextMessageAsync(text);
+        }
+
         public IMapMessage CreateMapMessage()
         {
             CheckClosed();
             return session.CreateMapMessage();
+        }
+
+        public async Task<IMapMessage> CreateMapMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateMapMessageAsync();
         }
 
         public IObjectMessage CreateObjectMessage(object body)
@@ -159,10 +183,22 @@ namespace Apache.NMS.AMQP
             return session.CreateObjectMessage(body);
         }
 
+        public async Task<IObjectMessage> CreateObjectMessageAsync(object body)
+        {
+            CheckClosed();
+            return await session.CreateObjectMessageAsync(body);
+        }
+
         public IBytesMessage CreateBytesMessage()
         {
             CheckClosed();
             return session.CreateBytesMessage();
+        }
+
+        public async Task<IBytesMessage> CreateBytesMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateBytesMessageAsync();
         }
 
         public IBytesMessage CreateBytesMessage(byte[] body)
@@ -171,10 +207,22 @@ namespace Apache.NMS.AMQP
             return session.CreateBytesMessage(body);
         }
 
+        public async Task<IBytesMessage> CreateBytesMessageAsync(byte[] body)
+        {
+            CheckClosed();
+            return await session.CreateBytesMessageAsync(body);
+        }
+
         public IStreamMessage CreateStreamMessage()
         {
             CheckClosed();
             return session.CreateStreamMessage();
+        }
+
+        public async Task<IStreamMessage> CreateStreamMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateStreamMessageAsync();
         }
 
         public ProducerTransformerDelegate ProducerTransformer { get; set; }
