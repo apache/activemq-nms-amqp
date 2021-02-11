@@ -105,7 +105,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
 
             // run on thread pool to ensure that the await statements in ScheduleReconnect are
             // not inside the lock statements in HandleProviderError and CreateNmsConnection
-            return Task.Run(async () => await reconnectControl.ScheduleReconnect(Reconnect));
+            return Task.Run(() => reconnectControl.ScheduleReconnect(Reconnect));
 
             async Task Reconnect()
             {
