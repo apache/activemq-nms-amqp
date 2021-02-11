@@ -161,9 +161,19 @@ namespace Apache.NMS.AMQP
             return session.CreateMessage();
         }
 
+        public Task<IMessage> CreateMessageAsync()
+        {
+            return session.CreateMessageAsync();
+        }
+
         public ITextMessage CreateTextMessage()
         {
             return session.CreateTextMessage();
+        }
+
+        public Task<ITextMessage> CreateTextMessageAsync()
+        {
+            return session.CreateTextMessageAsync();
         }
 
         public ITextMessage CreateTextMessage(string text)
@@ -171,9 +181,19 @@ namespace Apache.NMS.AMQP
             return session.CreateTextMessage(text);
         }
 
+        public Task<ITextMessage> CreateTextMessageAsync(string text)
+        {
+            return session.CreateTextMessageAsync(text);
+        }
+
         public IMapMessage CreateMapMessage()
         {
             return session.CreateMapMessage();
+        }
+
+        public Task<IMapMessage> CreateMapMessageAsync()
+        {
+            return session.CreateMapMessageAsync();
         }
 
         public IObjectMessage CreateObjectMessage(object body)
@@ -181,9 +201,19 @@ namespace Apache.NMS.AMQP
             return session.CreateObjectMessage(body);
         }
 
+        public Task<IObjectMessage> CreateObjectMessageAsync(object body)
+        {
+            return session.CreateObjectMessageAsync(body);
+        }
+
         public IBytesMessage CreateBytesMessage()
         {
             return session.CreateBytesMessage();
+        }
+
+        public Task<IBytesMessage> CreateBytesMessageAsync()
+        {
+            return session.CreateBytesMessageAsync();
         }
 
         public IBytesMessage CreateBytesMessage(byte[] body)
@@ -191,9 +221,19 @@ namespace Apache.NMS.AMQP
             return session.CreateBytesMessage(body);
         }
 
+        public Task<IBytesMessage> CreateBytesMessageAsync(byte[] body)
+        {
+            return session.CreateBytesMessageAsync(body);
+        }
+
         public IStreamMessage CreateStreamMessage()
         {
             return session.CreateStreamMessage();
+        }
+
+        public Task<IStreamMessage> CreateStreamMessageAsync()
+        {
+            return session.CreateStreamMessageAsync();
         }
 
         public void Close()
