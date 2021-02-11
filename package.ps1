@@ -34,7 +34,7 @@ if (test-path build) {
     write-progress "Packaging Application files." "Scanning..."
     $zipfile = "$pkgdir\$pkgname-$pkgver-bin.zip"
 
-    Compress-Archive -Path ..\LICENSE.txt, ..\NOTICE.txt -Update -DestinationPath $zipfile        
+    Compress-Archive -Path ..\LICENSE.txt, ..\NOTICE.txt -Update -DestinationPath $zipfile
     
     # clean up temp
     Remove-Item temp -Recurse -ErrorAction Ignore
@@ -47,6 +47,10 @@ if (test-path build) {
     $nupkg = "$pkgname.$pkgver.nupkg"
     $nupkgdestination = "$pkgdir\$nupkg"
     Copy-Item -Path $nupkg -Destination $nupkgdestination
+
+    $snupkg = "$pkgname.$pkgver.snupkg"
+    $snupkgdestination = "$pkgdir\$snupkg"
+    Copy-Item -Path $snupkg -Destination $snupkgdestination
 
     # clean up temp
     Remove-Item temp -Recurse -ErrorAction Inquire

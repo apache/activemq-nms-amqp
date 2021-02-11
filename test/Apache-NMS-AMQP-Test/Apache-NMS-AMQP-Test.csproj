@@ -16,7 +16,7 @@ under the License.
 -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net462;netcoreapp3.1</TargetFrameworks>
+    <TargetFrameworks>net462;netcoreapp2.1</TargetFrameworks>
     <TargetFramework Condition="'$(AppTargetFramework)' != ''">$(AppTargetFramework)</TargetFramework>
     <RootNamespace>NMS.AMQP.Test</RootNamespace>
     <AssemblyName>NMS.AMQP.Test</AssemblyName>
