@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -61,6 +62,29 @@ namespace Apache.NMS.AMQP
             actionBlock.Complete();
             cts.Cancel();
             cts.Dispose();
+        }
+
+        public IDisposable ExcludeCheckIsOnDeliveryExecutionFlow()
+        {
+            return new ExcludeCheckIsOnDeliveryExecutionFlowBlock(this);
+        }
+
+        private class ExcludeCheckIsOnDeliveryExecutionFlowBlock : IDisposable
+        {
+            private readonly bool previousValue = false;
+            private readonly SessionDispatcher sessionDispatcher;
+
+            public ExcludeCheckIsOnDeliveryExecutionFlowBlock(SessionDispatcher sessionDispatcher)
+            {
+                this.sessionDispatcher = sessionDispatcher;
+                this.previousValue = sessionDispatcher.isOnDispatcherFlow.Value;
+                sessionDispatcher.isOnDispatcherFlow.Value = false;
+            }
+
+            public void Dispose()
+            {
+                sessionDispatcher.isOnDispatcherFlow.Value = previousValue;
+            }
         }
     }
 }

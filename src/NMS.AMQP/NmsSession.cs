@@ -841,6 +841,11 @@ namespace Apache.NMS.AMQP
             }
         }
 
+        internal IDisposable ExcludeCheckIsOnDeliveryExecutionFlow()
+        {
+            return dispatcher?.ExcludeCheckIsOnDeliveryExecutionFlow();
+        }
+
         public async Task OnConnectionRecovery(IProvider provider)
         {
             await provider.CreateResource(SessionInfo).Await();
