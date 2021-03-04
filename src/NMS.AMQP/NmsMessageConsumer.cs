@@ -327,7 +327,7 @@ namespace Apache.NMS.AMQP
             
             if (Session.IsStarted && started && Listener != null)
             {
-                using(await syncRoot.LockAsync())
+                using(await syncRoot.LockAsync().Await())
                 {
                     try
                     {
@@ -400,7 +400,12 @@ namespace Apache.NMS.AMQP
                         //
                         // We need to decide how to respond to these, but definitely we cannot
                         // let this error propagate as it could take down the SessionDispatcher
-                        Session.Connection.OnAsyncException(e);
+
+                        // To let close the existing session/connection in error handler
+                        using (Session.ExcludeCheckIsOnDeliveryExecutionFlow())
+                        {
+                            Session.Connection.OnAsyncException(e);
+                        }
                     }
                 }
             }
