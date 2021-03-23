@@ -21,6 +21,7 @@ using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP
 {
@@ -31,6 +32,7 @@ namespace Apache.NMS.AMQP
         private readonly AtomicLong messageSequence = new AtomicLong();
 
         private Exception failureCause;
+        private TimeSpan deliveryDelay = TimeSpan.Zero;
         private MsgDeliveryMode deliveryMode = MsgDeliveryMode.Persistent;
         private TimeSpan timeToLive = NMSConstants.defaultTimeToLive;
         private TimeSpan requestTimeout;
@@ -38,19 +40,22 @@ namespace Apache.NMS.AMQP
         private bool disableMessageId;
         private bool disableMessageTimestamp;
 
-        public NmsMessageProducer(NmsProducerId producerId, NmsSession session, IDestination destination)
+        internal NmsMessageProducer(NmsProducerId producerId, NmsSession session, IDestination destination)
         {
             this.session = session;
             Info = new NmsProducerInfo(producerId)
             {
                 Destination = destination
             };
+        }
 
-            session.Connection.CreateResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+        internal async  Task Init()
+        {
+            await session.Connection.CreateResource(Info).Await();
 
             session.Add(this);
         }
-
+        
         public NmsProducerId ProducerId => Info.Id;
         public NmsProducerInfo Info { get; }
         public INmsMessageIdBuilder MessageIdBuilder { get; } = new DefaultMessageIdBuilder();
@@ -85,16 +90,43 @@ namespace Apache.NMS.AMQP
         public void Send(IDestination destination, IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority, TimeSpan timeToLive)
         {
             CheckClosed();
-            session.Send(this, destination, message, deliveryMode, priority, timeToLive, DisableMessageID, DisableMessageTimestamp);
+            session.Send(this, destination, message, deliveryMode, priority, timeToLive, DisableMessageID, DisableMessageTimestamp, deliveryDelay);
+        }
+
+        public Task SendAsync(IMessage message)
+        {
+            return SendAsync(Info.Destination, message, deliveryMode, priority, timeToLive);
+        }
+
+        public Task SendAsync(IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority, TimeSpan timeToLive)
+        {
+            return SendAsync(Info.Destination, message, deliveryMode, priority, timeToLive);
+        }
+
+        public Task SendAsync(IDestination destination, IMessage message)
+        {
+            return SendAsync(destination, message, deliveryMode, priority, timeToLive);
+        }
+
+        public Task SendAsync(IDestination destination, IMessage message, MsgDeliveryMode deliveryMode, MsgPriority priority,
+            TimeSpan timeToLive)
+        {
+            CheckClosed();
+            return session.SendAsync(this, destination, message, deliveryMode, priority, timeToLive, DisableMessageID, DisableMessageTimestamp, deliveryDelay);
         }
 
         public void Close()
+        {
+            CloseAsync().GetAsyncResult();
+        }
+
+        public async Task CloseAsync()
         {
             if (closed)
                 return;
 
             Shutdown();
-            session.Connection.DestroyResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+            await session.Connection.DestroyResource(Info).Await();
         }
 
         public IMessage CreateMessage()
@@ -103,10 +135,22 @@ namespace Apache.NMS.AMQP
             return session.CreateMessage();
         }
 
+        public async Task<IMessage> CreateMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateMessageAsync();
+        }
+
         public ITextMessage CreateTextMessage()
         {
             CheckClosed();
             return session.CreateTextMessage();
+        }
+
+        public async Task<ITextMessage> CreateTextMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateTextMessageAsync();
         }
 
         public ITextMessage CreateTextMessage(string text)
@@ -115,10 +159,22 @@ namespace Apache.NMS.AMQP
             return session.CreateTextMessage(text);
         }
 
+        public async Task<ITextMessage> CreateTextMessageAsync(string text)
+        {
+            CheckClosed();
+            return await session.CreateTextMessageAsync(text);
+        }
+
         public IMapMessage CreateMapMessage()
         {
             CheckClosed();
             return session.CreateMapMessage();
+        }
+
+        public async Task<IMapMessage> CreateMapMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateMapMessageAsync();
         }
 
         public IObjectMessage CreateObjectMessage(object body)
@@ -127,10 +183,22 @@ namespace Apache.NMS.AMQP
             return session.CreateObjectMessage(body);
         }
 
+        public async Task<IObjectMessage> CreateObjectMessageAsync(object body)
+        {
+            CheckClosed();
+            return await session.CreateObjectMessageAsync(body);
+        }
+
         public IBytesMessage CreateBytesMessage()
         {
             CheckClosed();
             return session.CreateBytesMessage();
+        }
+
+        public async Task<IBytesMessage> CreateBytesMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateBytesMessageAsync();
         }
 
         public IBytesMessage CreateBytesMessage(byte[] body)
@@ -139,10 +207,22 @@ namespace Apache.NMS.AMQP
             return session.CreateBytesMessage(body);
         }
 
+        public async Task<IBytesMessage> CreateBytesMessageAsync(byte[] body)
+        {
+            CheckClosed();
+            return await session.CreateBytesMessageAsync(body);
+        }
+
         public IStreamMessage CreateStreamMessage()
         {
             CheckClosed();
             return session.CreateStreamMessage();
+        }
+
+        public async Task<IStreamMessage> CreateStreamMessageAsync()
+        {
+            CheckClosed();
+            return await session.CreateStreamMessageAsync();
         }
 
         public ProducerTransformerDelegate ProducerTransformer { get; set; }
@@ -231,6 +311,25 @@ namespace Apache.NMS.AMQP
             }
         }
 
+        public TimeSpan DeliveryDelay
+        {
+            get
+            {
+                CheckClosed();
+                return deliveryDelay;
+            }
+            set
+            {
+                if (!session.Connection.ConnectionInfo.DelayedDeliverySupported)
+                {
+                    throw new NotSupportedException("Delayed Delivery is not supported");
+                }
+                
+                CheckClosed();
+                deliveryDelay = value;
+            }
+        }
+        
         public Task OnConnectionRecovery(IProvider provider)
         {
             return provider.CreateResource(Info);

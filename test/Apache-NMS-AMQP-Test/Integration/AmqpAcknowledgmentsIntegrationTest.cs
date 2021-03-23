@@ -18,6 +18,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Amqp.Framing;
 using Apache.NMS;
 using Apache.NMS.AMQP.Util;

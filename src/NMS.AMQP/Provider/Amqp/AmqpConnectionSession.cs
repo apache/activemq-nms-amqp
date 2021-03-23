@@ -22,6 +22,7 @@ using Amqp.Framing;
 using Amqp.Types;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -57,9 +58,9 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 tcs.TrySetException(exception);
             });
 
-            await tcs.Task;
+            await tcs.Task.Await();
             
-            receiverLink.Close(TimeSpan.FromMilliseconds(Connection.Provider.CloseTimeout));
+            await receiverLink.CloseAsync(TimeSpan.FromMilliseconds(Connection.Provider.CloseTimeout)).AwaitRunContinuationAsync();
         }
 
         private Attach CreateAttach(string subscriptionName)

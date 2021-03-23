@@ -25,6 +25,7 @@ using Amqp;
 using Amqp.Framing;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -83,14 +84,14 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             return tcs.Task;
         }
 
-        public void Close()
+        public async Task CloseAsync()
         {
             long closeTimeout = Connection.Provider.CloseTimeout;
             TimeSpan timeout = TimeSpan.FromMilliseconds(closeTimeout);
-            UnderlyingSession.Close(timeout);
+            await UnderlyingSession.CloseAsync(timeout).AwaitRunContinuationAsync();
             Connection.RemoveSession(SessionInfo.Id);
         }
-
+        
         public Task BeginTransaction(NmsTransactionInfo transactionInfo)
         {
             if (!SessionInfo.IsTransacted)
@@ -115,14 +116,14 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public async Task CreateConsumer(NmsConsumerInfo consumerInfo)
         {
             AmqpConsumer amqpConsumer = new AmqpConsumer(this, consumerInfo);
-            await amqpConsumer.Attach();
+            await amqpConsumer.Attach().Await();;
             consumers.TryAdd(consumerInfo.Id, amqpConsumer);
         }
 
         public async Task CreateProducer(NmsProducerInfo producerInfo)
         {
             var amqpProducer = new AmqpProducer(this, producerInfo);
-            await amqpProducer.Attach();
+            await amqpProducer.Attach().Await();;
             producers.TryAdd(producerInfo.Id, amqpProducer);
         }
 

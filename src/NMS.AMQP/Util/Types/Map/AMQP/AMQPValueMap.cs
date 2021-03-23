@@ -102,7 +102,7 @@ namespace Apache.NMS.AMQP.Util.Types.Map.AMQP
         /// </summary>
         /// <param name="key">Key to associated value.</param>
         /// <returns>Value for given Key.</returns>
-        protected override object GetObjectProperty(string key)
+        public override object GetObject(string key)
         {
             return this.value[key];
         }
@@ -112,7 +112,7 @@ namespace Apache.NMS.AMQP.Util.Types.Map.AMQP
         /// </summary>
         /// <param name="key">Key to associated value.</param>
         /// <param name="value">Value to set.</param>
-        protected override void SetObjectProperty(string key, object value)
+        public override void SetObject(string key, object value)
         {
             object objval = value;
             if(objval is IDictionary)

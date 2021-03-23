@@ -19,6 +19,6 @@ namespace Apache.NMS.AMQP.Message.Facade
 {
     public interface INmsObjectMessageFacade : INmsMessageFacade
     {
-        object Body { get; set; }        
+        object Object { get; set; }        
     }
 }

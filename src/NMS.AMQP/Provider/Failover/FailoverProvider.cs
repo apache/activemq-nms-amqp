@@ -22,6 +22,7 @@ using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 using Apache.NMS.Util;
 
 namespace Apache.NMS.AMQP.Provider.Failover
@@ -128,8 +129,8 @@ namespace Apache.NMS.AMQP.Provider.Failover
                             {
                                 Tracer.Debug($"Connection attempt:[{reconnectAttempts}] to: {target.Scheme}://{target.Host}:{target.Port} in-progress");
                                 provider = ProviderFactory.Create(target);
-                                await provider.Connect(connectionInfo).ConfigureAwait(false);
-                                await InitializeNewConnection(provider).ConfigureAwait(false);
+                                await provider.Connect(connectionInfo).Await();
+                                await InitializeNewConnection(provider).Await();
                                 return;
                             }
                             catch (Exception e)
@@ -173,7 +174,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
                         }
                         else
                         {
-                            await reconnectControl.ScheduleReconnect(Reconnect).ConfigureAwait(false);
+                            await reconnectControl.ScheduleReconnect(Reconnect).Await();
                         }
                     }
                 }
@@ -220,21 +221,21 @@ namespace Apache.NMS.AMQP.Provider.Failover
                 Tracer.Debug($"Signalling connection recovery: {provider}");
 
                 // Allow listener to recover its resources
-                await listener.OnConnectionRecovery(provider).ConfigureAwait(false);
+                await listener.OnConnectionRecovery(provider).Await();
 
                 // Restart consumers, send pull commands, etc.
-                await listener.OnConnectionRecovered(provider).ConfigureAwait(false);
+                await listener.OnConnectionRecovered(provider).Await();
 
                 // Let the client know that connection has restored.
                 listener.OnConnectionRestored(connectedUri);
 
                 // If we try to run pending requests right after the connection is reestablished 
                 // it will result in timeout on the first send request
-                await Task.Delay(50).ConfigureAwait(false);
+                await Task.Delay(50).Await();
 
                 foreach (FailoverRequest request in GetPendingRequests())
                 {
-                    await request.Run().ConfigureAwait(false);
+                    await request.Run().Await();
                 }
 
                 reconnectControl.ConnectionEstablished();
@@ -258,6 +259,21 @@ namespace Apache.NMS.AMQP.Provider.Failover
                 try
                 {
                     provider?.Close();
+                }
+                catch (Exception e)
+                {
+                    Tracer.Warn("Error caught while closing Provider: " + e.Message);
+                }
+            }
+        }
+
+        public async Task CloseAsync()
+        {
+            if (closed.CompareAndSet(false, true))
+            {
+                try
+                {
+                    if (provider != null) await provider.CloseAsync().Await();
                 }
                 catch (Exception e)
                 {
@@ -599,20 +615,20 @@ namespace Apache.NMS.AMQP.Provider.Failover
                     if (ReconnectAttempts == 0)
                     {
                         Tracer.Debug("Initial connect attempt will be performed immediately");
-                        await action();
+                        await action().Await();;
                     }
                     else if (ReconnectAttempts == 1 && failoverProvider.InitialReconnectDelay > 0)
                     {
                         Tracer.Debug($"Delayed initial reconnect attempt will be in {failoverProvider.InitialReconnectDelay} milliseconds");
-                        await Task.Delay(TimeSpan.FromMilliseconds(failoverProvider.InitialReconnectDelay));
-                        await action();
+                        await Task.Delay(TimeSpan.FromMilliseconds(failoverProvider.InitialReconnectDelay)).Await();;
+                        await action().Await();;
                     }
                     else
                     {
                         double delay = NextReconnectDelay();
                         Tracer.Debug($"Next reconnect attempt will be in {delay} milliseconds");
-                        await Task.Delay(TimeSpan.FromMilliseconds(delay));
-                        await action();
+                        await Task.Delay(TimeSpan.FromMilliseconds(delay)).Await();;
+                        await action().Await();;
                     }
                 }
                 else if (ReconnectAttempts == 0)
@@ -620,21 +636,21 @@ namespace Apache.NMS.AMQP.Provider.Failover
                     if (failoverProvider.InitialReconnectDelay > 0)
                     {
                         Tracer.Debug($"Delayed initial reconnect attempt will be in {failoverProvider.InitialReconnectDelay} milliseconds");
-                        await Task.Delay(TimeSpan.FromMilliseconds(failoverProvider.InitialReconnectDelay));
-                        await action();
+                        await Task.Delay(TimeSpan.FromMilliseconds(failoverProvider.InitialReconnectDelay)).Await();
+                        await action().Await();;
                     }
                     else
                     {
                         Tracer.Debug("Initial Reconnect attempt will be performed immediately");
-                        await action();
+                        await action().Await();;
                     }
                 }
                 else
                 {
                     double delay = NextReconnectDelay();
                     Tracer.Debug($"Next reconnect attempt will be in {delay} milliseconds");
-                    await Task.Delay(TimeSpan.FromMilliseconds(delay));
-                    await action();
+                    await Task.Delay(TimeSpan.FromMilliseconds(delay)).Await();
+                    await action().Await();;
                 }
             }
 

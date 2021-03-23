@@ -25,6 +25,7 @@ using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 using Apache.NMS.Util;
 
 namespace Apache.NMS.AMQP
@@ -43,7 +44,7 @@ namespace Apache.NMS.AMQP
         private readonly AtomicLong temporaryQueueIdGenerator = new AtomicLong();
         private readonly AtomicLong transactionIdGenerator = new AtomicLong();
         private Exception failureCause;
-        private readonly object syncRoot = new object();
+        private readonly NmsSynchronizationMonitor syncRoot = new NmsSynchronizationMonitor();
 
         public NmsConnection(NmsConnectionInfo connectionInfo, IProvider provider)
         {
@@ -89,12 +90,18 @@ namespace Apache.NMS.AMQP
             DoStop(true);
         }
 
+        public Task StopAsync()
+        {
+            Stop();
+            return Task.CompletedTask;
+        }
+
         private void DoStop(bool checkClosed)
         {
             if (checkClosed)
                 CheckClosedOrFailed();
 
-            CheckIsOnDeliveryThread();
+            CheckIsOnDeliveryExecutionFlow();
 
             if (started.CompareAndSet(true, false))
             {
@@ -112,13 +119,23 @@ namespace Apache.NMS.AMQP
 
         public ISession CreateSession(AcknowledgementMode acknowledgementMode)
         {
+            return CreateSessionAsync(acknowledgementMode).GetAsyncResult();
+        }
+
+        public Task<ISession> CreateSessionAsync()
+        {
+            return CreateSessionAsync(AcknowledgementMode);
+        }
+
+        public async Task<ISession> CreateSessionAsync(AcknowledgementMode acknowledgementMode)
+        {
             CheckClosedOrFailed();
-            CreateNmsConnection();
+            await CreateNmsConnectionAsync().Await();
 
             NmsSession session = new NmsSession(this, GetNextSessionId(), acknowledgementMode);
             try
             {
-                session.Begin().ConfigureAwait(false).GetAwaiter().GetResult();
+                await session.Begin().Await();
                 sessions.TryAdd(session.SessionInfo.Id, session);
                 if (started)
                 {
@@ -139,18 +156,23 @@ namespace Apache.NMS.AMQP
 
         public void Close()
         {
-            CheckIsOnDeliveryThread();
+            CloseAsync().GetAsyncResult();
+        }
+
+        public async Task CloseAsync()
+        {
+            CheckIsOnDeliveryExecutionFlow();
 
             if (closed.CompareAndSet(false, true))
             {
                 DoStop(false);
 
                 foreach (NmsSession session in sessions.Values)
-                    session.Shutdown(null);
+                    await session.ShutdownAsync(null).Await();;
 
                 try
                 {
-                    provider.Close();
+                    await provider.CloseAsync().Await();;
                 }
                 catch (Exception)
                 {
@@ -170,7 +192,12 @@ namespace Apache.NMS.AMQP
 
         public void Start()
         {
-            CreateNmsConnection();
+            StartAsync().GetAsyncResult();
+        }
+        
+        public async Task StartAsync()
+        {
+            await CreateNmsConnectionAsync().Await();;
 
             if (started.CompareAndSet(false, true))
             {
@@ -288,12 +315,12 @@ namespace Apache.NMS.AMQP
         {
             foreach (NmsTemporaryDestination tempDestination in tempDestinations.Values)
             {
-                await provider.CreateResource(tempDestination);
+                await provider.CreateResource(tempDestination).Await();;
             }
 
             foreach (NmsSession session in sessions.Values)
             {
-                await session.OnConnectionRecovery(provider).ConfigureAwait(false);
+                await session.OnConnectionRecovery(provider).Await();
             }
         }
 
@@ -314,7 +341,7 @@ namespace Apache.NMS.AMQP
 
             foreach (NmsSession session in sessions.Values)
             {
-                await session.OnConnectionRecovered(provider).ConfigureAwait(false);
+                await session.OnConnectionRecovered(provider).Await();
             }
         }
 
@@ -403,38 +430,56 @@ namespace Apache.NMS.AMQP
             return provider.Send(envelope);
         }
 
-        private void CheckIsOnDeliveryThread()
+        private void CheckIsOnDeliveryExecutionFlow()
         {
             foreach (NmsSession session in sessions.Values)
             {
-                session.CheckIsOnDeliveryThread();
+                session.CheckIsOnDeliveryExecutionFlow();
             }
         }
 
         private void CreateNmsConnection()
+        {
+            CreateNmsConnectionInternal(true).GetAsyncResult();
+        }
+
+        private Task CreateNmsConnectionAsync()
+        {
+            return CreateNmsConnectionInternal(false);
+        }
+        
+        private async Task CreateNmsConnectionInternal(bool sync = true)
         {
             if (connected || closed)
             {
                 return;
             }
 
-            lock (syncRoot)
+            var syncLock = sync ? syncRoot.Lock() : await syncRoot.LockAsync();
+            using(syncLock)
             {
                 if (closed || connected)
                 {
                     return;
                 }
-                
+
                 try
                 {
-                    provider.Connect(ConnectionInfo).ConfigureAwait(false).GetAwaiter().GetResult();
+                    var configureTask = provider.Connect(ConnectionInfo).Await();
+                    if (sync)
+                        configureTask.GetAwaiter().GetResult();
+                    else
+                        await configureTask;
                     connected.Set(true);
                 }
                 catch (Exception e)
                 {
                     try
                     {
-                        provider.Close();
+                        if (sync)
+                            provider.Close();
+                        else
+                            await provider.CloseAsync().Await();
                     }
                     catch
                     {
@@ -444,6 +489,7 @@ namespace Apache.NMS.AMQP
                     throw NMSExceptionSupport.Create(e);
                 }
             }
+            
         }
 
         internal void OnAsyncException(Exception error)
@@ -488,23 +534,33 @@ namespace Apache.NMS.AMQP
 
         public ITemporaryQueue CreateTemporaryQueue()
         {
+            return CreateTemporaryQueueAsync().GetAsyncResult();
+        } 
+        
+        public async Task<ITemporaryQueue> CreateTemporaryQueueAsync()
+        {
             var destinationName = $"{Id}:{temporaryQueueIdGenerator.IncrementAndGet().ToString()}";
             var queue = new NmsTemporaryQueue(destinationName);
-            InitializeTemporaryDestination(queue);
+            await InitializeTemporaryDestinationAsync(queue).Await();;
             return queue;
         }
 
         public ITemporaryTopic CreateTemporaryTopic()
         {
+            return CreateTemporaryTopicAsync().GetAsyncResult();
+        } 
+        
+        public async Task<ITemporaryTopic> CreateTemporaryTopicAsync()
+        {
             var destinationName = $"{Id}:{temporaryTopicIdGenerator.IncrementAndGet().ToString()}";
             NmsTemporaryTopic topic = new NmsTemporaryTopic(destinationName);
-            InitializeTemporaryDestination(topic);
+            await InitializeTemporaryDestinationAsync(topic).Await();;
             return topic;
         }
 
-        private void InitializeTemporaryDestination(NmsTemporaryDestination temporaryDestination)
+        private async Task InitializeTemporaryDestinationAsync(NmsTemporaryDestination temporaryDestination)
         {
-            CreateResource(temporaryDestination).ConfigureAwait(false).GetAwaiter().GetResult();
+            await CreateResource(temporaryDestination).Await();
             tempDestinations.TryAdd(temporaryDestination, temporaryDestination);
             temporaryDestination.Connection = this;
         }
@@ -515,7 +571,7 @@ namespace Apache.NMS.AMQP
                 throw new InvalidDestinationException("Can't consume from a temporary destination created using another connection");
         }
 
-        public void DeleteTemporaryDestination(NmsTemporaryDestination destination)
+        public async Task DeleteTemporaryDestinationAsync(NmsTemporaryDestination destination)
         {
             CheckClosedOrFailed();
 
@@ -531,7 +587,7 @@ namespace Apache.NMS.AMQP
 
                 tempDestinations.TryRemove(destination, out _);
 
-                DestroyResource(destination).ConfigureAwait(false).GetAwaiter().GetResult();
+                await DestroyResource(destination).Await();
             }
             catch (Exception e)
             {
@@ -541,11 +597,16 @@ namespace Apache.NMS.AMQP
 
         public void Unsubscribe(string subscriptionName)
         {
-            CheckClosedOrFailed();
-
-            provider.Unsubscribe(subscriptionName).ConfigureAwait(false).GetAwaiter().GetResult();
+            UnsubscribeAsync(subscriptionName).GetAsyncResult();
         }
 
+        public async Task UnsubscribeAsync(string subscriptionName)
+        {
+            CheckClosedOrFailed();
+            
+            await provider.Unsubscribe(subscriptionName).Await();
+        }
+        
         public Task Rollback(NmsTransactionInfo transactionInfo, NmsTransactionInfo nextTransactionInfo)
         {
             return provider.Rollback(transactionInfo, nextTransactionInfo);

@@ -60,6 +60,7 @@ namespace NMS.AMQP.Test.Message.Facade
         public IDestination NMSReplyTo { get; set; }
         public DateTime NMSTimestamp { get; set; }
         public string NMSType { get; set; }
+        public DateTime DeliveryTime { get; set; }
         public string GroupId { get; set; }
         public uint GroupSequence { get; set; }
         public DateTime? Expiration { get; set; }
@@ -70,6 +71,11 @@ namespace NMS.AMQP.Test.Message.Facade
         public INmsMessageFacade Copy()
         {
             return null;
+        }
+
+        public bool HasBody()
+        {
+            return true;
         }
     }
 }

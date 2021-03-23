@@ -14,13 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 using Amqp.Types;
-using Apache.NMS;
 
 namespace Apache.NMS.AMQP.Util
 {
@@ -39,6 +34,7 @@ namespace Apache.NMS.AMQP.Util
         public static readonly Symbol OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER = new Symbol("sole-connection-for-container");
         public static readonly Symbol OPEN_CAPABILITY_ANONYMOUS_RELAY = new Symbol("ANONYMOUS-RELAY");
         public static readonly Symbol OPEN_CAPABILITY_DELAYED_DELIVERY = new Symbol("DELAYED_DELIVERY");
+        public static readonly Symbol OPEN_CAPABILITY_SHARED_SUBS = new Symbol("SHARED-SUBS");
 
         // Attach Frame 
         public readonly static Symbol ATTACH_EXPIRY_POLICY_LINK_DETACH = new Symbol("link-detach");
@@ -61,6 +57,8 @@ namespace Apache.NMS.AMQP.Util
         public static readonly Symbol JMSX_OPT_MSG_TYPE = new Symbol("x-opt-jms-msg-type");
         public static readonly Symbol JMSX_OPT_DEST = new Symbol("x-opt-jms-dest");
         public static readonly Symbol JMSX_OPT_REPLY_TO = new Symbol("x-opt-jms-reply-to");
+
+        public static readonly Symbol NMS_DELIVERY_TIME = new Symbol("x-opt-delivery-time");
 
         // Frame Property Value
         public readonly static Symbol BOOLEAN_TRUE = new Symbol("true");
@@ -121,6 +119,21 @@ namespace Apache.NMS.AMQP.Util
             }
             // unknown destination type...
             return null;
+        }
+        
+        public static bool IsNumber(object value)
+        {
+            return value is sbyte
+                   || value is byte
+                   || value is short
+                   || value is ushort
+                   || value is int
+                   || value is uint
+                   || value is long
+                   || value is ulong
+                   || value is float
+                   || value is double
+                   || value is decimal;
         }
 
     }

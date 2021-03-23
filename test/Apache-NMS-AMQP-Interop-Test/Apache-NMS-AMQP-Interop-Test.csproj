@@ -33,5 +33,12 @@ under the License.
   
   <ItemGroup>
     <ProjectReference Include="..\..\src\NMS.AMQP\Apache-NMS-AMQP.csproj" />
+    <ProjectReference Include="..\Apache-NMS-AMQP-Test\Apache-NMS-AMQP-Test.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Update="NLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

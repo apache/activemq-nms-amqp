@@ -15,8 +15,10 @@
  * limitations under the License.
  */
 
+using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP
 {
@@ -32,7 +34,7 @@ namespace Apache.NMS.AMQP
             this.envelope = envelope;
         }
 
-        public void Acknowledge()
+        public async Task Acknowledge()
         {
             if (session.IsClosed)
             {
@@ -41,11 +43,11 @@ namespace Apache.NMS.AMQP
 
             if (envelope == null)
             {
-                session.Acknowledge(AcknowledgementType);
+                await session.AcknowledgeAsync(AcknowledgementType).Await();
             }
             else
             {
-                session.AcknowledgeIndividual(AcknowledgementType, envelope);
+                await session.AcknowledgeIndividualAsync(AcknowledgementType, envelope).Await();
             }
         }
 

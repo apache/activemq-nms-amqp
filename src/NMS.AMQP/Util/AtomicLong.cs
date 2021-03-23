@@ -32,6 +32,16 @@ namespace Apache.NMS.AMQP.Util
         {
             return Interlocked.Increment(ref value);
         }
+        
+        public long DecrementAndGet()
+        {
+            return Interlocked.Decrement(ref value);
+        }
+        
+        public long Get()
+        {
+            return Interlocked.Read(ref value);
+        }
 
         public static implicit operator long(AtomicLong atomicLong)
         {
