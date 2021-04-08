@@ -26,16 +26,15 @@ namespace NMS.AMQP.Test.Message.Facade
     {
         private BinaryWriter bytesOut = null;
         private BinaryReader bytesIn = null;
-        private byte[] content = null;
 
         public NmsTestBytesMessageFacade()
         {
-            content = new byte[0];
+            Content = new byte[0];
         }
 
         public NmsTestBytesMessageFacade(byte[] content)
         {
-            this.content = content;
+            this.Content = content;
         }
 
         public BinaryReader GetDataReader()
@@ -45,7 +44,7 @@ namespace NMS.AMQP.Test.Message.Facade
                 throw new IllegalStateException("Body is being written to, cannot perform a read.");
             }
             
-            return bytesIn ?? (bytesIn = new BinaryReader(new MemoryStream(content)));
+            return bytesIn ?? (bytesIn = new BinaryReader(new MemoryStream(Content)));
         }
 
         public BinaryWriter GetDataWriter()
@@ -65,7 +64,7 @@ namespace NMS.AMQP.Test.Message.Facade
                 bytesOut.BaseStream.Position = 0;
                 bytesOut.BaseStream.CopyTo(byteStream);
 
-                content = byteStream.ToArray();
+                Content = byteStream.ToArray();
 
                 byteStream.Close();
                 bytesOut.Close();
@@ -81,9 +80,10 @@ namespace NMS.AMQP.Test.Message.Facade
         public override void ClearBody()
         {
             this.Reset();
-            content = new byte[0];
+            Content = new byte[0];
         }
 
-        public long BodyLength => content?.LongLength ?? 0;
+        public long BodyLength => Content?.LongLength ?? 0;
+        public byte[] Content { get; set; }
     }
 }
