@@ -71,7 +71,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             SetTextBody(null);
         }
 
-        public virtual bool HasBody()
+        public override bool HasBody()
         {
             try
             {

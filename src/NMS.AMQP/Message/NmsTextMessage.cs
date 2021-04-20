@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+using System;
 using Apache.NMS.AMQP.Message.Facade;
 
 namespace Apache.NMS.AMQP.Message
@@ -48,6 +49,17 @@ namespace Apache.NMS.AMQP.Message
             NmsTextMessage copy = new NmsTextMessage(facade.Copy() as INmsTextMessageFacade);
             CopyInto(copy);
             return copy;
+        }
+        
+        public override bool IsBodyAssignableTo(Type type)
+        {
+            return !facade.HasBody() || type.IsAssignableFrom(typeof(string));
+        }
+        
+        protected override T DoGetBody<T>()
+        {
+            object o = Text;
+            return (T) o;
         }
     }
 }

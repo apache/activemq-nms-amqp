@@ -15,16 +15,18 @@
  * limitations under the License.
  */
 
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP
 {
     internal class SessionDispatcher
     {
         private readonly ActionBlock<NmsMessageConsumer.MessageDeliveryTask> actionBlock;
-        private int dispatchThreadId;
+        private readonly AsyncLocal<bool> isOnDispatcherFlow = new AsyncLocal<bool>();
         private readonly CancellationTokenSource cts;
 
         public SessionDispatcher()
@@ -40,18 +42,18 @@ namespace Apache.NMS.AMQP
 
         public void Post(NmsMessageConsumer.MessageDeliveryTask task) => actionBlock.Post(task);
 
-        public bool IsOnDeliveryThread() => dispatchThreadId == Thread.CurrentThread.ManagedThreadId;
+        public bool IsOnDeliveryExecutionFlow() => isOnDispatcherFlow.Value;
 
-        private void HandleTask(NmsMessageConsumer.MessageDeliveryTask messageDeliveryTask)
+        private async Task HandleTask(NmsMessageConsumer.MessageDeliveryTask messageDeliveryTask)
         {
             try
             {
-                dispatchThreadId = Thread.CurrentThread.ManagedThreadId;
-                messageDeliveryTask.DeliverNextPending();
+                isOnDispatcherFlow.Value = true;
+                await messageDeliveryTask.DeliverNextPending().Await();
             }
             finally
             {
-                dispatchThreadId = -1;
+                isOnDispatcherFlow.Value = false;
             }
         }
 
@@ -60,6 +62,29 @@ namespace Apache.NMS.AMQP
             actionBlock.Complete();
             cts.Cancel();
             cts.Dispose();
+        }
+
+        public IDisposable ExcludeCheckIsOnDeliveryExecutionFlow()
+        {
+            return new ExcludeCheckIsOnDeliveryExecutionFlowBlock(this);
+        }
+
+        private class ExcludeCheckIsOnDeliveryExecutionFlowBlock : IDisposable
+        {
+            private readonly bool previousValue = false;
+            private readonly SessionDispatcher sessionDispatcher;
+
+            public ExcludeCheckIsOnDeliveryExecutionFlowBlock(SessionDispatcher sessionDispatcher)
+            {
+                this.sessionDispatcher = sessionDispatcher;
+                this.previousValue = sessionDispatcher.isOnDispatcherFlow.Value;
+                sessionDispatcher.isOnDispatcherFlow.Value = false;
+            }
+
+            public void Dispose()
+            {
+                sessionDispatcher.isOnDispatcherFlow.Value = previousValue;
+            }
         }
     }
 }

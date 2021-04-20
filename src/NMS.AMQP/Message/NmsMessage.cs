@@ -16,7 +16,9 @@
  */
 
 using System;
+using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message.Facade;
+using Apache.NMS.AMQP.Util.Synchronization;
 using Apache.NMS.Util;
 
 namespace Apache.NMS.AMQP.Message
@@ -33,7 +35,9 @@ namespace Apache.NMS.AMQP.Message
 
         public INmsMessageFacade Facade { get; }
 
-        public IPrimitiveMap Properties => properties ?? (properties = new MessagePropertyIntercepter(this, Facade.Properties, IsReadOnlyProperties));
+        public IPrimitiveMap Properties => properties ??
+                                           (properties = new MessagePropertyIntercepter(this, Facade.Properties,
+                                               IsReadOnlyProperties));
 
         public string NMSCorrelationID
         {
@@ -109,6 +113,12 @@ namespace Apache.NMS.AMQP.Message
             set => Facade.NMSType = value;
         }
 
+        public DateTime NMSDeliveryTime
+        {
+            get => Facade.DeliveryTime;
+            set => Facade.DeliveryTime = value;
+        }
+
         public string NMSXGroupId
         {
             get => Facade.GroupId;
@@ -142,11 +152,16 @@ namespace Apache.NMS.AMQP.Message
 
         public void Acknowledge()
         {
+            AcknowledgeAsync().GetAsyncResult();
+        }
+
+        public async Task AcknowledgeAsync()
+        {
             if (NmsAcknowledgeCallback != null)
             {
                 try
                 {
-                    NmsAcknowledgeCallback.Acknowledge();
+                    await NmsAcknowledgeCallback.Acknowledge().Await();
                     NmsAcknowledgeCallback = null;
                 }
                 catch (Exception e)
@@ -254,6 +269,26 @@ namespace Apache.NMS.AMQP.Message
             target.IsReadOnlyBody = IsReadOnlyBody;
             target.IsReadOnlyProperties = IsReadOnlyProperties;
             target.NmsAcknowledgeCallback = NmsAcknowledgeCallback;
+        }
+
+        public virtual bool IsBodyAssignableTo(Type type)
+        {
+            return true;
+        }
+
+        public T Body<T>()
+        {
+            if (IsBodyAssignableTo(typeof(T)))
+            {
+                return DoGetBody<T>();
+            }
+
+            throw new MessageFormatException("Message body cannot be read as type: " + typeof(T));
+        }
+
+        protected virtual T DoGetBody<T>()
+        {
+            return default;
         }
     }
 }

@@ -70,17 +70,21 @@ So in general most of the top level classes that implement the Apache.NMS interf
 | IConnection | Y | The ConnectionInterruptedListener event and the ConnectionResumedListener are not supported. |
 | ProducerTransformerDelegate | N | Any member access should throw a NotSupportedException. |
 | ConsumerTransformerDelegate | N | Any member access should throw a NotSupportedException. |
-| ISession | Y | 
+| ISession | Y | |
+[ INMSContext | Y | |
 | IQueue | Y | |
 | ITopic | Y | |
 | ITemporaryQueue | Y | |
 | ITemporaryTopic | Y | |
 | IMessageProducer | Y * | Anonymous producers are only supported on connections with the ANONYMOUS-RELAY capability. |
+| INMSProducer | Y | |
 | MsgDeliveryMode.Persistent | Y | Producers will block on send until an outcome is received or will timeout after waiting the RequestTimeout timespan amount. Exceptions may be throw depending on the outcome or if the producer times out. |
 | MsgDeliveryMode.NonPersistent | Y | Producers will not block on send nor expect to receive an outcome. Should an exception be raised from the outcome the exception will be delivered using the the connection ExceptionListener. |
 | IMessageConsumer | Y | |
+| INMSConsumer | Y | |
 | Durable Consumers | Y | |
-| IQueueBrowser | N | The provider will throw NotImplementedException for the ISession create methods. |
+| Shared Consumers | Y | |
+| IQueueBrowser | Y | |
 | Configurable NMSMessageID and amqp serializtion | N | For future consideration. The prodiver will generate a MessageID from a sequence and serialize it as a string. |
 | Flow control configuration | N | For future consideration. The provider will use amqpnetlite defaults except for initial link credits which is 200. |
 | Object Deserialization Policy | N | For future consideration. The provider considers all Dotnet serialized objects in Object Message bodies are safe to deserialize. |

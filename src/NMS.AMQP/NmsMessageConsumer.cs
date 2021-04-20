@@ -21,13 +21,14 @@ using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 using Apache.NMS.Util;
 
 namespace Apache.NMS.AMQP
 {
     public class NmsMessageConsumer : IMessageConsumer
     {
-        private readonly object syncRoot = new object();
+        private readonly NmsSynchronizationMonitor syncRoot = new NmsSynchronizationMonitor();
         private readonly AcknowledgementMode acknowledgementMode;
         private readonly AtomicBool closed = new AtomicBool();
         private readonly MessageDeliveryTask deliveryTask;
@@ -55,18 +56,15 @@ namespace Apache.NMS.AMQP
                 Destination = destination,
                 Selector = selector,
                 NoLocal = noLocal,
+                IsExplicitClientId = Session.Connection.ConnectionInfo.IsExplicitClientId,
                 SubscriptionName = name,
-                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry,
-                IsDurable = IsDurableSubscription
+                IsShared = IsSharedSubscription,
+                IsDurable = IsDurableSubscription,
+                IsBrowser =  IsBrowser,
+                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry
+
             };
             deliveryTask = new MessageDeliveryTask(this);
-            
-            Session.Connection.CreateResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
-            
-            Session.Add(this);
-
-            if (Session.IsStarted)
-                Start();
         }
 
         public NmsSession Session { get; }
@@ -74,6 +72,10 @@ namespace Apache.NMS.AMQP
         public IDestination Destination => Info.Destination;
 
         protected virtual bool IsDurableSubscription => false;
+        
+        protected virtual bool IsSharedSubscription => false;
+        
+        protected virtual bool IsBrowser => false;
 
         public void Dispose()
         {
@@ -89,24 +91,31 @@ namespace Apache.NMS.AMQP
 
         public void Close()
         {
+            CloseAsync().GetAsyncResult();
+        }
+
+        public async Task CloseAsync()
+        {
             if (closed)
                 return;
 
-            lock (syncRoot)
+            using(await syncRoot.LockAsync().Await())
             {
                 Shutdown(null);
-                Session.Connection.DestroyResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+                await Session.Connection.DestroyResource(Info).Await();
             }
         }
 
         public ConsumerTransformerDelegate ConsumerTransformer { get; set; }
+
+        public string MessageSelector => Info.Selector;
 
         event MessageListener IMessageConsumer.Listener
         {
             add
             {
                 CheckClosed();
-                lock (syncRoot)
+                using(syncRoot.Lock())
                 {
                     Listener += value;
                     DrainMessageQueueToListener();
@@ -114,7 +123,7 @@ namespace Apache.NMS.AMQP
             }
             remove
             {
-                lock (syncRoot)
+                using(syncRoot.Lock())
                 {
                     Listener -= value;
                 }
@@ -130,29 +139,76 @@ namespace Apache.NMS.AMQP
             {
                 if (started)
                 {
-                    return ReceiveInternal(-1);
+                    return ReceiveInternalAsync(-1).GetAsyncResult();
                 }
             }
         }
+
+        public async Task<IMessage> ReceiveAsync()
+        {
+            CheckClosed();
+            CheckMessageListener();
+
+            while (true)
+            {
+                if (started)
+                {
+                    return await ReceiveInternalAsync(-1).Await();
+                }
+            }
+        }
+
+        public T ReceiveBody<T>()
+        {
+            return ReceiveBodyAsync<T>().GetAsyncResult();
+        }
+        
+        public Task<T> ReceiveBodyAsync<T>()
+        {
+            CheckClosed();
+            CheckMessageListener();
+
+            while (true)
+            {
+                if (started)
+                {
+                    return ReceiveBodyInternalAsync<T>(-1);
+                }
+            }
+        }
+
 
         public IMessage ReceiveNoWait()
         {
             CheckClosed();
             CheckMessageListener();
 
-            return started ? ReceiveInternal(0) : null;
+            return started ? ReceiveInternalAsync(0).GetAsyncResult() : null;
         }
-
-        public IMessage Receive(TimeSpan timeout)
+        
+        public T ReceiveBodyNoWait<T>()
         {
             CheckClosed();
             CheckMessageListener();
 
+            return started ? ReceiveBodyInternalAsync<T>(0).GetAsyncResult() : default;
+        }
+
+        public IMessage Receive(TimeSpan timeout)
+        {
+            return ReceiveAsync(timeout).GetAsyncResult();
+        }
+        
+        public async Task<IMessage> ReceiveAsync(TimeSpan timeout)
+        {
+            CheckClosed();
+            CheckMessageListener();
+            
             int timeoutInMilliseconds = (int) timeout.TotalMilliseconds;
 
             if (started)
             {
-                return ReceiveInternal(timeoutInMilliseconds);
+                return await ReceiveInternalAsync(timeoutInMilliseconds).Await();
             }
 
             long deadline = GetDeadline(timeoutInMilliseconds);
@@ -167,7 +223,41 @@ namespace Apache.NMS.AMQP
 
                 if (started)
                 {
-                    return ReceiveInternal(timeoutInMilliseconds);
+                    return await ReceiveInternalAsync(timeoutInMilliseconds).Await();
+                }
+            }
+        }
+        
+        public T ReceiveBody<T>(TimeSpan timeout)
+        {
+            return ReceiveBodyAsync<T>(timeout).GetAsyncResult();
+        }
+        
+        public async Task<T> ReceiveBodyAsync<T>(TimeSpan timeout)
+        {
+            CheckClosed();
+            CheckMessageListener();
+
+            int timeoutInMilliseconds = (int) timeout.TotalMilliseconds;
+
+            if (started)
+            {
+                return await ReceiveBodyInternalAsync<T>(timeoutInMilliseconds).Await();
+            }
+
+            long deadline = GetDeadline(timeoutInMilliseconds);
+
+            while (true)
+            {
+                timeoutInMilliseconds = (int) (deadline - DateTime.UtcNow.Ticks / 10_000L);
+                if (timeoutInMilliseconds < 0)
+                {
+                    return default;
+                }
+
+                if (started)
+                {
+                    return await ReceiveBodyInternalAsync<T>(timeoutInMilliseconds).Await();
                 }
             }
         }
@@ -193,9 +283,16 @@ namespace Apache.NMS.AMQP
 
         private event MessageListener Listener;
 
-        public Task Init()
+        public async Task Init()
         {
-            return Session.Connection.StartResource(Info);
+            await Session.Connection.CreateResource(Info).Await();
+            
+            Session.Add(this);
+
+            if (Session.IsStarted)
+                Start();
+            
+            await Session.Connection.StartResource(Info).Await();
         }
 
         public void OnInboundMessage(InboundMessageDispatch envelope)
@@ -214,11 +311,14 @@ namespace Apache.NMS.AMQP
 
             if (Session.IsStarted && Listener != null)
             {
-                Session.EnqueueForDispatch(deliveryTask);
+                using (syncRoot.Exclude()) // Exclude lock for a time of dispatching, so it does not pass along to actionblock
+                {
+                    Session.EnqueueForDispatch(deliveryTask);
+                }
             }
         }
 
-        private void DeliverNextPending()
+        private async Task DeliverNextPendingAsync()
         {
             if (Tracer.IsDebugEnabled)
             {
@@ -227,7 +327,7 @@ namespace Apache.NMS.AMQP
             
             if (Session.IsStarted && started && Listener != null)
             {
-                lock (syncRoot)
+                using(await syncRoot.LockAsync().Await())
                 {
                     try
                     {
@@ -251,7 +351,7 @@ namespace Apache.NMS.AMQP
                                     Tracer.Debug($"{Info.Id} filtered expired message: {envelope.Message.NMSMessageId}");
                                 }
 
-                                DoAckExpired(envelope);
+                                await DoAckExpiredAsync(envelope).Await();
                             }
                             else if (IsRedeliveryExceeded(envelope))
                             {
@@ -261,7 +361,7 @@ namespace Apache.NMS.AMQP
                                 }
 
                                 // TODO: Apply redelivery policy
-                                DoAckExpired(envelope);
+                                await DoAckExpiredAsync(envelope).Await();
                             }
                             else
                             {
@@ -269,9 +369,9 @@ namespace Apache.NMS.AMQP
                                 bool autoAckOrDupsOk = acknowledgementMode == AcknowledgementMode.AutoAcknowledge || acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge;
 
                                 if (autoAckOrDupsOk)
-                                    DoAckDelivered(envelope);
+                                    await DoAckDeliveredAsync(envelope).Await();
                                 else
-                                    AckFromReceive(envelope);
+                                    await AckFromReceiveAsync(envelope).Await();
 
                                 try
                                 {
@@ -285,9 +385,9 @@ namespace Apache.NMS.AMQP
                                 if (autoAckOrDupsOk)
                                 {
                                     if (!deliveryFailed)
-                                        DoAckConsumed(envelope);
+                                        await DoAckConsumedAsync(envelope).Await();
                                     else
-                                        DoAckReleased(envelope);
+                                        await DoAckReleasedAsync(envelope).Await();
                                 }
                             }
                         }
@@ -300,7 +400,12 @@ namespace Apache.NMS.AMQP
                         //
                         // We need to decide how to respond to these, but definitely we cannot
                         // let this error propagate as it could take down the SessionDispatcher
-                        Session.Connection.OnAsyncException(e);
+
+                        // To let close the existing session/connection in error handler
+                        using (Session.ExcludeCheckIsOnDeliveryExecutionFlow())
+                        {
+                            Session.Connection.OnAsyncException(e);
+                        }
                     }
                 }
             }
@@ -324,12 +429,50 @@ namespace Apache.NMS.AMQP
             return false;
         }
 
-        private void DoAckReleased(InboundMessageDispatch envelope)
+        private Task DoAckReleasedAsync(InboundMessageDispatch envelope)
         {
-            Session.AcknowledgeIndividual(AckType.RELEASED, envelope);
+            return Session.AcknowledgeIndividualAsync(AckType.RELEASED, envelope);
         }
 
-        private IMessage ReceiveInternal(int timeout)
+        
+        private Task<IMessage> ReceiveInternalAsync(int timeout)
+        {
+            return ReceiveInternalBaseAsync(timeout, async envelope =>
+            {
+                IMessage message = envelope.Message.Copy();
+                await AckFromReceiveAsync(envelope);
+                return message;
+            });
+        }
+        
+        
+        private Task<T> ReceiveBodyInternalAsync<T>(int timeout)
+        {
+            return ReceiveInternalBaseAsync<T>(timeout, async envelope =>
+            {
+                try
+                {
+                    T body = envelope.Message.Body<T>();
+                    await AckFromReceiveAsync(envelope);
+                    return body;
+                }
+                catch (MessageFormatException mfe)
+                {
+                    // Should behave as if receiveBody never happened in these modes.
+                    if (acknowledgementMode == AcknowledgementMode.AutoAcknowledge ||
+                        acknowledgementMode == AcknowledgementMode.DupsOkAcknowledge) {
+
+                        envelope.EnqueueFirst = true;
+                        OnInboundMessage(envelope);
+                    }
+
+                    throw mfe;
+                }
+            });
+        }
+
+
+        private async Task<T> ReceiveInternalBaseAsync<T>(int timeout, Func<InboundMessageDispatch, Task<T>> func)
         {
             try
             {
@@ -346,13 +489,13 @@ namespace Apache.NMS.AMQP
                         Tracer.Debug("Trying to dequeue next message.");
                     }
 
-                    InboundMessageDispatch envelope = messageQueue.Dequeue(timeout);
+                    InboundMessageDispatch envelope = await messageQueue.DequeueAsync(timeout).Await();
 
                     if (failureCause != null)
                         throw NMSExceptionSupport.Create(failureCause);
 
                     if (envelope == null)
-                        return null;
+                        return default;
 
                     if (IsMessageExpired(envelope))
                     {
@@ -361,7 +504,7 @@ namespace Apache.NMS.AMQP
                             Tracer.Debug($"{Info.Id} filtered expired message: {envelope.Message.NMSMessageId}");
                         }
 
-                        DoAckExpired(envelope);
+                        await DoAckExpiredAsync(envelope).Await();
 
                         if (timeout > 0)
                             timeout = (int) Math.Max(deadline - DateTime.UtcNow.Ticks / 10_000L, 0);
@@ -374,7 +517,7 @@ namespace Apache.NMS.AMQP
                         }
 
                         // TODO: Apply redelivery policy
-                        DoAckExpired(envelope);
+                        await DoAckExpiredAsync(envelope).Await();
                     }
                     else
                     {
@@ -383,8 +526,7 @@ namespace Apache.NMS.AMQP
                             Tracer.Debug($"{Info.Id} received message {envelope.Message.NMSMessageId}.");
                         }
 
-                        AckFromReceive(envelope);
-                        return envelope.Message.Copy();
+                        return await func.Invoke(envelope);
                     }
                 }
             }
@@ -397,41 +539,42 @@ namespace Apache.NMS.AMQP
                 throw ExceptionSupport.Wrap(ex, "Receive failed");
             }
         }
+        
 
         private static long GetDeadline(int timeout)
         {
             return DateTime.UtcNow.Ticks / 10_000L + timeout;
         }
 
-        private void AckFromReceive(InboundMessageDispatch envelope)
+        private async Task AckFromReceiveAsync(InboundMessageDispatch envelope)
         {
             if (envelope?.Message != null)
             {
                 NmsMessage message = envelope.Message;
                 if (message.NmsAcknowledgeCallback != null)
                 {
-                    DoAckDelivered(envelope);
+                    await DoAckDeliveredAsync(envelope).Await();
                 }
                 else
                 {
-                    DoAckConsumed(envelope);
+                    await DoAckConsumedAsync(envelope).Await();
                 }
             }
         }
 
-        private void DoAckDelivered(InboundMessageDispatch envelope)
+        private Task DoAckDeliveredAsync(InboundMessageDispatch envelope)
         {
-            Session.Acknowledge(AckType.DELIVERED, envelope);
+            return Session.AcknowledgeAsync(AckType.DELIVERED, envelope);
         }
 
-        private void DoAckConsumed(InboundMessageDispatch envelope)
+        private Task DoAckConsumedAsync(InboundMessageDispatch envelope)
         {
-            Session.Acknowledge(AckType.ACCEPTED, envelope);
+            return Session.AcknowledgeAsync(AckType.ACCEPTED, envelope);
         }
 
-        private void DoAckExpired(InboundMessageDispatch envelope)
+        private Task DoAckExpiredAsync(InboundMessageDispatch envelope)
         {
-            Session.Acknowledge(AckType.MODIFIED_FAILED_UNDELIVERABLE, envelope);
+            return Session.AcknowledgeAsync(AckType.MODIFIED_FAILED_UNDELIVERABLE, envelope);
         }
 
         private void SetAcknowledgeCallback(InboundMessageDispatch envelope)
@@ -489,7 +632,10 @@ namespace Apache.NMS.AMQP
                 int size = messageQueue.Count;
                 for (int i = 0; i < size; i++)
                 {
-                    Session.EnqueueForDispatch(deliveryTask);
+                    using (syncRoot.Exclude()) // Exclude lock for a time of dispatching, so it does not pass along to actionblock
+                    {
+                        Session.EnqueueForDispatch(deliveryTask);
+                    }
                 }
             }
         }
@@ -501,13 +647,13 @@ namespace Apache.NMS.AMQP
 
         public async Task OnConnectionRecovered(IProvider provider)
         {
-            await provider.StartResource(Info).ConfigureAwait(false);
+            await provider.StartResource(Info).Await();
             DrainMessageQueueToListener();
         }
 
         public void Stop()
         {
-            lock (syncRoot)
+            using(syncRoot.Lock())
             {
                 started.Set(false);
             }
@@ -523,13 +669,13 @@ namespace Apache.NMS.AMQP
             messageQueue.Clear();
         }
 
-        public void SuspendForRollback()
+        public async Task SuspendForRollbackAsync()
         {
             Stop();
 
             try
             {
-                Session.Connection.StopResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+                await Session.Connection.StopResource(Info).Await();
             }
             finally
             {
@@ -540,17 +686,17 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        public void ResumeAfterRollback()
+        public async Task ResumeAfterRollbackAsync()
         {
             Start();
-            StartConsumerResource();
+            await StartConsumerResourceAsync().Await();
         }
 
-        private void StartConsumerResource()
+        private async Task StartConsumerResourceAsync()
         {
             try
             {
-                Session.Connection.StartResource(Info).ConfigureAwait(false).GetAwaiter().GetResult();
+                await Session.Connection.StartResource(Info).Await();
             }
             catch (NMSException)
             {
@@ -568,9 +714,9 @@ namespace Apache.NMS.AMQP
                 this.consumer = consumer;
             }
 
-            public void DeliverNextPending()
+            public Task DeliverNextPending()
             {
-                consumer.DeliverNextPending();
+                return consumer.DeliverNextPendingAsync();
             }
         }
     }

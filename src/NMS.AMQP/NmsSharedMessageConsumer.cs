@@ -19,16 +19,19 @@ using Apache.NMS.AMQP.Meta;
 
 namespace Apache.NMS.AMQP
 {
-    public class NmsDurableTopicSubscriber : NmsMessageConsumer
+    public class NmsSharedMessageConsumer : NmsMessageConsumer
     {
-        public NmsDurableTopicSubscriber(NmsConsumerId consumerId, NmsSession session, IDestination destination, string selector, bool noLocal) : base(consumerId, session, destination, selector, noLocal)
+        public NmsSharedMessageConsumer(NmsConsumerId consumerId, NmsSession session, IDestination destination, string selector, bool noLocal) : base(consumerId, session, destination, selector, noLocal)
         {
         }
 
-        public NmsDurableTopicSubscriber(NmsConsumerId consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal) : base(consumerId, session, destination, name, selector, noLocal)
+        public NmsSharedMessageConsumer(NmsConsumerId consumerId, NmsSession session, IDestination destination, string name, string selector, bool noLocal) : base(consumerId, session, destination, name, selector, noLocal)
         {
         }
 
-        protected override bool IsDurableSubscription => true;
+        protected override bool IsDurableSubscription => false;
+        
+        protected override bool IsSharedSubscription => true;
+
     }
 }

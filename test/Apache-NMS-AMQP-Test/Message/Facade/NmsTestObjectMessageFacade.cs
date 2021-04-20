@@ -21,11 +21,11 @@ namespace NMS.AMQP.Test.Message.Facade
 {
     public class NmsTestObjectMessageFacade : NmsTestMessageFacade, INmsObjectMessageFacade
     {
-        public object Body { get; set; }
+        public object Object { get; set; }
 
         public override void ClearBody()
         {
-            Body = null;
+            Object = null;
         }
     }
 }

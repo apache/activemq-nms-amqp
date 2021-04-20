@@ -38,6 +38,8 @@ namespace NMS.AMQP.Test.TestAmqp
         private SocketAsyncEventArgs args;
         private Socket acceptSocket;
 
+        private bool pumpEnabled = true;
+
         public TestAmqpPeerRunner(TestAmqpPeer testAmqpPeer, IPEndPoint ipEndPoint)
         {
             this.testAmqpPeer = testAmqpPeer;
@@ -107,13 +109,13 @@ namespace NMS.AMQP.Test.TestAmqp
         {
             try
             {
-                while (true)
+                while (pumpEnabled)
                 {
                     byte[] buffer = new byte[8];
                     Read(stream, buffer, 0, 8);
                     testAmqpPeer.OnHeader(stream, buffer);
 
-                    while (true)
+                    while (pumpEnabled)
                     {
                         Read(stream, buffer, 0, 4);
                         int len = AmqpBitConverter.ReadInt(buffer, 0);
@@ -173,6 +175,8 @@ namespace NMS.AMQP.Test.TestAmqp
 
         public void Close()
         {
+            pumpEnabled = false;
+            
             acceptSocket?.Dispose();
             acceptSocket = null;
             

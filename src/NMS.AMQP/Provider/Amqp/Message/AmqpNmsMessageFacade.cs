@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Amqp;
 using Amqp.Framing;
@@ -37,6 +38,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         private IDestination consumerDestination;
         private IAmqpConnection connection;
         private DateTime? syntheticExpiration;
+        private DateTime syntheticDeliveryTime;
         public global::Amqp.Message Message { get; private set; }
 
         public int RedeliveryCount
@@ -254,6 +256,32 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             }
         }
 
+        public DateTime DeliveryTime
+        {
+            get
+            {
+                object deliveryTime = GetMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME);
+                switch (deliveryTime)
+                {
+                    case DateTime time:
+                        return time;
+                    case long _:
+                    case ulong _:
+                    case int _:
+                    case uint _:
+                        return new DateTime(621355968000000000L + Convert.ToInt64(deliveryTime) * 10000L, DateTimeKind.Utc);
+                    default:
+                        return syntheticDeliveryTime;
+                }
+            }
+            set
+            {
+                // Assumption that if it is being set through property, then it is with purpose of send out this value 
+                syntheticDeliveryTime = value;
+                SetMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME, new DateTimeOffset(value).ToUnixTimeMilliseconds());
+            }
+        }
+
         public Header Header => Message.Header;
 
         public string GroupId
@@ -395,6 +423,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             {
                 syntheticExpiration = DateTime.UtcNow + ttl;
             }
+
+            if (GetMessageAnnotation(SymbolUtil.NMS_DELIVERY_TIME) == null)
+            {
+                syntheticDeliveryTime = DateTime.UtcNow;
+            }
+            
         }
 
         protected virtual void InitializeBody()
@@ -445,11 +479,17 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             return copy;
         }
 
+        public virtual bool HasBody()
+        {
+            return false;
+        }
+
         protected void CopyInto(AmqpNmsMessageFacade target)
         {
             target.connection = connection;
             target.consumerDestination = consumerDestination;
             target.syntheticExpiration = syntheticExpiration;
+            target.syntheticDeliveryTime = syntheticDeliveryTime;
             target.amqpTimeToLiveOverride = amqpTimeToLiveOverride;
             target.destination = destination;
             target.replyTo = replyTo;
@@ -470,10 +510,17 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             return MessageAnnotations != null && MessageAnnotations.Map.ContainsKey(annotationName);
         }
 
-        public void SetMessageAnnotation(Symbol symbolKeyName, string value)
+        public void SetMessageAnnotation(Symbol symbolKeyName, object value)
         {
             LazyCreateMessageAnnotations();
             MessageAnnotations.Map.Add(symbolKeyName, value);
+        }
+        
+        
+        public void RemoveMessageAnnotation(Symbol symbolKeyName)
+        {
+            if (Message.MessageAnnotations == null) return;
+            MessageAnnotations.Map.Remove(symbolKeyName);
         }
 
         private void LazyCreateMessageAnnotations()

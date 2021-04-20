@@ -29,7 +29,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
 
         public IAmqpObjectTypeDelegate Delegate => typeDelegate;
 
-        public object Body
+        public object Object
         {
             get => Delegate.Object;
             set => Delegate.Object = value;
@@ -47,7 +47,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         {
             try
             {
-                Body = null;
+                Object = null;
             }
             catch (IOException e)
             {
@@ -90,6 +90,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             CopyInto(copy);
             copy.typeDelegate = typeDelegate;
             return copy;
+        }
+
+        public override bool HasBody()
+        {
+            return Object != null;
         }
     }
 }

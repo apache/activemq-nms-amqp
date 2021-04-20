@@ -227,5 +227,62 @@ namespace NMS.AMQP.Test.Integration
                 testPeer.WaitForAllMatchersToComplete(1000);
             }
         }
+       
+        [Test, Timeout(20_000)]
+        public void TestCreateSharedConsumer()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                
+                string topicName = "myTopic";
+                ITopic topic = session.GetTopic(topicName);
+                string subscriptionName = "mySubscription";
+
+                testPeer.ExpectSharedSubscriberAttach(topicName, subscriptionName);
+                testPeer.ExpectLinkFlow();
+                
+                IMessageConsumer durableConsumer = session.CreateSharedConsumer(topic, subscriptionName, null);//, false);
+                // IMessageConsumer durableConsumer = session.CreateDurableConsumer(topic, subscriptionName, null, false);
+                Assert.NotNull(durableConsumer, "MessageConsumer object was null");
+                
+                testPeer.ExpectClose();
+                connection.Close();
+                
+                testPeer.WaitForAllMatchersToComplete(20000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public void TestCreateSharedDurableConsumer()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                
+                string topicName = "myTopic";
+                ITopic topic = session.GetTopic(topicName);
+                string subscriptionName = "mySubscription";
+
+                testPeer.ExpectSharedDurableSubscriberAttach(topicName, subscriptionName);
+                testPeer.ExpectLinkFlow();
+                
+                IMessageConsumer durableConsumer = session.CreateSharedDurableConsumer(topic, subscriptionName, null); //, false);
+                Assert.NotNull(durableConsumer, "MessageConsumer object was null");
+                
+                testPeer.ExpectClose();
+                connection.Close();
+                
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
     }
 }

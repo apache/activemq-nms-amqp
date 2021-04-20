@@ -16,6 +16,8 @@
  */
 
 using System;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Apache.NMS.AMQP.Message.Facade;
 
 namespace Apache.NMS.AMQP.Message
@@ -31,13 +33,13 @@ namespace Apache.NMS.AMQP.Message
 
         public object Body
         {
-            get => this.facade.Body;
+            get => this.facade.Object;
             set
             {
                 CheckReadOnlyBody();
                 try
                 {
-                    this.facade.Body = value;
+                    this.facade.Object = value;
                 }
                 catch (Exception e)
                 {
@@ -57,5 +59,22 @@ namespace Apache.NMS.AMQP.Message
             CopyInto(copy);
             return copy;
         }
+
+
+        public override bool IsBodyAssignableTo(Type type)
+        {
+            if (!facade.HasBody())
+            {
+                return true;
+            }
+
+            return type.IsInstanceOfType(Body);
+        }
+        
+        protected override T DoGetBody<T>()
+        {
+            return (T) Body;
+        }
+
     }
 }

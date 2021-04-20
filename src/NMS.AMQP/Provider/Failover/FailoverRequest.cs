@@ -20,6 +20,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Meta;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Failover
 {
@@ -61,7 +62,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             {
                 try
                 {
-                    await this.DoTask(activeProvider).ConfigureAwait(false);
+                    await this.DoTask(activeProvider).Await();
                     this.taskCompletionSource.TrySetResult(true);
                     this.failoverProvider.RemoveFailoverRequest(this);
                     this.cancellationTokenSource?.Dispose();

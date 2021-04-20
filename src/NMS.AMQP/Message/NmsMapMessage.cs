@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+using System;
 using Apache.NMS.AMQP.Message.Facade;
 using Apache.NMS.Util;
 
@@ -54,6 +55,19 @@ namespace Apache.NMS.AMQP.Message
             NmsMapMessage copy = new NmsMapMessage(facade.Copy() as INmsMapMessageFacade);
             CopyInto(copy);
             return copy;
+        }
+        
+        public override bool IsBodyAssignableTo(Type type)
+        {
+            return !facade.HasBody() || type.IsAssignableFrom(typeof(IPrimitiveMap));
+        }
+        
+        protected override T DoGetBody<T>() {
+            if (!facade.HasBody()) {
+                return default;
+            }
+
+            return (T) Body;
         }
     }
 }

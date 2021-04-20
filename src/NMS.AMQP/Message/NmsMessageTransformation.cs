@@ -16,6 +16,7 @@
  */
 
 using System.Collections;
+using Apache.NMS.AMQP.Util.Types.Map;
 
 namespace Apache.NMS.AMQP.Message
 {
@@ -106,7 +107,7 @@ namespace Apache.NMS.AMQP.Message
             CopyMap(source.Properties, target.Properties);
         }
 
-        private static void CopyMap(IPrimitiveMap source, IPrimitiveMap target)
+        public static void CopyMap(IPrimitiveMap source, IPrimitiveMap target)
         {
             foreach (object key in source.Keys)
             {
@@ -150,6 +151,12 @@ namespace Apache.NMS.AMQP.Message
                         break;
                     case IDictionary dictionaryValue:
                         target.SetDictionary(name, dictionaryValue);
+                        break;
+                    case object objectValue:
+                        if (target is PrimitiveMapBase primitiveMapBase)
+                        {
+                            primitiveMapBase.SetObject(name, objectValue);
+                        }
                         break;
                 }
             }

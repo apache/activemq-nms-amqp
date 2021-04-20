@@ -21,6 +21,7 @@ using Amqp;
 using Amqp.Framing;
 using Amqp.Transactions;
 using Apache.NMS.AMQP.Util;
+using Apache.NMS.AMQP.Util.Synchronization;
 
 namespace Apache.NMS.AMQP.Provider.Amqp
 {
@@ -51,7 +52,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 
         public async Task<byte[]> DeclareAsync()
         {
-            var outcome = await this.SendAsync(DeclareMessage, null, this.session.Connection.Provider.RequestTimeout).ConfigureAwait(false);
+            var outcome = await this.SendAsync(DeclareMessage, null, this.session.Connection.Provider.RequestTimeout).Await();
             if (outcome.Descriptor.Code == MessageSupport.DECLARED_INSTANCE.Descriptor.Code)
             {
                 return ((Declared) outcome).TxnId;
@@ -71,7 +72,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public async Task DischargeAsync(byte[] txnId, bool fail)
         {
             var message = new global::Amqp.Message(new Discharge { TxnId = txnId, Fail = fail });
-            var outcome = await this.SendAsync(message, null, this.session.Connection.Provider.RequestTimeout).ConfigureAwait(false);
+            var outcome = await this.SendAsync(message, null, this.session.Connection.Provider.RequestTimeout).Await();
 
             if (outcome.Descriptor.Code == MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code)
             {
