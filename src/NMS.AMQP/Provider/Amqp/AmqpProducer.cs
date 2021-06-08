@@ -170,6 +170,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             senderLink.Send(message, deliveryState, Callback, manualResetEvent);
             if (!manualResetEvent.WaitOne((int) session.Connection.Provider.SendTimeout))
             {
+                senderLink.Cancel(message);
                 throw new TimeoutException(Fx.Format(SRAmqp.AmqpTimeout, "send", session.Connection.Provider.SendTimeout, nameof(message)));
             }
             if (outcome == null)
