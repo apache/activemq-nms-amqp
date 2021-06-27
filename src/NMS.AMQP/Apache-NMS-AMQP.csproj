@@ -38,7 +38,7 @@ with the License.  You may obtain a copy of the License at
         <Company>Apache Software Foundation</Company>
         <Product>Apache ActiveMQ NMS AMQP Client</Product>
         <Description>Apache ActiveMQ NMS.AMQP provides a NMS based client that uses the AMQP v1.0 protocol.</Description>
-        <Copyright>Copyright (C) 2005-2019 Apache Software Foundation</Copyright>
+        <Copyright>Copyright (C) 2005-2021 Apache Software Foundation</Copyright>
         <PackageProjectUrl>https://activemq.apache.org/components/nms/</PackageProjectUrl>
         <PackageLicense>https://github.com/apache/activemq-nms-amqp/blob/master/NOTICE.txt</PackageLicense>
         <PackageIconUrl>https://activemq.apache.org/assets/img/activemq_logo_icon.png</PackageIconUrl>
