@@ -56,6 +56,9 @@ namespace NMS.AMQP.Test
             Assert.IsInstanceOf<ITextMessage>(msg);
             Assert.AreEqual(text, ((ITextMessage) msg).Text);
             Assert.IsNull(messageConsumer.Receive(TimeSpan.FromSeconds(1)));
+            
+            messageConsumer.Close();
+            
         }
 
         [Test, Timeout(60_000)]
@@ -310,8 +313,8 @@ namespace NMS.AMQP.Test
 
                 messageConsumer1.Close();
                 messageConsumer2.Close();
+                
                 sessionConsumer1.Unsubscribe(subscriptionName);
-                sessionConsumer2.Unsubscribe(subscriptionName);
             }
         }
 

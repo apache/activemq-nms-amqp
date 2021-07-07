@@ -54,8 +54,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     ? $"Cannot remove Subscription {subscriptionName} that does not exists"
                     : $"Subscription {subscriptionName} unsubscribe operation failure";
 
-                NMSException exception = ExceptionSupport.GetException(sender, failureMessage);
-                tcs.TrySetException(exception);
+                if (!tcs.Task.IsCompleted || error != null)
+                {
+                    NMSException exception = ExceptionSupport.GetException(sender, failureMessage);
+                    tcs.TrySetException(exception);
+                }
             });
 
             await tcs.Task.Await();

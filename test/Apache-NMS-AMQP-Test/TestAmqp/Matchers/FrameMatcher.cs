@@ -17,6 +17,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using Amqp.Types;
 using NUnit.Framework;
@@ -28,10 +29,17 @@ namespace NMS.AMQP.Test.TestAmqp.Matchers
         private bool shouldContinue = true;
         private readonly List<Action<FrameContext<T>>> onCompleteActions = new List<Action<FrameContext<T>>>();
         private readonly List<Action<T, Amqp.Message>> assertions = new List<Action<T, Amqp.Message>>();
+        private string creationStackTrace = null;
+
+        public FrameMatcher()
+        {
+            creationStackTrace = new StackTrace(true).ToString();
+        }
+        
         public bool OnFrame(Stream stream, ushort channel, DescribedList describedList, Amqp.Message message)
         {
             Assert.IsNotNull(describedList);
-            Assert.IsInstanceOf<T>(describedList, $"Wrong frame! Expected: {typeof(T).Name} but received: {describedList.GetType().Name}");
+            Assert.IsInstanceOf<T>(describedList, $"Wrong frame! Expected: {typeof(T).Name} but received: {describedList.GetType().Name}. Stack trace of expected frame being set: {creationStackTrace}");
 
             T command = (T) describedList;
 

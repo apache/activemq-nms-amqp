@@ -247,7 +247,7 @@ namespace NMS.AMQP.Test.Integration.Async
                     latch.Signal();
                 };
                 
-                Assert.True(latch.Wait(TimeSpan.FromMilliseconds(1000)), $"Should receive: {msgCount}, but received: {messages.Count}");
+                Assert.True(latch.Wait(TimeSpan.FromMilliseconds(3000)), $"Should receive: {msgCount}, but received: {messages.Count}");
                 
                 Action<DeliveryState> dispositionMatcher = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code); };
                 

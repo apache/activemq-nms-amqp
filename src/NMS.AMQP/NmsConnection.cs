@@ -197,7 +197,7 @@ namespace Apache.NMS.AMQP
         
         public async Task StartAsync()
         {
-            await CreateNmsConnectionAsync().Await();;
+            await CreateNmsConnectionAsync().AwaitRunContinuationAsync();;
 
             if (started.CompareAndSet(false, true))
             {
