@@ -238,20 +238,30 @@ namespace NMS.AMQP.Test.Utils.Synchronization
 
             Assert.Greater(Math.Abs(a1.Last().Item2 - a2.First().Item2), 1, "A1 and A2, should be intersected by B, and not happening one right after another");
         }
-
-
-        [TestCase(1,3500,6)]
-        [TestCase(0,2000,200)]
+        
+        [TestCase(0.25,1000,6)]
+        [TestCase(0,1000,200)]
         [Timeout(20_000)]
-        public void TestConcurrentProducersSyncAndAsync(int sleepTimeMs, int testTimeMs, int minimumOccurences)
+        public void TestConcurrentProducersSyncAndAsync(double sleepTimeMs, int minTestTimeMs, int minimumOccurences)
         {
+            TimeSpan sleepTime = TimeSpan.FromMilliseconds(sleepTimeMs);
+            
             EventList evListCommon = new EventList();
             
             NmsSynchronizationMonitor syncRootA = new NmsSynchronizationMonitor();
             NmsSynchronizationMonitor syncRootB = new NmsSynchronizationMonitor();
             bool runTest = true;
 
-            // int sleepTimeMs = 1;
+            // Counter helping us signal situation when we can stop running tasks/threads
+            Dictionary<String, CountdownEventEx> counters = new Dictionary<string, CountdownEventEx>()
+            {
+                ["A1"] = new CountdownEventEx((int) Math.Ceiling(minimumOccurences / 3.0)),
+                ["B1"] = new CountdownEventEx((int) Math.Ceiling(minimumOccurences / 3.0)),
+                ["A2"] = new CountdownEventEx((int) Math.Ceiling(minimumOccurences / 3.0)),
+                ["B2"] = new CountdownEventEx((int) Math.Ceiling(minimumOccurences / 3.0)),
+                ["A3"] = new CountdownEventEx((int) Math.Ceiling(minimumOccurences / 3.0)),
+                ["B3"] = new CountdownEventEx((int) Math.Ceiling(minimumOccurences / 3.0)),
+            };
             
             var task1 = Task.Run(async () =>
             {
@@ -261,42 +271,45 @@ namespace NMS.AMQP.Test.Utils.Synchronization
                     var lockA = (counter % 2 == 0) ? syncRootA.Lock() : await syncRootA.LockAsync();
                     using (lockA)
                     {
-                        await Task.Delay(sleepTimeMs);
+                        await Task.Delay(sleepTime);
                         await Task.Yield();
                         evListCommon.Add("A1");
-                        await Task.Delay(sleepTimeMs);
+                        await Task.Delay(sleepTime);
                         await Task.Yield();
                         evListCommon.Add("A1");
-                        await Task.Delay(sleepTimeMs);
+                        await Task.Delay(sleepTime);
                         await Task.Yield();
                         evListCommon.Add("A1");
-                        await Task.Delay(sleepTimeMs);
+                        counters["A1"].TrySignal();
+                        await Task.Delay(sleepTime);
                         await Task.Yield();
 
                         var lockB = (counter % 2 == 0) ? syncRootB.Lock() : await syncRootB.LockAsync();
                         using (lockB)
                         {
                             evListCommon.Add("B1");
-                            await Task.Delay(sleepTimeMs);
+                            await Task.Delay(sleepTime);
                             await Task.Yield();
                             evListCommon.Add("B1");
-                            await Task.Delay(sleepTimeMs);
+                            await Task.Delay(sleepTime);
                             await Task.Yield();
                             evListCommon.Add("B1");
-                            await Task.Delay(sleepTimeMs);
+                            counters["B1"].TrySignal();
+                            await Task.Delay(sleepTime);
                             await Task.Yield();
                         }
                         
-                        await Task.Delay(sleepTimeMs);
+                        await Task.Delay(sleepTime);
                         await Task.Yield();
                         evListCommon.Add("A1");
-                        await Task.Delay(sleepTimeMs);
+                        await Task.Delay(sleepTime);
                         await Task.Yield();
                         evListCommon.Add("A1");
-                        await Task.Delay(sleepTimeMs);
+                        await Task.Delay(sleepTime);
                         await Task.Yield();
                         evListCommon.Add("A1");
-                        await Task.Delay(sleepTimeMs);
+                        counters["A1"].TrySignal();
+                        await Task.Delay(sleepTime);
                         await Task.Yield();
                     }
 
@@ -317,16 +330,17 @@ namespace NMS.AMQP.Test.Utils.Synchronization
                         int depth = counter % 4;
                         if (level == depth)
                         {
-                            await Task.Delay(sleepTimeMs);
+                            await Task.Delay(sleepTime);
                             await Task.Yield();
                             evListCommon.Add(symbol);
-                            await Task.Delay(sleepTimeMs);
+                            await Task.Delay(sleepTime);
                             await Task.Yield();
                             evListCommon.Add(symbol);
-                            await Task.Delay(sleepTimeMs);
+                            await Task.Delay(sleepTime);
                             await Task.Yield();
                             evListCommon.Add(symbol);
-                            await Task.Delay(sleepTimeMs);
+                            counters[symbol].TrySignal();
+                            await Task.Delay(sleepTime);
                             await Task.Yield();
                         }
                         else
@@ -339,13 +353,13 @@ namespace NMS.AMQP.Test.Utils.Synchronization
                 while (runTest)
                 {
                     await ResourceAccess("A2",0, syncRootA);
-                    await ResourceAccess("B2",0,syncRootB);
+                    await ResourceAccess("B2",0, syncRootB);
                     
                     counter++;
                 }
             });
             
-            var task3 = Task.Run(() =>
+            var task3 = new Thread(() =>
             {
                 int counter = 0;
                 while (runTest)
@@ -353,45 +367,50 @@ namespace NMS.AMQP.Test.Utils.Synchronization
                     var lockA = (counter % 2 == 0) ? syncRootA.Lock() : syncRootA.LockAsync().GetAsyncResult();
                     using (lockA)
                     {
-                        Thread.Sleep(sleepTimeMs);
+                        Thread.Sleep(sleepTime);
                         evListCommon.Add("A3");
-                        Thread.Sleep(sleepTimeMs);
+                        Thread.Sleep(sleepTime);
                         evListCommon.Add("A3");
-                        Thread.Sleep(sleepTimeMs);
+                        Thread.Sleep(sleepTime);
                         evListCommon.Add("A3");
-                        Thread.Sleep(sleepTimeMs);
+                        counters["A3"].TrySignal();
+                        Thread.Sleep(sleepTime);
                     }
                     
                     var lockB = (counter % 2 == 0) ? syncRootB.Lock() : syncRootB.LockAsync().GetAsyncResult();
                     using (lockB)
                     {
                         evListCommon.Add("B3");
-                        Thread.Sleep(sleepTimeMs);
+                        Thread.Sleep(sleepTime);
                         evListCommon.Add("B3");
-                        Thread.Sleep(sleepTimeMs);
+                        Thread.Sleep(sleepTime);
                         evListCommon.Add("B3");
-                        Thread.Sleep(sleepTimeMs);
+                        counters["B3"].TrySignal();
+                        Thread.Sleep(sleepTime);
                     }
-
 
                     counter++;
                 }
             });
+            task3.IsBackground = true;
+            task3.Start();
             
-            // Let it run for one sec
-            Thread.Sleep(testTimeMs);
-
+            // Let it run for a short while
+            Thread.Sleep(minTestTimeMs);
+            
+            // Wait for all counter events to get to zero so min occurences should be met
+            counters.ToList().ForEach(counterEvent => counterEvent.Value.Wait());
+                        
             runTest = false;
             task1.Wait();
             task2.Wait();
-            task3.Wait();
+            task3.Join();
 
             var sequenceCommon = evListCommon.ToString();
             var sequenceA = evListCommon.ToString("A");
             var sequenceB = evListCommon.ToString("B");
             
-            // remove B locks interfering with A sequence of rvalidating task1
-            
+            // remove B locks interfering with A sequence of validating task1
             Enumerable.Range(0,10).ToList().ForEach( (i) => sequenceCommon = sequenceCommon
                 .Replace("A1B2", "A1")
                 .Replace("A1B3", "A1")
@@ -429,9 +448,34 @@ namespace NMS.AMQP.Test.Utils.Synchronization
             sequenceB = sequenceB.Replace("B3B3B3", "");
 
             
-            Assert.AreEqual(0,sequenceA.Length, "There were illegal sequences of execution for resource A: "+sequenceA);
-            Assert.AreEqual(0,sequenceB.Length, "There were illegal sequences of execution for resource B: "+sequenceB);
+            Assert.AreEqual(0, sequenceA.Length, "There were illegal sequences of execution for resource A: " + sequenceA);
+            Assert.AreEqual(0, sequenceB.Length, "There were illegal sequences of execution for resource B: " + sequenceB);
             
+        }
+
+        /// <summary>
+        /// Extended class to have signaling method that does not throw if count gets to minus
+        /// </summary>
+        private class CountdownEventEx : CountdownEvent
+        {
+            public CountdownEventEx(int initialCount) : base(initialCount)
+            {
+            }
+
+            public bool TrySignal()
+            {
+                try
+                {
+                    this.Signal();
+                    return true;
+                }
+                catch (Exception)
+                {
+                    // empty
+                }
+
+                return false;
+            }
         }
     }
 }

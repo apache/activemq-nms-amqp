@@ -17,16 +17,42 @@
 
 using System;
 using System.IO;
+using System.Threading;
 using Amqp;
 using Amqp.Framing;
 using Amqp.Types;
 using NMS.AMQP.Test.TestAmqp.BasicTypes;
+using NUnit.Framework;
 
 namespace NMS.AMQP.Test.TestAmqp.Matchers
 {
     public class FrameContext
     {
         private readonly Stream stream;
+
+        private static double? SendDelayMs
+        {
+            get
+            {
+                try
+                {
+                    object value = TestContext.CurrentContext.Test.Properties.Get("FrameContext.SendDelayMs");
+                    if (value != null)
+                    {
+                        return Convert.ToDouble(value);
+                    }
+                }
+                catch (Exception)
+                {
+                    // empty
+                }
+
+                return null;
+            }
+        }
+
+
+
 
         public FrameContext(Stream stream, ushort channel)
         {
@@ -47,6 +73,11 @@ namespace NMS.AMQP.Test.TestAmqp.Matchers
 
         private void Send(Action<ByteBuffer> encode)
         {
+            if (SendDelayMs != null)
+            {
+                Thread.Sleep(TimeSpan.FromMilliseconds(SendDelayMs.Value));
+            }
+            
             ByteBuffer buffer = new ByteBuffer(128, true);
             encode(buffer);
             stream.Write(buffer.Buffer, buffer.Offset, buffer.Length);

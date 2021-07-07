@@ -30,8 +30,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 {
     public class AmqpProducer
     {
-        private static readonly OutcomeCallback _onOutcome = OnOutcome;
-        
         private readonly AmqpSession session;
         private readonly NmsProducerInfo info;
         private SenderLink senderLink;
@@ -165,52 +163,37 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         
         private async Task SendAsync(global::Amqp.Message message, DeliveryState deliveryState)
         {
-            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            CancellationTokenSource cts = null;
-            if (session.Connection.Provider.SendTimeout != NmsConnectionInfo.INFINITE)
-            {
-                cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(session.Connection.Provider.SendTimeout));
-                cts.Token.Register(_ =>
-                {
-                    var timeoutException = ExceptionSupport.GetTimeoutException(this.senderLink, $"The operation did not complete within the allocated time {session.Connection.Provider.SendTimeout}ms.");
-                    tcs.TrySetException(timeoutException);
-                }, null);
-            }
+            Outcome outcome = null;
             try
             {
-                senderLink.Send(message, deliveryState, _onOutcome, tcs);
-                await tcs.Task.Await();
+                outcome = await senderLink.SendAsync(message, deliveryState, session.Connection.Provider.SendTimeout).Await(); 
+                // SendTimeout being NmsConnectionInfo.INFINITE is handled in SendAsync AmqpSendTask
             }
-            finally
+            catch (TimeoutException)
             {
-                cts?.Dispose();
+                throw;
+            }
+
+            if (outcome.Descriptor.Code != MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code)
+            {
+                if (outcome.Descriptor.Code == MessageSupport.REJECTED_INSTANCE.Descriptor.Code)
+                {
+                    Rejected rejected = (Rejected) outcome;
+                    throw ExceptionSupport.GetException(rejected.Error, $"Message {message.Properties.GetMessageId()} rejected");
+                }
+                else if (outcome.Descriptor.Code == MessageSupport.RELEASED_INSTANCE.Descriptor.Code)
+                {
+                    Error error = new Error(ErrorCode.MessageReleased);
+                    throw ExceptionSupport.GetException(error, $"Message {message.Properties.GetMessageId()} released");
+                }
+                else
+                {
+                    Error error = new Error(ErrorCode.InternalError);
+                    throw ExceptionSupport.GetException(error, outcome.ToString());
+                }
             }
         }
         
-        private static void OnOutcome(ILink sender, global::Amqp.Message message, Outcome outcome, object state)
-        {
-            var tcs = (TaskCompletionSource<bool>) state;
-            if (outcome.Descriptor.Code == MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code)
-            {
-                tcs.TrySetResult(true);
-            }
-            else if (outcome.Descriptor.Code == MessageSupport.REJECTED_INSTANCE.Descriptor.Code)
-            {
-                Rejected rejected = (Rejected) outcome;
-                tcs.TrySetException(ExceptionSupport.GetException(rejected.Error, $"Message {message.Properties.GetMessageId()} rejected"));
-            }
-            else if (outcome.Descriptor.Code == MessageSupport.RELEASED_INSTANCE.Descriptor.Code)
-            {
-                Error error = new Error(ErrorCode.MessageReleased);
-                tcs.TrySetException(ExceptionSupport.GetException(error, $"Message {message.Properties.GetMessageId()} released"));
-            }
-            else
-            {
-                Error error = new Error(ErrorCode.InternalError);
-                tcs.TrySetException(ExceptionSupport.GetException(error, outcome.ToString()));
-            }
-        }
-
         public async Task CloseAsync()
         {
             try
