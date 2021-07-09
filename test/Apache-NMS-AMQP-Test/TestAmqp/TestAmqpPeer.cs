@@ -1076,6 +1076,8 @@ namespace NMS.AMQP.Test.TestAmqp
             
             if (sendClose)
             {
+                testAmqpPeerRunner.StopPump();
+                
                 var close = new Close();
                 this.testAmqpPeerRunner.Send(CONNECTION_CHANNEL, close);
             }

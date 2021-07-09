@@ -240,7 +240,7 @@ namespace NMS.AMQP.Test.Utils.Synchronization
         }
 
 
-        [TestCase(1,3500,6)]
+        [TestCase(1,5000,6)]
         [TestCase(0,2000,200)]
         [Timeout(20_000)]
         public void TestConcurrentProducersSyncAndAsync(int sleepTimeMs, int testTimeMs, int minimumOccurences)

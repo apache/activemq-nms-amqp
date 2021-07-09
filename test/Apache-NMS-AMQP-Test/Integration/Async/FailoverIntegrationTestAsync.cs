@@ -931,7 +931,7 @@ namespace NMS.AMQP.Test.Integration.Async
                 ISession session = await connection.CreateSessionAsync(AcknowledgementMode.AutoAcknowledge);
                 ITemporaryTopic temporaryTopic = await session.CreateTemporaryTopicAsync();
                 
-                Assert.True(finalConnected.WaitOne(TimeSpan.FromSeconds(5)), "Should connect to final peer");
+                Assert.True(finalConnected.WaitOne(TimeSpan.FromSeconds(10)), "Should connect to final peer");
                 
                 // Delete the temporary Topic and close the session.
                 finalPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
