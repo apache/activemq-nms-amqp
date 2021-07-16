@@ -17,6 +17,7 @@
 
 using System;
 using System.Collections.Specialized;
+using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
@@ -36,6 +37,9 @@ namespace Apache.NMS.AMQP
         private IdGenerator clientIdGenerator;
         private IdGenerator connectionIdGenerator;
         private readonly object syncRoot = new object();
+        
+        DateTime nextAllowedConnectionCreationTime = DateTime.MinValue;
+
 
         public NmsConnectionFactory(string userName, string password)
         {
@@ -110,7 +114,7 @@ namespace Apache.NMS.AMQP
         /// User name value used to authenticate the connection
         /// </summary>
         public string UserName { get; set; }
-        
+
         /// <summary>
         /// The password value used to authenticate the connection
         /// </summary>
@@ -121,7 +125,7 @@ namespace Apache.NMS.AMQP
         /// before returning an error. Does not affect synchronous message sends. By default the client will wait indefinitely for a request to complete.
         /// </summary>
         public long RequestTimeout { get; set; } = NmsConnectionInfo.DEFAULT_REQUEST_TIMEOUT;
-        
+
         /// <summary>
         /// Timeout value that controls how long the client waits on completion of a synchronous message send before returning an error.
         /// By default the client will wait indefinitely for a send to complete.
@@ -146,7 +150,7 @@ namespace Apache.NMS.AMQP
         /// the logs easier. The default prefix is 'ID:'.
         /// </summary>
         public string ConnectionIdPrefix { get; set; }
-        
+
         /// <summary>
         /// Optional prefix value that is used for generated Client ID values when a new Connection is created for the JMS ConnectionFactory.
         /// The default prefix is 'ID:'.
@@ -164,7 +168,15 @@ namespace Apache.NMS.AMQP
         /// </summary>
         public string ClientId { get; set; }
 
-        public IConnection CreateConnection()
+        /// <summary>
+        /// Sets the desired max rate of creating new connections by this factory.
+        ///
+        /// NOTE: During creating new connection if the rate is too high system will
+        /// try to suspend creation execution to force the desired max rate of new connection creation
+        /// </summary>
+        public double MaxNewConnectionRatePerSec { get; set; } = NmsConnectionInfo.DEFAULT_MAX_NEW_CONNECTION_RATE_PER_SEC;
+        
+    public IConnection CreateConnection()
         {
             return CreateConnection(UserName, Password);
         }
@@ -174,15 +186,17 @@ namespace Apache.NMS.AMQP
             return CreateConnectionAsync(UserName, Password);
         }
 
-        public Task<IConnection> CreateConnectionAsync(string userName, string password)
-        {
-            return Task.FromResult(CreateConnection(userName, password));
-        }
-       
         public IConnection CreateConnection(string userName, string password)
+        {
+            return CreateConnectionAsync(userName, password).GetAsyncResult();
+        }
+
+        public async Task<IConnection> CreateConnectionAsync(string userName, string password)
         {
             try
             {
+                await CheckMaxNewConnectionRate();
+
                 NmsConnectionInfo connectionInfo = ConfigureConnectionInfo(userName, password);
                 IProvider provider = ProviderFactory.Create(BrokerUri);
                 return new NmsConnection(connectionInfo, provider);
@@ -192,7 +206,38 @@ namespace Apache.NMS.AMQP
                 throw NMSExceptionSupport.Create(e);
             }
         }
+        
+        private async Task CheckMaxNewConnectionRate()
+        {
+            if (MaxNewConnectionRatePerSec != NmsConnectionInfo.DEFAULT_MAX_NEW_CONNECTION_RATE_PER_SEC)
+            {
+                TimeSpan waitTime = TimeSpan.Zero;
+                lock (syncRoot)
+                {
+                    TimeSpan waitTimeForNewConnection = TimeSpan.FromMilliseconds(1_000.0 / MaxNewConnectionRatePerSec);
+                    
+                    DateTime now = DateTime.Now;
 
+                    if (nextAllowedConnectionCreationTime > now)
+                    {
+                        waitTime = (nextAllowedConnectionCreationTime - now) + waitTimeForNewConnection;
+                    }
+                    else
+                    {
+                        waitTime = TimeSpan.Zero;
+                        nextAllowedConnectionCreationTime = now;
+                    }
+
+                    nextAllowedConnectionCreationTime += waitTimeForNewConnection;
+                }
+
+                if (waitTime > TimeSpan.Zero)
+                {
+                    await Task.Delay(waitTime);
+                }
+            }
+        }
+        
         public INMSContext CreateContext()
         {
             return new NmsContext((NmsConnection)CreateConnection(), AcknowledgementMode.AutoAcknowledge);

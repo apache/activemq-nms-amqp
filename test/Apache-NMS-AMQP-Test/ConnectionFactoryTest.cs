@@ -16,8 +16,12 @@
  */
 
 using System;
+using System.Diagnostics;
+using System.Threading.Tasks;
 using Apache.NMS;
 using Apache.NMS.AMQP;
+using Apache.NMS.AMQP.Provider;
+using NMS.AMQP.Test.Provider.Mock;
 using NUnit.Framework;
 
 namespace NMS.AMQP.Test
@@ -28,6 +32,16 @@ namespace NMS.AMQP.Test
         private static readonly string USER = "USER";
         private static readonly string PASSWORD = "PASSWORD";
 
+        private MockRemotePeer mockPeer;
+
+        [SetUp]
+        public void SetUp()
+        {
+            mockPeer = new MockRemotePeer();
+            mockPeer.Start();
+            ProviderFactory.RegisterProviderFactory("mock", new MockProviderFactory());
+        }
+        
         [Test]
         public void TestConnectionFactoryCreate()
         {
@@ -77,7 +91,8 @@ namespace NMS.AMQP.Test
                                 "&nms.clientIDPrefix=clientId" +
                                 "&nms.requestTimeout=1000" +
                                 "&nms.sendTimeout=1000" +
-                                "&nms.localMessageExpiry=false";
+                                "&nms.localMessageExpiry=false" +
+                                "&nms.maxNewConnectionRatePerSec=4";
 
             NmsConnectionFactory factory = new NmsConnectionFactory(configuredUri);
 
@@ -88,6 +103,7 @@ namespace NMS.AMQP.Test
             Assert.AreEqual("clientId", factory.ClientIdPrefix);
             Assert.AreEqual(1000, factory.RequestTimeout);
             Assert.AreEqual(1000, factory.SendTimeout);
+            Assert.AreEqual(4, factory.MaxNewConnectionRatePerSec);
             Assert.IsFalse(factory.LocalMessageExpiry);
         }
         
@@ -135,6 +151,54 @@ namespace NMS.AMQP.Test
         {
             NmsConnectionFactory factory = new NmsConnectionFactory("bad://127.0.0.1:5763");
             Assert.Throws<NMSException>(() => factory.CreateConnection());
+        }
+        
+        [Test, Timeout(12000)]
+        public void TestMaxNewConnectionRatePerSec()
+        {
+            double desiredRatePerSec = 5;
+            
+            NmsConnectionFactory factory = new NmsConnectionFactory(
+                "failover:(mock://localhost?mock.failOnConnect=true)" +
+                "?failover.maxReconnectAttempts=0" +
+                "&nms.maxNewConnectionRatePerSec="+desiredRatePerSec);
+
+            int testTimeMs = 5000;
+
+            int mainCounter = 0;
+
+            Parallel.For(0, 4, (i) =>
+            {
+                Stopwatch st = Stopwatch.StartNew();
+                IConnection connection = null;
+                int counter = -1;
+                do
+                {
+                    try
+                    {
+                        counter++;
+                        connection = factory.CreateConnection();
+                        connection.Start();
+                        Assert.Fail("Should have stopped after predefined number of retries.");
+                    }
+                    catch (NMSException)
+                    {
+                    }
+                    finally
+                    {
+                        connection?.Close();
+                    }
+                } while (st.ElapsedMilliseconds < testTimeMs);
+
+                lock (factory)
+                {
+                    mainCounter += counter;
+                }
+            });
+
+            double ratePerSec = 1000.0 * mainCounter / testTimeMs;
+            
+            Assert.AreEqual(desiredRatePerSec, ratePerSec, 1);
         }
     }
 }

@@ -17,13 +17,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Apache.NMS;
 using Apache.NMS.AMQP;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Provider.Failover;
-using Apache.NMS.AMQP.Util;
 using Moq;
 using NMS.AMQP.Test.Provider.Mock;
 using NUnit.Framework;
@@ -205,7 +205,92 @@ namespace NMS.AMQP.Test.Provider
             Assert.AreEqual(5, mockPeer.ContextStats.ConnectionAttempts);
             Assert.AreEqual(5, mockPeer.ContextStats.CloseAttempts);
         }
+        
+        [Test, Timeout(5000)]
+        public void TestMaxReconnectAttemptsWithBackOffAndMaxReconnectDelay()
+        {
+            NmsConnectionFactory factory = new NmsConnectionFactory(
+                "failover:(mock://localhost?mock.failOnConnect=true)" +
+                "?failover.maxReconnectAttempts=6" +
+                "&failover.maxReconnectDelay=800" +
+                "&failover.reconnectDelay=100" +
+                "&failover.useReconnectBackOff=true");
 
+            IConnection connection = null;
+            try
+            {
+                connection = factory.CreateConnection();
+                connection.Start();
+                Assert.Fail("Should have stopped after five retries.");
+            }
+            catch (NMSException)
+            {
+            }
+            finally
+            {
+                connection?.Close();
+            }
+
+            Assert.AreEqual(6, mockPeer.ContextStats.ProvidersCreated);
+            Assert.AreEqual(6, mockPeer.ContextStats.ConnectionAttempts);
+            Assert.AreEqual(6, mockPeer.ContextStats.CloseAttempts);
+            
+            // Verify if reconnect backoff was performed in expected growing delays
+            IEnumerable<double> expectedDelays = new double[] {100, 200, 400, 800, 800}; // At the end it should actually stop growing cause MaxReconnectDelay should kick in
+            var actualDelays = GetActualReconnectDelays();
+
+            Enumerable.Zip(expectedDelays, actualDelays, (expected, actual) => new { expected, actual })
+            .ToList()
+            .ForEach(p => Assert.AreEqual(p.expected, p.actual, 100));
+        }
+
+        [Test, Timeout(10000)]
+        public void TestMaxReconnectAttemptsWithBackOffAndRandomDelay()
+        {
+            NmsConnectionFactory factory = new NmsConnectionFactory(
+                "failover:(mock://localhost?mock.failOnConnect=true)" +
+                "?failover.maxReconnectAttempts=7" +
+                "&failover.maxReconnectDelay=3200" +
+                "&failover.reconnectDelay=100" +
+                "&failover.useReconnectBackOff=true"+
+                "&failover.reconnectDelayRandomFactor=0.9");
+
+            IConnection connection = null;
+            try
+            {
+                connection = factory.CreateConnection();
+                connection.Start();
+                Assert.Fail("Should have stopped after predefined number of retries.");
+            }
+            catch (NMSException)
+            {
+            }
+            finally
+            {
+                connection?.Close();
+            }
+
+            Assert.AreEqual(7, mockPeer.ContextStats.ProvidersCreated);
+            Assert.AreEqual(7, mockPeer.ContextStats.ConnectionAttempts);
+            Assert.AreEqual(7, mockPeer.ContextStats.CloseAttempts);
+            
+            // Verify if reconnect backoff was performed in expected growing delays
+            IEnumerable<double> expectedDelays = new double[] {100, 200, 400, 800, 1600, 3200};
+            var actualDelays = GetActualReconnectDelays();
+
+            double difference = Enumerable.Zip(expectedDelays, actualDelays, (expected, actual) => Math.Abs(expected - actual)).Max();
+            Assert.GreaterOrEqual(difference,80);
+        }
+        
+        private IEnumerable<double> GetActualReconnectDelays()
+        {
+            IEnumerable<double> actualDelays = Enumerable
+                .Range(1, mockPeer.ContextStats.ConnectionAttemptsTimestamps.Count - 1)
+                .Select(i => mockPeer.ContextStats.ConnectionAttemptsTimestamps[i] - mockPeer.ContextStats.ConnectionAttemptsTimestamps[i - 1])
+                .Select(a => a.TotalMilliseconds);
+            return actualDelays;
+        }
+       
         [Test]
         public void TestFailureOnCloseIsSwallowed()
         {

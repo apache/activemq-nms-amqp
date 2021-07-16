@@ -23,6 +23,7 @@ The options apply to the behavior of the NMS objects such as Connection, Session
 - **nms.requestTimeout** Timeout value that controls how long the client waits on completion of various synchronous interactions, such as opening a producer or consumer, before returning an error. Does not affect synchronous message sends. By default the client will wait indefinitely for a request to complete.
 - **nms.clientIdPrefix** Optional prefix value that is used for generated Client ID values when a new Connection is created for the JMS ConnectionFactory. The default prefix is 'ID:'.
 - **nms.connectionIdPrefix** Optional prefix value that is used for generated Connection ID values when a new Connection is created for the JMS ConnectionFactory. This connection ID is used when logging some information from the JMS Connection object so a configurable prefix can make breadcrumbing the logs easier. The default prefix is 'ID:'.
+- **nms.maxNewConnectionRatePerSec** Allowed approximated rate for how fast connection factory is allowed to create new connection. If there is more request, they will have to wait. Default value is -1 which means unlimited.
 
 ### TCP Transport Configuration options
 When connected to a remote using plain TCP these options configure the behaviour of the underlying socket. These options are appended to the connection URI along with the other configuration options, for example:

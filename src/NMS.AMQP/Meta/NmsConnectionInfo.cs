@@ -34,6 +34,7 @@ namespace Apache.NMS.AMQP.Meta
         public static readonly int DEFAULT_IDLE_TIMEOUT;
         public static readonly ushort DEFAULT_CHANNEL_MAX;
         public static readonly int DEFAULT_MAX_FRAME_SIZE;
+        public static double DEFAULT_MAX_NEW_CONNECTION_RATE_PER_SEC = -1;
 
         static NmsConnectionInfo()
         {

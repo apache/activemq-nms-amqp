@@ -69,7 +69,9 @@ namespace NMS.AMQP.Test.Provider
                                     "&failover.maxReconnectAttempts=" + (FailoverProvider.DEFAULT_MAX_RECONNECT_ATTEMPTS + 5) +
                                     "&failover.warnAfterReconnectAttempts=" + (FailoverProvider.DEFAULT_WARN_AFTER_RECONNECT_ATTEMPTS + 6) +
                                     "&failover.useReconnectBackOff=" + (!FailoverProvider.DEFAULT_USE_RECONNECT_BACKOFF) +
-                                    "&failover.reconnectBackOffMultiplier=" + (FailoverProvider.DEFAULT_RECONNECT_BACKOFF_MULTIPLIER + 1.0d));
+                                    "&failover.reconnectBackOffMultiplier=" + (FailoverProvider.DEFAULT_RECONNECT_BACKOFF_MULTIPLIER + 1.0d) +
+                                    "&failover.reconnectDelayRandomFactor=" +(FailoverProvider.DEFAULT_RECONNECT_DELAY_RANDOM_FACTOR + 1.0d)
+            );
 
             FailoverProvider failover = ProviderFactory.Create(configured) as FailoverProvider;
             Assert.IsNotNull(failover);
@@ -82,6 +84,7 @@ namespace NMS.AMQP.Test.Provider
             Assert.AreEqual(FailoverProvider.DEFAULT_WARN_AFTER_RECONNECT_ATTEMPTS + 6, failover.WarnAfterReconnectAttempts);
             Assert.AreEqual(!FailoverProvider.DEFAULT_USE_RECONNECT_BACKOFF, failover.UseReconnectBackOff);
             Assert.AreEqual(FailoverProvider.DEFAULT_RECONNECT_BACKOFF_MULTIPLIER + 1.0d, failover.ReconnectBackOffMultiplier, 0.0);
+            Assert.AreEqual(FailoverProvider.DEFAULT_RECONNECT_DELAY_RANDOM_FACTOR + 1.0d, failover.ReconnectDelayRandomFactor, 0.0);
         }
 
     }

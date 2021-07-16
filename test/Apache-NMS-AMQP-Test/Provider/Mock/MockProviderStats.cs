@@ -39,6 +39,8 @@ namespace NMS.AMQP.Test.Provider.Mock
         public int CloseAttempts { get; private set; }
         public int RecoverCalls { get; set; }
 
+        public List<DateTime> ConnectionAttemptsTimestamps { get; set; } = new List<DateTime>(); 
+
         public int GetCreateResourceCalls<T>() where T : INmsResource => createResourceCalls[typeof(T)];
 
         public int GetDestroyResourceCalls<T>() where T : INmsResource => destroyResourceCalls[typeof(T)];
@@ -55,6 +57,7 @@ namespace NMS.AMQP.Test.Provider.Mock
         {
             parent?.RecordConnectAttempt();
             ConnectionAttempts++;
+            ConnectionAttemptsTimestamps.Add(DateTime.Now);
         }
 
         public void RecordCloseAttempt()
