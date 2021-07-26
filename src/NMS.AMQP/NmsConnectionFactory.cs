@@ -17,7 +17,6 @@
 
 using System;
 using System.Collections.Specialized;
-using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider;
@@ -40,7 +39,7 @@ namespace Apache.NMS.AMQP
         
         DateTime nextAllowedConnectionCreationTime = DateTime.MinValue;
 
-
+        
         public NmsConnectionFactory(string userName, string password)
         {
             UserName = userName;
@@ -168,6 +167,8 @@ namespace Apache.NMS.AMQP
         /// </summary>
         public string ClientId { get; set; }
 
+        public int MaxMessageSize { get; set; } = NmsConnectionInfo.DEFAULT_MAX_MESSAGE_SIZE;
+
         /// <summary>
         /// Sets the desired max rate of creating new connections by this factory.
         ///
@@ -176,7 +177,7 @@ namespace Apache.NMS.AMQP
         /// </summary>
         public double MaxNewConnectionRatePerSec { get; set; } = NmsConnectionInfo.DEFAULT_MAX_NEW_CONNECTION_RATE_PER_SEC;
         
-    public IConnection CreateConnection()
+        public IConnection CreateConnection()
         {
             return CreateConnection(UserName, Password);
         }
@@ -333,11 +334,11 @@ namespace Apache.NMS.AMQP
                 RequestTimeout = RequestTimeout,
                 SendTimeout = SendTimeout,
                 CloseTimeout = CloseTimeout,
-                LocalMessageExpiry = LocalMessageExpiry
+                LocalMessageExpiry = LocalMessageExpiry,
+                MaxMessageSize = MaxMessageSize
             };
 
             bool userSpecifiedClientId = ClientId != null;
-
             if (userSpecifiedClientId)
             {
                 connectionInfo.SetClientId(ClientId, true);
@@ -346,7 +347,7 @@ namespace Apache.NMS.AMQP
             {
                 connectionInfo.SetClientId(ClientIdGenerator.GenerateId(), false);
             }
-
+            
             return connectionInfo;
         }
 

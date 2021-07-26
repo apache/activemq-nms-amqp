@@ -58,6 +58,36 @@ namespace NMS.AMQP.Test.Integration
         }
 
         [Test, Timeout(20_000)]
+        public void TestSendMaxMessageSize()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = base.EstablishConnection(testPeer, "nms.maxMessageSize=80");
+                testPeer.ExpectBegin();
+                testPeer.ExpectSenderAttach();
+
+                ISession session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+                IQueue queue = session.GetQueue("myQueue");
+                IMessageProducer producer = session.CreateProducer(queue);
+
+                // Create and transfer a new message
+                String text = "myMessage";
+                testPeer.ExpectTransfer(x => Assert.AreEqual(text, (x.BodySection as AmqpValue).Value));
+                testPeer.ExpectClose();
+                
+                // First send message under body size limit
+                producer.Send(session.CreateTextMessage(text));
+
+                // Now we expect this to throw
+                Assert.Catch<NMSException>(() => producer.Send(session.CreateBytesMessage(new byte[100])));
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+        
+
+        [Test, Timeout(20_000)]
         public void TestSentTextMessageCanBeModified()
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())

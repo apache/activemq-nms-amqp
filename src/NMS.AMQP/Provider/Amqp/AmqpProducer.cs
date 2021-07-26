@@ -163,6 +163,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         
         private async Task SendAsync(global::Amqp.Message message, DeliveryState deliveryState)
         {
+            CheckMaxMessageSize(message);
+            
             Outcome outcome = null;
             try
             {
@@ -193,6 +195,31 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                     throw ExceptionSupport.GetException(error, outcome.ToString());
                 }
             }
+        }
+
+        private void CheckMaxMessageSize(global::Amqp.Message message)
+        {
+            int maxMessageSize = this.session?.Connection?.Info?.MaxMessageSize ?? NmsConnectionInfo.DEFAULT_MAX_MESSAGE_SIZE;
+            if (maxMessageSize != NmsConnectionInfo.DEFAULT_MAX_MESSAGE_SIZE)
+            {
+                if (GetEstimatedBodySize(message) >= maxMessageSize)
+                {
+                    throw new ArgumentException("Estimated message Body is bigger than configured MaxMessageSize");
+                }
+            }
+        }
+
+        private int GetEstimatedBodySize(global::Amqp.Message message)
+        {
+            switch (message.Body)
+            {
+                case String str:
+                    return str.Length;
+                case byte[] bytes:
+                    return bytes.Length;
+            }
+
+            return 64;
         }
         
         public async Task CloseAsync()

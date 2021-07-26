@@ -35,6 +35,7 @@ namespace Apache.NMS.AMQP.Meta
         public static readonly ushort DEFAULT_CHANNEL_MAX;
         public static readonly int DEFAULT_MAX_FRAME_SIZE;
         public static double DEFAULT_MAX_NEW_CONNECTION_RATE_PER_SEC = -1;
+        public static readonly int DEFAULT_MAX_MESSAGE_SIZE = -1;
 
         static NmsConnectionInfo()
         {
@@ -63,6 +64,9 @@ namespace Apache.NMS.AMQP.Meta
         public string TopicPrefix { get; set; }
         public ushort ChannelMax { get; set; } = DEFAULT_CHANNEL_MAX;
         public int MaxFrameSize { get; set; } = DEFAULT_MAX_FRAME_SIZE;
+
+        public int MaxMessageSize { get; set; } = DEFAULT_MAX_MESSAGE_SIZE;
+        
         public int IdleTimeOut { get; set; } = DEFAULT_IDLE_TIMEOUT;
         
         public bool AnonymousRelaySupported { get; set; }

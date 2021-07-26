@@ -987,7 +987,6 @@ namespace NMS.AMQP.Test.Integration
                 testPeer.ExpectLinkFlowRespondWithTransfer(CreateMessageWithValueContent(inputValue));
                 testPeer.ExpectDisposition(true, _ => { } );
                 
-
                 IQueue destination = context.GetQueue("myQueue");
                 var consumer = context.CreateConsumer(destination);
 
@@ -1030,12 +1029,11 @@ namespace NMS.AMQP.Test.Integration
                 // Release and allow link to flow
                 beforeFlow.Set();
                 // Give short time to arrive
-                Thread.Sleep(100);
+                Thread.Sleep(500);
                 
                 T body = consumer.ReceiveBodyNoWait<T>();
                 Assert.AreEqual(inputValue, body);
                 Assert.AreNotSame(inputValue, body);
-
 
                 testPeer.ExpectEnd();
                 testPeer.ExpectClose();
