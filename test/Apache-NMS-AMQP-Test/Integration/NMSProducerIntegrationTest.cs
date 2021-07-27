@@ -577,6 +577,10 @@ namespace NMS.AMQP.Test.Integration
                 // send operation to time out.
                 testPeer.ExpectSenderAttach();
                 testPeer.ExpectTransferButDoNotRespond(messageMatcher: Assert.NotNull);
+                testPeer.ExpectDisposition(settled: true, state =>
+                {
+                    Assert.AreEqual(state.Descriptor.Code, MessageSupport.RELEASED_INSTANCE.Descriptor.Code);
+                });
                 testPeer.ExpectEnd();
                 testPeer.ExpectClose();
 
