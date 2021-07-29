@@ -59,6 +59,130 @@ namespace NMS.AMQP.Test.Integration.Async
         }
 
         [Test, Timeout(20_000)]
+        public async Task TestConsumerCreditAll()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = await EstablishConnectionAsync(testPeer, "nms.prefetchPolicy.all=5");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(5, credit));
+
+                ISession session = await connection.CreateSessionAsync(AcknowledgementMode.AutoAcknowledge);
+                IQueue queue = await session.GetQueueAsync("myQueue");
+                IMessageConsumer consumer = await session.CreateConsumerAsync(queue);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                await consumer.CloseAsync();
+
+                testPeer.ExpectClose();
+                await connection.CloseAsync();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public async Task TestConsumerCreditQueuePrefetch()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = await EstablishConnectionAsync(testPeer, "nms.prefetchPolicy.queuePrefetch=6");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(6, credit));
+
+                ISession session = await connection.CreateSessionAsync(AcknowledgementMode.AutoAcknowledge);
+                IQueue queue = await session.GetQueueAsync("myQueue");
+                IMessageConsumer consumer = await session.CreateConsumerAsync(queue);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                await consumer.CloseAsync();
+
+                testPeer.ExpectClose();
+                await connection.CloseAsync();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public async Task TestConsumerCreditTopicPrefetch()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = await EstablishConnectionAsync(testPeer, "nms.prefetchPolicy.topicPrefetch=7");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(7, credit));
+
+                ISession session = await connection.CreateSessionAsync(AcknowledgementMode.AutoAcknowledge);
+                ITopic topic = await session.GetTopicAsync("myTopic");
+                IMessageConsumer consumer = await session.CreateConsumerAsync(topic);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                await consumer.CloseAsync();
+
+                testPeer.ExpectClose();
+                await connection.CloseAsync();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+
+        [Test, Timeout(20_000)]
+        public async Task TestConsumerCreditDurableTopicPrefetch()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = await EstablishConnectionAsync(testPeer, "nms.prefetchPolicy.durableTopicPrefetch=8");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(8, credit));
+
+                ISession session = await connection.CreateSessionAsync(AcknowledgementMode.AutoAcknowledge);
+                ITopic topic = await session.GetTopicAsync("myTopic");
+                IMessageConsumer consumer = await session.CreateDurableConsumerAsync(topic, "durableName");
+
+                testPeer.ExpectDetach(expectClosed: false, sendResponse: true, replyClosed: false);
+                await consumer.CloseAsync();
+
+                testPeer.ExpectClose();
+                await connection.CloseAsync();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public async Task TestConsumerCreditQueueBrowserPrefetch()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = await EstablishConnectionAsync(testPeer, "nms.prefetchPolicy.queueBrowserPrefetch=9");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach(Assert.IsNotNull, Assert.IsNotNull, Assert.IsNotNull, true);
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(9, credit));
+
+                ISession session = await connection.CreateSessionAsync(AcknowledgementMode.AutoAcknowledge);
+                IQueue queue = await session.GetQueueAsync("myQueue");
+                IQueueBrowser consumer = await session.CreateBrowserAsync(queue);
+                
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                
+                // To cause actual creation of consumer, after iteration consumer would be closed
+                foreach (var o in consumer)
+                {
+                }
+
+                testPeer.ExpectClose();
+                await connection.CloseAsync();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
         public async Task TestRemotelyCloseConsumer()
         {
             Mock<INmsConnectionListener> mockConnectionListener = new Mock<INmsConnectionListener>();

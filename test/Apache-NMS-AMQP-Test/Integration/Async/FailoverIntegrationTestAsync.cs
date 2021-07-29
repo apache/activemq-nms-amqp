@@ -23,6 +23,7 @@ using Amqp.Framing;
 using Amqp.Types;
 using Apache.NMS;
 using Apache.NMS.AMQP;
+using Apache.NMS.AMQP.Meta;
 using Moq;
 using NLog;
 using NMS.AMQP.Test.TestAmqp;
@@ -617,7 +618,7 @@ namespace NMS.AMQP.Test.Integration.Async
                 finalPeer.ExpectBegin();
                 finalPeer.ExpectBegin();
                 finalPeer.ExpectReceiverAttach();
-                finalPeer.ExpectLinkFlow(drain: false, sendDrainFlowResponse: false, creditMatcher: credit => Assert.AreEqual(credit, 200));
+                finalPeer.ExpectLinkFlow(drain: false, sendDrainFlowResponse: false, creditMatcher: credit => Assert.AreEqual(NmsConnectionInfo.DEFAULT_PREFETCH_POLICY.QueuePrefetch, credit));
                 finalPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
                 finalPeer.ExpectClose();
 

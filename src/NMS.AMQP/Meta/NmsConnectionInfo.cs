@@ -34,6 +34,13 @@ namespace Apache.NMS.AMQP.Meta
         public static readonly int DEFAULT_IDLE_TIMEOUT;
         public static readonly ushort DEFAULT_CHANNEL_MAX;
         public static readonly int DEFAULT_MAX_FRAME_SIZE;
+        public static readonly PrefetchPolicyInfo DEFAULT_PREFETCH_POLICY = new PrefetchPolicyInfo()
+        {
+            QueuePrefetch = 1000,
+            TopicPrefetch = 1000,
+            DurableTopicPrefetch = 1000,
+            QueueBrowserPrefetch = 1000
+        };
         public static double DEFAULT_MAX_NEW_CONNECTION_RATE_PER_SEC = -1;
 
         static NmsConnectionInfo()
@@ -70,6 +77,11 @@ namespace Apache.NMS.AMQP.Meta
         public bool DelayedDeliverySupported { get; set; }
         
         public bool SharedSubsSupported { get; set; }
+
+        public PrefetchPolicyInfo PrefetchPolicy { get; set; } = DEFAULT_PREFETCH_POLICY;
+        
+        
+        
         
 
         public void SetClientId(string clientId, bool explicitClientId)
@@ -99,6 +111,38 @@ namespace Apache.NMS.AMQP.Meta
         public override string ToString()
         {
             return $"[{nameof(NmsConnectionInfo)}] {nameof(Id)}: {Id}, {nameof(ConfiguredUri)}: {ConfiguredUri}";
+        }
+    }
+
+    public class PrefetchPolicyInfo
+    {
+        public int QueuePrefetch { get; set; }
+        public int TopicPrefetch { get; set; }
+        public int QueueBrowserPrefetch { get; set; }
+        public int DurableTopicPrefetch { get; set; }
+
+        public int All
+        {
+            set => QueuePrefetch = TopicPrefetch = QueueBrowserPrefetch = DurableTopicPrefetch = value;
+        }
+
+        internal PrefetchPolicyInfo Clone()
+        {
+            return (PrefetchPolicyInfo) this.MemberwiseClone();
+        }
+        
+        public int GetLinkCredit(IDestination destination, bool browser, bool durable)
+        {
+            if (destination.IsTopic)
+            {
+                if (durable) return DurableTopicPrefetch;
+                else return TopicPrefetch;
+            }
+            else
+            {
+                if (browser) return QueueBrowserPrefetch;
+                else return QueuePrefetch;
+            }
         }
     }
 }

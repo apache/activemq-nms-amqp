@@ -52,26 +52,43 @@ namespace Apache.NMS.AMQP.Util
 
         public static void SetProperties(object obj, StringDictionary properties, string propertyPrefix = PROPERTY_PREFIX)
         {
-            Dictionary<string, PropertyInfo> props = GetPropertiesForClass(obj);
             foreach (string rawkey in properties.Keys)
             {
-                string key = RemovePrefix(propertyPrefix, rawkey);
-                Tracer.DebugFormat("Searching for Property: \"{0}\"", key);
-                if (props.ContainsKey(key))
-                {
-                    Tracer.DebugFormat(
-                        "Assigning Property {0} to {1}.{2} with value {3}",
-                        key, obj.GetType().Namespace, obj.GetType().Name, properties[rawkey]
-                        );
-#if NET40
-                    if (props[key].GetSetMethod() != null)
-#else
-                    if(props[key].SetMethod!=null)
-#endif
-                        props[key].SetValue(obj, ConvertType(props[key].PropertyType, properties[rawkey]), null);
-                }
+                Tracer.DebugFormat("Searching for Property: \"{0}\"", rawkey);
+                var (currentObject, propertyInfo) = GetPropertyInfo(obj, propertyPrefix, rawkey);
 
+                if (propertyInfo != null)
+                {
+#if NET40
+                    if (propertyInfo.GetSetMethod() != null)
+#else
+                    if (propertyInfo.SetMethod != null)
+#endif
+                    {
+                        Tracer.DebugFormat(
+                            "Assigning Property {0} to {1}.{2} with value {3}",
+                            rawkey, obj.GetType().Namespace, obj.GetType().Name, properties[rawkey]
+                        );
+                        propertyInfo.SetValue(currentObject, ConvertType(propertyInfo.PropertyType, properties[rawkey]), null);
+                    }
+
+                }
             }
+        }
+
+        private static (object,PropertyInfo) GetPropertyInfo(object obj, string propertyPrefix, string rawkey)
+        {
+            Object currentObject = null;
+            PropertyInfo propertyInfo = null;
+            
+            foreach (var propertyName in rawkey.Split(new[] {'.'}, StringSplitOptions.RemoveEmptyEntries))
+            {
+                currentObject = currentObject == null ? obj : propertyInfo.GetValue(currentObject);
+                string key = RemovePrefix(propertyPrefix, propertyName);
+                propertyInfo = GetPropertiesForClass(currentObject)[key];
+            }
+
+            return (currentObject, propertyInfo);
         }
 
         public static StringDictionary GetProperties(object obj, string propertyPrefix = PROPERTY_PREFIX)

@@ -50,7 +50,7 @@ namespace Apache.NMS.AMQP
             {
                 session.Connection.CheckConsumeFromTemporaryDestination((NmsTemporaryDestination) destination);
             }
-
+         
             Info = new NmsConsumerInfo(consumerId)
             {
                 Destination = destination,
@@ -61,8 +61,8 @@ namespace Apache.NMS.AMQP
                 IsShared = IsSharedSubscription,
                 IsDurable = IsDurableSubscription,
                 IsBrowser =  IsBrowser,
-                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry
-
+                LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry,
+                LinkCredit = Session.Connection.ConnectionInfo.PrefetchPolicy.GetLinkCredit(destination, IsBrowser, IsDurableSubscription)
             };
             deliveryTask = new MessageDeliveryTask(this);
         }

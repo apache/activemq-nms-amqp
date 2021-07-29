@@ -21,8 +21,6 @@ namespace Apache.NMS.AMQP.Meta
 {
     public class NmsConsumerInfo : INmsResource<NmsConsumerId>
     {
-        public static readonly int DEFAULT_CREDIT = 200;
-        
         public NmsConsumerInfo(NmsConsumerId consumerId)
         {
             Id = consumerId ?? throw new ArgumentNullException(nameof(consumerId), "Consumer ID cannot be null");
@@ -39,7 +37,7 @@ namespace Apache.NMS.AMQP.Meta
         public bool IsShared { get; set; }
         public bool LocalMessageExpiry { get; set; }
         public bool IsBrowser { get; set; }
-        public int LinkCredit { get; set; } = DEFAULT_CREDIT;
+        public int LinkCredit { get; set; }
         
         public bool HasSelector() => !string.IsNullOrWhiteSpace(Selector);
 
