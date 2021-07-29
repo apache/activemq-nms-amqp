@@ -60,7 +60,47 @@ namespace NMS.AMQP.Test
             messageConsumer.Close();
             
         }
+        
+        [Test, Timeout(60_000)]
+        public void TestConsumerCredit()
+        {
+            PurgeQueue(TimeSpan.FromMilliseconds(500));
 
+            Connection = CreateAmqpConnection(options: "nms.prefetchPolicy.all=3");
+            Connection.Start();
+
+            ISession session = Connection.CreateSession(AcknowledgementMode.ClientAcknowledge);
+            IQueue queue = session.GetQueue(TestName);
+            IMessageConsumer messageConsumer = session.CreateConsumer(queue);
+            ConcurrentBag<IMessage> messages = new ConcurrentBag<IMessage>();
+            CountdownEvent countdownReceived = new CountdownEvent(4);
+            messageConsumer.Listener += message =>
+            {
+                messages.Add(message);
+                try
+                {
+                    countdownReceived.Signal();
+                }
+                catch (Exception)
+                {
+                    // if it gets below zero, we dont care
+                }
+            };
+            
+            IMessageProducer producer = session.CreateProducer(queue);
+            Enumerable.Range(0, 100).ToList().ForEach(nr => producer.Send(session.CreateTextMessage("hello")));
+            
+            // Wait for at least four messages are read, which should never happen
+            Assert.IsFalse(countdownReceived.Wait(500));
+            Assert.AreEqual(3, messages.Count);
+            
+            // Once we ack messages we should start receiving another 3
+            messages.ToList().ForEach(m => m.Acknowledge());
+            // We just wait to see if 4th message arrived
+            Assert.IsTrue(countdownReceived.Wait(500));
+        }
+
+        
         [Test, Timeout(60_000)]
         public void TestSelectorsWithJMSType()
         {

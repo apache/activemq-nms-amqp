@@ -169,6 +169,11 @@ namespace Apache.NMS.AMQP
         public string ClientId { get; set; }
 
         /// <summary>
+        /// Sets and gets the prefetch values for consumers
+        /// </summary>
+        public PrefetchPolicyInfo PrefetchPolicy { get; set; } = NmsConnectionInfo.DEFAULT_PREFETCH_POLICY.Clone();
+
+        /// <summary>
         /// Sets the desired max rate of creating new connections by this factory.
         ///
         /// NOTE: During creating new connection if the rate is too high system will
@@ -333,7 +338,8 @@ namespace Apache.NMS.AMQP
                 RequestTimeout = RequestTimeout,
                 SendTimeout = SendTimeout,
                 CloseTimeout = CloseTimeout,
-                LocalMessageExpiry = LocalMessageExpiry
+                LocalMessageExpiry = LocalMessageExpiry,
+                PrefetchPolicy = PrefetchPolicy.Clone()
             };
 
             bool userSpecifiedClientId = ClientId != null;

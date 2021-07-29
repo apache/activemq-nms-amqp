@@ -58,6 +58,131 @@ namespace NMS.AMQP.Test.Integration
             }
         }
 
+        [Test, Timeout(20_000)]
+        public void TestConsumerCreditAll()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                INMSContext context = EstablishNMSContext(testPeer, "nms.prefetchPolicy.all=5");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(5, credit));
+
+                IQueue queue = context.GetQueue("myQueue");
+                INMSConsumer consumer = context.CreateConsumer(queue);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                testPeer.ExpectEnd();
+                consumer.Close();
+
+                testPeer.ExpectClose();
+                context.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestConsumerCreditQueuePrefetch()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                INMSContext context = EstablishNMSContext(testPeer, "nms.prefetchPolicy.queuePrefetch=6");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(6, credit));
+
+                IQueue queue = context.GetQueue("myQueue");
+                INMSConsumer consumer = context.CreateConsumer(queue);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                testPeer.ExpectEnd();
+                consumer.Close();
+
+                testPeer.ExpectClose();
+                context.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestConsumerCreditTopicPrefetch()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                INMSContext context = EstablishNMSContext(testPeer, "nms.prefetchPolicy.topicPrefetch=7");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(7, credit));
+
+                ITopic topic = context.GetTopic("myTopic");
+                INMSConsumer consumer = context.CreateConsumer(topic);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                testPeer.ExpectEnd();
+                consumer.Close();
+
+                testPeer.ExpectClose();
+                context.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestConsumerCreditDurableTopicPrefetch()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                INMSContext context = EstablishNMSContext(testPeer, "nms.prefetchPolicy.durableTopicPrefetch=8");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(8, credit));
+
+                ITopic topic = context.GetTopic("myTopic");
+                INMSConsumer consumer = context.CreateDurableConsumer(topic, "durableName");
+
+                testPeer.ExpectDetach(expectClosed: false, sendResponse: true, replyClosed: false);
+                testPeer.ExpectEnd();
+                consumer.Close();
+
+                testPeer.ExpectClose();
+                context.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestConsumerCreditQueueBrowserPrefetch()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                INMSContext context = EstablishNMSContext(testPeer, "nms.prefetchPolicy.queueBrowserPrefetch=9");
+                testPeer.ExpectBegin();
+                testPeer.ExpectReceiverAttach(Assert.IsNotNull, Assert.IsNotNull, Assert.IsNotNull, true);
+                testPeer.ExpectLinkFlow(false, false, credit => Assert.AreEqual(9, credit));
+
+                IQueue queue = context.GetQueue("myQueue");
+                IQueueBrowser consumer = context.CreateBrowser(queue);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                testPeer.ExpectEnd();
+
+                // To cause actual creation of consumer, after iteration consumer would be closed
+                foreach (var o in consumer)
+                {
+                }
+
+                testPeer.ExpectClose();
+                context.Close();
+
+                testPeer.WaitForAllMatchersToComplete(1000);
+            }
+        }
+        
+       
         // TODO No connection Listener in context
         // [Test, Timeout(20_000)]
         // public void TestRemotelyCloseConsumer()

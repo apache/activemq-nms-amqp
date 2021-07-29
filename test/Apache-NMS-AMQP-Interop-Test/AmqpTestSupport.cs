@@ -48,10 +48,14 @@ namespace NMS.AMQP.Test
             connection.Start();
             return connection;
         }
-        
-        protected IConnection CreateAmqpConnection(string clientId = null)
+
+        protected IConnection CreateAmqpConnection(string clientId = null, string options = null)
         {
             string brokerUri = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_URI") ?? "amqp://127.0.0.1:5672";
+            if (options != null)
+            {
+                brokerUri += "?" + options;
+            }
             string userName = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_CU") ?? "admin";
             string password = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_CPWD") ?? "admin";
 
