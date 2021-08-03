@@ -50,6 +50,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         private readonly AmqpMessageFactory messageFactory;
         private AmqpConnectionSession connectionSession;
         private TaskCompletionSource<bool> tsc;
+        
+        private bool closeCalled = false;
 
         public AmqpConnection(AmqpProvider provider, ITransportContext transport, NmsConnectionInfo info)
         {
@@ -97,7 +99,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
 
             bool connectionExplicitlyClosed = error == null;
-            if (!connectionExplicitlyClosed)
+            if (!closeCalled || !connectionExplicitlyClosed)
             {
                 var exception = ExceptionSupport.GetException(error);
                 if (!this.tsc.TrySetException(exception))
@@ -183,6 +185,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             try
             {
+                closeCalled = true;
                 UnderlyingConnection?.Close();
             }
             catch (Exception ex)
@@ -197,6 +200,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         {
             try
             {
+                closeCalled = true;
                 if (UnderlyingConnection != null) await UnderlyingConnection.CloseAsync().AwaitRunContinuationAsync();
             }
             catch (Exception ex)

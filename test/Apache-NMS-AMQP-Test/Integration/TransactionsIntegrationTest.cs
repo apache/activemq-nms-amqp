@@ -17,7 +17,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Transactions;
+using System.Threading;
 using Amqp;
 using Amqp.Framing;
 using Amqp.Transactions;
@@ -997,6 +997,12 @@ namespace NMS.AMQP.Test.Integration
 
                 testPeer.WaitForAllMatchersToComplete(2000);
 
+                // Make sure that above line 'WaitForAllMatchersToComplete' also finishes on session/producer side
+                // In order for producer.Send to not really send, transaction on this end needs to be IsTransactionFailed
+                // in AmqpProducer  if (session.IsTransacted && session.IsTransactionFailed), and sometimes producer.Send tries
+                // to send before this flag is set, which would cause actual transfer
+                Thread.Sleep(10);
+                
                 producer.Send(session.CreateMessage());
 
                 // Expect that a new link will be created in order to start the next TX.
@@ -1016,7 +1022,7 @@ namespace NMS.AMQP.Test.Integration
             }
         }
 
-        [Test, Timeout(20_000)]
+        [Test, Timeout(20_000), Property("FrameContext.SendDelayMs", 10)]
         public void TestReceiveAfterCoordinatorLinkClosedDuringTX()
         {
             using (TestAmqpPeer testPeer = new TestAmqpPeer())
@@ -1040,7 +1046,7 @@ namespace NMS.AMQP.Test.Integration
                 testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithNullContent());
 
                 // Close the link, the messages should now just get dropped on the floor.
-                testPeer.RemotelyCloseLastCoordinatorLink();
+                testPeer.RemotelyCloseLastCoordinatorLink(100);
 
                 IMessageConsumer consumer = session.CreateConsumer(queue);
 
@@ -1380,7 +1386,7 @@ namespace NMS.AMQP.Test.Integration
                 IMessageConsumer consumer = session.CreateConsumer(queue);
                 for (int i = 0; i < messageCount; i++)
                 {
-                    IMessage message = consumer.Receive(TimeSpan.FromMilliseconds(500));
+                    IMessage message = consumer.Receive(TimeSpan.FromMilliseconds(1000));
                     Assert.IsNotNull(message);
                     Assert.AreEqual(i, message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER));
                 }

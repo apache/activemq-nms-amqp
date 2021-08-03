@@ -1033,12 +1033,12 @@ namespace NMS.AMQP.Test.TestAmqp
             RemotelyCloseLastCoordinatorLink(expectDetachResponse: true, closed: true, error: new Error(ErrorCode.TransactionRollback) { Description = "Discharge of TX failed." });
         }
 
-        public void RemotelyCloseLastCoordinatorLink()
+        public void RemotelyCloseLastCoordinatorLink(int delayMs = 0)
         {
-            RemotelyCloseLastCoordinatorLink(expectDetachResponse: true, closed: true, error: new Error(ErrorCode.TransactionRollback) { Description = "Discharge of TX failed." });
+            RemotelyCloseLastCoordinatorLink(expectDetachResponse: true, closed: true, error: new Error(ErrorCode.TransactionRollback) { Description = "Discharge of TX failed." }, delayMs);
         }
 
-        private void RemotelyCloseLastCoordinatorLink(bool expectDetachResponse, bool closed, Error error)
+        private void RemotelyCloseLastCoordinatorLink(bool expectDetachResponse, bool closed, Error error, int delayMs = 0)
         {
             lock (matchersLock)
             {
@@ -1051,6 +1051,11 @@ namespace NMS.AMQP.Test.TestAmqp
                         detach.Error = error;
                     }
 
+                    if (delayMs > 0)
+                    {
+                        Thread.Sleep(delayMs);
+                    }
+                    
                     context.SendCommand(detach);
                 });
 
@@ -1076,6 +1081,8 @@ namespace NMS.AMQP.Test.TestAmqp
             
             if (sendClose)
             {
+                testAmqpPeerRunner.StopPump();
+                
                 var close = new Close();
                 this.testAmqpPeerRunner.Send(CONNECTION_CHANNEL, close);
             }

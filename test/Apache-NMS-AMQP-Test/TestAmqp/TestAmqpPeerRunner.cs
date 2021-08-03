@@ -21,16 +21,15 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Amqp;
-using Amqp.Framing;
 using Amqp.Types;
-using NLog.Fluent;
+using NLog;
 using NMS.AMQP.Test.TestAmqp.BasicTypes;
 
 namespace NMS.AMQP.Test.TestAmqp
 {
     public class TestAmqpPeerRunner
     {
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         
         private readonly TestAmqpPeer testAmqpPeer;
         private readonly IPEndPoint ip;
@@ -131,7 +130,6 @@ namespace NMS.AMQP.Test.TestAmqp
             catch(Exception e)
             {
                 Logger.Info(e);
-                stream.Dispose();
             }
         }
 
@@ -163,7 +161,14 @@ namespace NMS.AMQP.Test.TestAmqp
                 message = Amqp.Message.Decode(buffer);
             }
 
-            return testAmqpPeer.OnFrame(stream, channel, command, message);
+            if (pumpEnabled)
+            {
+                return testAmqpPeer.OnFrame(stream, channel, command, message);
+            }
+            else
+            {
+                return false;
+            }
         }
 
         public void Send(ushort channel, DescribedList command, FrameType type = FrameType.Amqp)
@@ -175,7 +180,7 @@ namespace NMS.AMQP.Test.TestAmqp
 
         public void Close()
         {
-            pumpEnabled = false;
+            StopPump();
             
             acceptSocket?.Dispose();
             acceptSocket = null;
@@ -184,6 +189,11 @@ namespace NMS.AMQP.Test.TestAmqp
             socket = null;
             s?.Dispose();
             args?.Dispose();
+        }
+        
+        public void StopPump()
+        {
+            pumpEnabled = false;
         }
     }
 }
