@@ -171,6 +171,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             }
             catch (TimeoutException)
             {
+                senderLink.Cancel(message);
                 throw;
             }
 
