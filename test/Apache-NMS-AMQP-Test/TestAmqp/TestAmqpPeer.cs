@@ -71,6 +71,12 @@ namespace NMS.AMQP.Test.TestAmqp
             Open();
         }
 
+        public TestAmqpPeer(int explicitPort)
+        {
+            testAmqpPeerRunner = new TestAmqpPeerRunner(this, new IPEndPoint(IPAddress.Any, explicitPort));
+            Open();
+        }
+
         public int ServerPort => testAmqpPeerRunner.Port;
         public Socket ClientSocket => testAmqpPeerRunner?.ClientSocket;
 
