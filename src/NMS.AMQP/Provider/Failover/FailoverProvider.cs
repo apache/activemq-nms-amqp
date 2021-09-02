@@ -35,6 +35,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
 
         public static int DEFAULT_INITIAL_RECONNECT_DELAY = 0;
         public static long DEFAULT_RECONNECT_DELAY = 10;
+        public static double DEFAULT_RECONNECT_DELAY_RANDOM_FACTOR = 0.0d;
         public static double DEFAULT_RECONNECT_BACKOFF_MULTIPLIER = 2.0d;
         public static long DEFAULT_MAX_RECONNECT_DELAY = (long) Math.Round(TimeSpan.FromSeconds(30).TotalMilliseconds);
         public static int DEFAULT_STARTUP_MAX_RECONNECT_ATTEMPTS = UNDEFINED;
@@ -69,6 +70,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
 
         public long InitialReconnectDelay { get; set; } = DEFAULT_INITIAL_RECONNECT_DELAY;
         public long ReconnectDelay { get; set; } = DEFAULT_RECONNECT_DELAY;
+        public double ReconnectDelayRandomFactor { get; set; } = DEFAULT_RECONNECT_DELAY_RANDOM_FACTOR;
         public bool UseReconnectBackOff { get; set; } = DEFAULT_USE_RECONNECT_BACKOFF;
         public double ReconnectBackOffMultiplier { get; set; } = DEFAULT_RECONNECT_BACKOFF_MULTIPLIER;
         public long MaxReconnectDelay { get; set; } = DEFAULT_MAX_RECONNECT_DELAY;
@@ -597,6 +599,7 @@ namespace Apache.NMS.AMQP.Provider.Failover
             private volatile bool recoveryRequired;
             private long reconnectAttempts;
             private long nextReconnectDelay = -1;
+            private Random random = new Random();
 
             public ReconnectControls(FailoverProvider failoverProvider)
             {
@@ -671,7 +674,10 @@ namespace Apache.NMS.AMQP.Provider.Failover
                     }
                 }
 
-                return nextReconnectDelay;
+                long randomFactor = (long) ((1 - 2 * random.NextDouble()) *
+                                            failoverProvider.ReconnectDelayRandomFactor * nextReconnectDelay);
+
+                return Math.Min(failoverProvider.MaxReconnectDelay, nextReconnectDelay + randomFactor);
             }
 
             public long RecordNextAttempt()
