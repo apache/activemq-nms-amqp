@@ -674,12 +674,19 @@ namespace Apache.NMS.AMQP.Provider.Failover
                     }
                 }
 
-                long randomFactor = (long) ((1 - 2 * random.NextDouble()) *
-                                            failoverProvider.ReconnectDelayRandomFactor * nextReconnectDelay);
+                long randomFactor = (long)((1 - 2 * GetRandomDouble()) * failoverProvider.ReconnectDelayRandomFactor * nextReconnectDelay);
 
-                return Math.Min(failoverProvider.MaxReconnectDelay, nextReconnectDelay + randomFactor);
+                return Math.Max(0, Math.Min(failoverProvider.MaxReconnectDelay, nextReconnectDelay + randomFactor));
             }
 
+            private double GetRandomDouble()
+            {
+                lock (random) // Random is not thread safe
+                {
+                    return random.NextDouble();
+                }
+            }
+            
             public long RecordNextAttempt()
             {
                 return ++reconnectAttempts;
