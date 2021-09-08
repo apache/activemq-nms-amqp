@@ -120,7 +120,8 @@ namespace NMS.AMQP.Test
                                 "&nms.requestTimeout=1000" +
                                 "&nms.sendTimeout=1000" +
                                 "&nms.closeTimeout=2000" +
-                                "&nms.localMessageExpiry=false";
+                                "&nms.localMessageExpiry=false" +
+                                "&nms.prefetchPolicy.all=55";
 
             NmsConnectionFactory factory = new NmsConnectionFactory(new Uri(configuredUri));
 
@@ -132,6 +133,46 @@ namespace NMS.AMQP.Test
             Assert.AreEqual(1000, factory.RequestTimeout);
             Assert.AreEqual(1000, factory.SendTimeout);
             Assert.AreEqual(2000, factory.CloseTimeout);
+            Assert.AreEqual(55, factory.PrefetchPolicy.QueuePrefetch);
+            Assert.AreEqual(55, factory.PrefetchPolicy.TopicPrefetch);
+            Assert.AreEqual(55, factory.PrefetchPolicy.DurableTopicPrefetch);
+            Assert.AreEqual(55, factory.PrefetchPolicy.QueueBrowserPrefetch);
+            Assert.IsFalse(factory.LocalMessageExpiry);
+        }
+        
+        [Test]
+        public void TestSetPrefetchPolicyPropertiesFromUri()
+        {
+            string baseUri = "amqp://localhost:1234";
+            string configuredUri = baseUri +
+                                   "?nms.username=user" +
+                                   "&nms.password=password" +
+                                   "&nms.clientId=client" +
+                                   "&nms.connectionIdPrefix=ID:TEST" +
+                                   "&nms.clientIDPrefix=clientId" +
+                                   "&nms.requestTimeout=1000" +
+                                   "&nms.sendTimeout=1000" +
+                                   "&nms.closeTimeout=2000" +
+                                   "&nms.localMessageExpiry=false" +
+                                   "&nms.prefetchPolicy.queuePrefetch=11" +
+                                   "&nms.prefetchPolicy.topicPrefetch=22" +
+                                   "&nms.prefetchPolicy.durableTopicPrefetch=33" +
+                                   "&nms.prefetchPolicy.queueBrowserPrefetch=44";
+
+            NmsConnectionFactory factory = new NmsConnectionFactory(new Uri(configuredUri));
+
+            Assert.AreEqual("user", factory.UserName);
+            Assert.AreEqual("password", factory.Password);
+            Assert.AreEqual("client", factory.ClientId);
+            Assert.AreEqual("ID:TEST", factory.ConnectionIdPrefix);
+            Assert.AreEqual("clientId", factory.ClientIdPrefix);
+            Assert.AreEqual(1000, factory.RequestTimeout);
+            Assert.AreEqual(1000, factory.SendTimeout);
+            Assert.AreEqual(2000, factory.CloseTimeout);
+            Assert.AreEqual(11, factory.PrefetchPolicy.QueuePrefetch);
+            Assert.AreEqual(22, factory.PrefetchPolicy.TopicPrefetch);
+            Assert.AreEqual(33, factory.PrefetchPolicy.DurableTopicPrefetch);
+            Assert.AreEqual(44, factory.PrefetchPolicy.QueueBrowserPrefetch);
             Assert.IsFalse(factory.LocalMessageExpiry);
         }
 
