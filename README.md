@@ -4,7 +4,7 @@
 
 OS | Status
 ---|---
-Linux | [![Build Status](https://travis-ci.org/apache/activemq-nms-amqp.svg?branch=master)](https://travis-ci.org/apache/activemq-nms-amqp)
+Linux | [![Build Status](https://travis-ci.com/apache/activemq-nms-amqp.svg?branch=master)](https://travis-ci.com/apache/activemq-nms-amqp)
 Windows | [![Build status](https://ci.appveyor.com/api/projects/status/yn2wkhq1nbhkfsur?svg=true)](https://ci.appveyor.com/project/ApacheSoftwareFoundation/activemq-nms-amqp)
 
 ### Installing Apache NMS AMQP
