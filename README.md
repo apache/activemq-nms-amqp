@@ -86,7 +86,7 @@ So in general most of the top level classes that implement the Apache.NMS interf
 | Shared Consumers | Y | |
 | IQueueBrowser | Y | |
 | Configurable NMSMessageID and amqp serializtion | N | For future consideration. The prodiver will generate a MessageID from a sequence and serialize it as a string. |
-| Flow control configuration | N | For future consideration. The provider will use amqpnetlite defaults except for initial link credits which is 200. |
+| Flow control configuration | Y | You can configure link credit. Default value is 1000. See prefetchPolicy in [Configuration](docs/configuration.md). |
 | Object Deserialization Policy | N | For future consideration. The provider considers all Dotnet serialized objects in Object Message bodies are safe to deserialize. |
 | Failover | Y
 
