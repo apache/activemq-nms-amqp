@@ -34,11 +34,8 @@ namespace Apache.NMS.AMQP
         private NmsMessageProducer sharedProducer;
         private bool autoStart = true;
 
-        public NmsContext(NmsConnection connection, AcknowledgementMode acknowledgementMode)
+        public NmsContext(NmsConnection connection, AcknowledgementMode acknowledgementMode) : this(connection, acknowledgementMode, new AtomicLong(1))
         {
-            this.connection = connection;
-            this.AcknowledgementMode = acknowledgementMode;
-            this.connectionRefCount = new AtomicLong(1);
         }
 
         private NmsContext(NmsConnection connection, AcknowledgementMode acknowledgementMode,
@@ -462,7 +459,7 @@ namespace Apache.NMS.AMQP
         private NmsSession GetSession() {
             if (session == null)
             {
-                using( syncRoot.Lock())
+                using(syncRoot.Lock())
                 {
                     if (session == null)
                     {
@@ -516,16 +513,40 @@ namespace Apache.NMS.AMQP
         
         public bool AutoStart { get => autoStart; set => autoStart = value; }
         
-        public event SessionTxEventDelegate TransactionStartedListener;
+        public event SessionTxEventDelegate TransactionStartedListener
+        {
+            add => GetSession().TransactionStartedListener += value;
+            remove => GetSession().TransactionStartedListener -= value;
+        }
+
+        public event SessionTxEventDelegate TransactionCommittedListener
+        {
+            add => GetSession().TransactionCommittedListener += value;
+            remove => GetSession().TransactionCommittedListener -= value;
+        }
+
+        public event SessionTxEventDelegate TransactionRolledBackListener
+        {
+            add => GetSession().TransactionRolledBackListener += value;
+            remove => GetSession().TransactionRolledBackListener -= value;
+        }
+
+        public event ExceptionListener ExceptionListener
+        {
+            add => connection.ExceptionListener += value;
+            remove => connection.ExceptionListener -= value;
+        }
         
-        public event SessionTxEventDelegate TransactionCommittedListener;
+        public event ConnectionInterruptedListener ConnectionInterruptedListener
+        {
+            add => connection.ConnectionInterruptedListener += value;
+            remove => connection.ConnectionInterruptedListener -= value;
+        }
         
-        public event SessionTxEventDelegate TransactionRolledBackListener;
-        
-        public event ExceptionListener ExceptionListener;
-        
-        public event ConnectionInterruptedListener ConnectionInterruptedListener;
-        
-        public event ConnectionResumedListener ConnectionResumedListener;
+        public event ConnectionResumedListener ConnectionResumedListener
+        {
+            add => connection.ConnectionResumedListener += value;
+            remove => connection.ConnectionResumedListener -= value;
+        }
     }
 }

@@ -1126,6 +1126,14 @@ namespace NMS.AMQP.Test.Integration
 
         private NmsConnection EstablishAnonymousConnection(string connectionParams, string failoverParams, params TestAmqpPeer[] peers)
         {
+            var remoteUri = CreateFailoverUri(connectionParams, failoverParams, peers);
+
+            NmsConnectionFactory factory = new NmsConnectionFactory(remoteUri);
+            return (NmsConnection) factory.CreateConnection();
+        }
+
+        internal static string CreateFailoverUri(string connectionParams, string failoverParams, params TestAmqpPeer[] peers)
+        {
             if (peers.Length == 0)
             {
                 throw new ArgumentException("No test peers were given, at least 1 required");
@@ -1153,11 +1161,10 @@ namespace NMS.AMQP.Test.Integration
                 remoteUri += ")?" + failoverParams;
             }
 
-            NmsConnectionFactory factory = new NmsConnectionFactory(remoteUri);
-            return (NmsConnection) factory.CreateConnection();
+            return remoteUri;
         }
 
-        private string CreatePeerUri(TestAmqpPeer peer, string parameters = null)
+        internal static string CreatePeerUri(TestAmqpPeer peer, string parameters = null)
         {
             return $"amqp://127.0.0.1:{peer.ServerPort}/{(parameters != null ? "?" + parameters : "")}";
         }
