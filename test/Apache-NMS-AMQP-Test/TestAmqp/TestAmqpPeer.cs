@@ -727,6 +727,11 @@ namespace NMS.AMQP.Test.TestAmqp
             ExpectDisposition(settled: true, stateMatcher: stateMatcher);
         }
         
+        public void ExpectDispositionThatIsRejectedAndSettled()
+        {
+            ExpectDisposition(settled: true, stateMatcher: Assert.IsInstanceOf<Rejected>);
+        }
+        
         public void ExpectDispositionThatIsModifiedFailedAndSettled()
         {
             Action<DeliveryState> stateMatcher = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.MODIFIED_FAILED_INSTANCE.Descriptor.Code); };

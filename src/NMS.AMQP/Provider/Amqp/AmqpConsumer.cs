@@ -340,6 +340,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         receiverLink.Reject(message);
                         RemoveMessage(envelope);
                         break;
+                    case AckType.REJECTED:
+                        receiverLink.Reject(message);
+                        RemoveMessage(envelope);
+                        break;
                     default:
                         Tracer.ErrorFormat("Unsupported Ack Type for message: {0}", envelope);
                         throw new ArgumentException($"Unsupported Ack Type for message: {envelope}");
