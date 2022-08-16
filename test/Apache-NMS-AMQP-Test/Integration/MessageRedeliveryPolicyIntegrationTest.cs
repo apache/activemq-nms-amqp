@@ -103,7 +103,7 @@ namespace NMS.AMQP.Test.Integration
                         success.Signal();
                 };
                 
-                Assert.IsTrue(success.Wait(TimeSpan.FromSeconds(5)), "Didn't get expected messages");
+                Assert.IsTrue(success.Wait(TimeSpan.FromSeconds(3)), "Didn't get expected messages");
                 
                 testPeer.ExpectClose();
                 connection.Close();
