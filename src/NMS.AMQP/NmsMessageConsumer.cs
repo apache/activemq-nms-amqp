@@ -458,14 +458,15 @@ namespace Apache.NMS.AMQP
             return false;
         }
         
-        private int RedeliveryDelay(InboundMessageDispatch envelope)
+        private int GetRedeliveryDelay(InboundMessageDispatch envelope)
         {
             Tracer.DebugFormat("Checking if envelope is redelivered");
             IRedeliveryPolicy redeliveryPolicy = Session.Connection.RedeliveryPolicy;
-            if (redeliveryPolicy == null || envelope.RedeliveryCount <= 0) return 0;
+            
+            if (redeliveryPolicy == null || envelope.RedeliveryCount <= 0) 
+                return 0;
             
             var redeliveryDelay = redeliveryPolicy.RedeliveryDelay(envelope.RedeliveryCount);
-            Tracer.DebugFormat("Envelope has been redelivered, apply redelivery policy wait {0} milliseconds", redeliveryDelay);
             return redeliveryDelay;
         }
 
@@ -583,10 +584,11 @@ namespace Apache.NMS.AMQP
 
         private async Task ApplyRedeliveryPolicy(InboundMessageDispatch envelope)
         {
-            int redeliveryDelay = RedeliveryDelay(envelope);
+            int redeliveryDelay = GetRedeliveryDelay(envelope);
 
             if (redeliveryDelay > 0)
             {
+                Tracer.DebugFormat("Envelope has been redelivered, apply redelivery policy wait {0} milliseconds", redeliveryDelay);
                 await Task.Delay(TimeSpan.FromMilliseconds(redeliveryDelay)).Await();
             }
         }
