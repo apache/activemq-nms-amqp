@@ -17,9 +17,9 @@
 
 using System;
 using System.Collections.Specialized;
-using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Meta;
+using Apache.NMS.AMQP.Policies;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
 using Apache.NMS.AMQP.Util.Synchronization;
@@ -308,6 +308,12 @@ namespace Apache.NMS.AMQP
         }
 
         public IRedeliveryPolicy RedeliveryPolicy { get; set; }
+        
+        /// <summary>
+        /// The deserialization policy that is applied when a connection is created.
+        /// </summary>
+        public INmsDeserializationPolicy DeserializationPolicy { get; set; } = new NmsDefaultDeserializationPolicy();
+
         public ConsumerTransformerDelegate ConsumerTransformer { get; set; }
         public ProducerTransformerDelegate ProducerTransformer { get; set; }
 
@@ -339,7 +345,8 @@ namespace Apache.NMS.AMQP
                 SendTimeout = SendTimeout,
                 CloseTimeout = CloseTimeout,
                 LocalMessageExpiry = LocalMessageExpiry,
-                PrefetchPolicy = PrefetchPolicy.Clone()
+                PrefetchPolicy = PrefetchPolicy.Clone(),
+                DeserializationPolicy = DeserializationPolicy.Clone()
             };
 
             bool userSpecifiedClientId = ClientId != null;

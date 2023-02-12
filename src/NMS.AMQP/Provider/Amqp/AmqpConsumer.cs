@@ -33,6 +33,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
 {
     public interface IAmqpConsumer
     {
+        NmsConsumerInfo ResourceInfo { get; }
         IDestination Destination { get; }
         IAmqpConnection Connection { get; }
     }
@@ -60,7 +61,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         }
 
         public NmsConsumerId ConsumerId => this.info.Id;
-        
+        public NmsConsumerInfo ResourceInfo => this.info;
 
         public Task Attach()
         {

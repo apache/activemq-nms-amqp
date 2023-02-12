@@ -15,10 +15,12 @@
  * limitations under the License.
  */
 
+using System;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using Amqp.Framing;
+using Apache.NMS.AMQP.Policies;
 using Apache.NMS.AMQP.Util;
 
 namespace Apache.NMS.AMQP.Provider.Amqp.Message
@@ -28,10 +30,13 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         public static readonly Data NULL_OBJECT_BODY = new Data() {Binary = new byte[] {0xac, 0xed, 0x00, 0x05, 0x70}};
 
         private readonly AmqpNmsObjectMessageFacade facade;
+        private readonly INmsDeserializationPolicy deserializationPolicy;
+        private bool localContent;
 
-        public AmqpSerializedObjectDelegate(AmqpNmsObjectMessageFacade facade)
+        public AmqpSerializedObjectDelegate(AmqpNmsObjectMessageFacade facade, INmsDeserializationPolicy deserializationPolicy)
         {
             this.facade = facade;
+            this.deserializationPolicy = deserializationPolicy;
             facade.ContentType = MessageSupport.SERIALIZED_DOTNET_OBJECT_CONTENT_TYPE;
         }
 
@@ -64,6 +69,8 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
                 {
                     facade.Message.BodySection = NULL_OBJECT_BODY;
                 }
+
+                localContent = true;
             }
         }
 
@@ -74,11 +81,18 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
                 facade.Message.BodySection = NULL_OBJECT_BODY;
         }
 
+        public bool IsAmqpTypeEncoded() => false;
+
         private object Deserialize(byte[] binary)
         {
-            using (MemoryStream stream = new MemoryStream(binary))
+            using (var stream = new MemoryStream(binary))
             {
                 IFormatter formatter = new BinaryFormatter();
+                if (localContent == false && deserializationPolicy != null)
+                {
+                    formatter.Binder = new TrustedClassFilter(deserializationPolicy, facade.NMSDestination);
+                }
+                
                 return formatter.Deserialize(stream);
             }
         }

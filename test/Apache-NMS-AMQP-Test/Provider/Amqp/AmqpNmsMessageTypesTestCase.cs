@@ -16,6 +16,7 @@
  */
 
 using Apache.NMS.AMQP;
+using Apache.NMS.AMQP.Meta;
 using Apache.NMS.AMQP.Provider.Amqp;
 using Apache.NMS.AMQP.Provider.Amqp.Message;
 using Moq;
@@ -127,9 +128,10 @@ namespace NMS.AMQP.Test.Provider.Amqp
 
         protected IAmqpConsumer CreateMockConsumer()
         {
-            Mock<IAmqpConsumer> mockConsumer = new Mock<IAmqpConsumer>();
+            var mockConsumer = new Mock<IAmqpConsumer>();
             mockConsumer.Setup(consumer => consumer.Connection).Returns(() => CreateMockAmqpConnection());
             mockConsumer.Setup(consumer => consumer.Destination).Returns(new NmsTopic("TestTopic"));
+            mockConsumer.Setup(consumer => consumer.ResourceInfo).Returns(new NmsConsumerInfo(new NmsConsumerId(new NmsSessionId(new NmsConnectionId("1"), 1), 1)));
             return mockConsumer.Object;
         }
 
