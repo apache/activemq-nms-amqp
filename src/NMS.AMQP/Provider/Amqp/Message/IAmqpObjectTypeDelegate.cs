@@ -25,5 +25,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
     {
         object Object { get; set; }
         void OnSend();
+        bool IsAmqpTypeEncoded();
     }
 }

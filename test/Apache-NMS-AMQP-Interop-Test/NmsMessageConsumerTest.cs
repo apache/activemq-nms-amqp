@@ -19,9 +19,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS;
+using Apache.NMS.AMQP.Policies;
 using NUnit.Framework;
 
 namespace NMS.AMQP.Test
@@ -374,6 +376,88 @@ namespace NMS.AMQP.Test
             producer.Send(message, MsgDeliveryMode.Persistent, MsgPriority.Normal, TimeSpan.Zero);
             IMessageConsumer messageConsumer = session.CreateConsumer(topic, null, noLocal: true);
             Assert.IsNull(messageConsumer.Receive(TimeSpan.FromMilliseconds(500)));
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestShouldNotDeserializeUntrustedType()
+        {
+            Connection = CreateAmqpConnection(configureConnectionFactory: factory =>
+            {
+                var deserializationPolicy = new NmsDefaultDeserializationPolicy
+                {
+                    DenyList = typeof(UntrustedType).FullName
+                };
+                factory.DeserializationPolicy = deserializationPolicy;
+            });
+            Connection.Start();
+            var session = Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+            var queue = session.GetQueue(TestName);
+            var consumer = session.CreateConsumer(queue);
+            var producer = session.CreateProducer(queue);
+            
+            var message = producer.CreateObjectMessage(new UntrustedType { Prop1 = "foo" });
+            producer.Send(message);
+
+            var receivedMessage = consumer.Receive();
+            var objectMessage = receivedMessage as IObjectMessage;
+            Assert.NotNull(objectMessage);
+            var exception = Assert.Throws<SerializationException>(() =>
+            {
+                _ = objectMessage.Body;
+            });
+            Assert.AreEqual($"Forbidden {typeof(UntrustedType).FullName}! " +
+                            "This type is not trusted to be deserialized under the current configuration. " +
+                            "Please refer to the documentation for more information on how to configure trusted types.",
+                exception.Message);
+        }
+
+        [Test]
+        public void TestShouldUseCustomDeserializationPolicy()
+        {
+            Connection = CreateAmqpConnection(configureConnectionFactory: factory =>
+            {
+                factory.DeserializationPolicy = new CustomDeserializationPolicy();
+            });
+            Connection.Start();
+            var session = Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+            var queue = session.GetQueue(TestName);
+            var consumer = session.CreateConsumer(queue);
+            var producer = session.CreateProducer(queue);
+            
+            var message = producer.CreateObjectMessage(new UntrustedType { Prop1 = "foo" });
+            producer.Send(message);
+
+            var receivedMessage = consumer.Receive();
+            var objectMessage = receivedMessage as IObjectMessage;
+            Assert.NotNull(objectMessage);
+            _ = Assert.Throws<SerializationException>(() =>
+            {
+                _ = objectMessage.Body;
+            });
+        }
+    }
+
+    [Serializable]
+    public class UntrustedType
+    {
+        public string Prop1 { get; set; }
+    }
+    
+    public class CustomDeserializationPolicy : INmsDeserializationPolicy
+    {
+        public bool IsTrustedType(IDestination destination, Type type)
+        {
+            if (type == typeof(UntrustedType))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public INmsDeserializationPolicy Clone()
+        {
+            return this;
         }
     }
 }
