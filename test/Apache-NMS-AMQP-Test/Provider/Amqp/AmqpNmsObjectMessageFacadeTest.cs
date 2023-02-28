@@ -358,6 +358,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             Assert.AreEqual(amqpObjectMessageFacade.Object, copy.Object);
         }
 
+        [Obsolete("Obsolete")]
         private static byte[] GetSerializedBytes(object content)
         {
             using (MemoryStream stream = new MemoryStream())

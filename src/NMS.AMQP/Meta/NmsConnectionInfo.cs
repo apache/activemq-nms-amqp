@@ -17,6 +17,7 @@
 
 using System;
 using Amqp;
+using Apache.NMS.AMQP.Policies;
 
 namespace Apache.NMS.AMQP.Meta
 {
@@ -79,10 +80,8 @@ namespace Apache.NMS.AMQP.Meta
         public bool SharedSubsSupported { get; set; }
 
         public PrefetchPolicyInfo PrefetchPolicy { get; set; } = DEFAULT_PREFETCH_POLICY;
-        
-        
-        
-        
+        public INmsDeserializationPolicy DeserializationPolicy { get; set; }
+
 
         public void SetClientId(string clientId, bool explicitClientId)
         {

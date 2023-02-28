@@ -16,6 +16,7 @@
  */
 
 using System;
+using Apache.NMS.AMQP.Policies;
 
 namespace Apache.NMS.AMQP.Meta
 {
@@ -38,7 +39,8 @@ namespace Apache.NMS.AMQP.Meta
         public bool LocalMessageExpiry { get; set; }
         public bool IsBrowser { get; set; }
         public int LinkCredit { get; set; }
-        
+        public INmsDeserializationPolicy DeserializationPolicy { get; set; }
+
         public bool HasSelector() => !string.IsNullOrWhiteSpace(Selector);
 
         protected bool Equals(NmsConsumerInfo other)

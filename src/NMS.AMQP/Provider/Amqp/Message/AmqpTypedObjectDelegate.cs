@@ -103,5 +103,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             if (facade.Message.BodySection == null)
                 facade.Message.BodySection = NULL_OBJECT_BODY;
         }
+
+        public bool IsAmqpTypeEncoded() => true;
     }
 }

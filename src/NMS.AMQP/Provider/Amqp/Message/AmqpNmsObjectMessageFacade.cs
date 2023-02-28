@@ -19,16 +19,18 @@ using System;
 using System.IO;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Message.Facade;
+using Apache.NMS.AMQP.Policies;
 using Apache.NMS.AMQP.Util;
 
 namespace Apache.NMS.AMQP.Provider.Amqp.Message
 {
     public class AmqpNmsObjectMessageFacade : AmqpNmsMessageFacade, INmsObjectMessageFacade
     {
+        private INmsDeserializationPolicy deserializationPolicy;
         private IAmqpObjectTypeDelegate typeDelegate;
 
         public IAmqpObjectTypeDelegate Delegate => typeDelegate;
-
+        
         public object Object
         {
             get => Delegate.Object;
@@ -68,15 +70,18 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         public override void Initialize(IAmqpConsumer consumer, global::Amqp.Message message)
         {
             base.Initialize(consumer, message);
-            bool dotnetSerialized = MessageSupport.SERIALIZED_DOTNET_OBJECT_CONTENT_TYPE.Equals(ContentType);
-            InitSerializer(!dotnetSerialized);
+            deserializationPolicy = consumer.ResourceInfo.DeserializationPolicy;
+            bool hasDotNetSerializedType = MessageSupport.SERIALIZED_DOTNET_OBJECT_CONTENT_TYPE.Equals(ContentType);
+            InitSerializer(!hasDotNetSerializedType);
         }
+
+        
 
         private void InitSerializer(bool useAmqpTypes)
         {
             if (!useAmqpTypes)
             {
-                typeDelegate = new AmqpSerializedObjectDelegate(this);
+                typeDelegate = new AmqpSerializedObjectDelegate(this, deserializationPolicy);
             }
             else
             {
@@ -86,9 +91,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
 
         public override INmsMessageFacade Copy()
         {
-            AmqpNmsObjectMessageFacade copy = new AmqpNmsObjectMessageFacade();
+            var copy = new AmqpNmsObjectMessageFacade();
+            copy.deserializationPolicy = deserializationPolicy;
             CopyInto(copy);
-            copy.typeDelegate = typeDelegate;
+            copy.InitSerializer(typeDelegate.IsAmqpTypeEncoded());
             return copy;
         }
 

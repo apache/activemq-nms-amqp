@@ -62,7 +62,8 @@ namespace Apache.NMS.AMQP
                 IsDurable = IsDurableSubscription,
                 IsBrowser =  IsBrowser,
                 LocalMessageExpiry = Session.Connection.ConnectionInfo.LocalMessageExpiry,
-                LinkCredit = Session.Connection.ConnectionInfo.PrefetchPolicy.GetLinkCredit(destination, IsBrowser, IsDurableSubscription)
+                LinkCredit = Session.Connection.ConnectionInfo.PrefetchPolicy.GetLinkCredit(destination, IsBrowser, IsDurableSubscription),
+                DeserializationPolicy = Session.Connection.ConnectionInfo.DeserializationPolicy.Clone()
             };
             deliveryTask = new MessageDeliveryTask(this);
         }

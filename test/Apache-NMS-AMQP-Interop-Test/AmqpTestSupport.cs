@@ -49,7 +49,7 @@ namespace NMS.AMQP.Test
             return connection;
         }
 
-        protected IConnection CreateAmqpConnection(string clientId = null, string options = null)
+        protected IConnection CreateAmqpConnection(string clientId = null, string options = null, Action<NmsConnectionFactory> configureConnectionFactory = null)
         {
             string brokerUri = Environment.GetEnvironmentVariable("NMS_AMQP_TEST_URI") ?? "amqp://127.0.0.1:5672";
             if (options != null)
@@ -61,6 +61,7 @@ namespace NMS.AMQP.Test
 
             NmsConnectionFactory factory = new NmsConnectionFactory(brokerUri);
             factory.ClientId = clientId;
+            configureConnectionFactory?.Invoke(factory);
             return factory.CreateConnection(userName, password);
         }
 

@@ -20,6 +20,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Apache.NMS;
 using Apache.NMS.AMQP;
+using Apache.NMS.AMQP.Policies;
 using Apache.NMS.AMQP.Provider;
 using NMS.AMQP.Test.Provider.Mock;
 using NUnit.Framework;
@@ -174,6 +175,21 @@ namespace NMS.AMQP.Test
             Assert.AreEqual(33, factory.PrefetchPolicy.DurableTopicPrefetch);
             Assert.AreEqual(44, factory.PrefetchPolicy.QueueBrowserPrefetch);
             Assert.IsFalse(factory.LocalMessageExpiry);
+        }
+
+        [Test]
+        public void TestSetDeserializationPolicy()
+        {
+            string baseUri = "amqp://localhost:1234";
+            string configuredUri = baseUri +
+                                   "?nms.deserializationPolicy.allowList=a,b,c" +
+                                   "&nms.deserializationPolicy.denyList=c,d,e";
+
+            var factory = new NmsConnectionFactory(new Uri(configuredUri));
+            var deserializationPolicy = factory.DeserializationPolicy as NmsDefaultDeserializationPolicy;
+            Assert.IsNotNull(deserializationPolicy);
+            Assert.AreEqual("a,b,c", deserializationPolicy.AllowList);
+            Assert.AreEqual("c,d,e", deserializationPolicy.DenyList);
         }
 
         [Test]
