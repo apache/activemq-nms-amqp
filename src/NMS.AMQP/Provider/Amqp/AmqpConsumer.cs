@@ -331,6 +331,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         receiverLink.Modify(message, true, true);
                         RemoveMessage(envelope);
                         break;
+                    case AckType.MODIFIED_FAILED:
+                        receiverLink.Modify(message,true,false);
+                        RemoveMessage(envelope);
+                        break;
                     default:
                         Tracer.ErrorFormat("Unsupported Ack Type for message: {0}", envelope);
                         throw new ArgumentException($"Unsupported Ack Type for message: {envelope}");
