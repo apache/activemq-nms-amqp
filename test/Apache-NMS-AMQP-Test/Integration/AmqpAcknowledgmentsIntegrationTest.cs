@@ -21,6 +21,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Amqp.Framing;
 using Apache.NMS;
+using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Util;
 using NMS.AMQP.Test.TestAmqp;
 using NUnit.Framework;
@@ -261,6 +262,219 @@ namespace NMS.AMQP.Test.Integration
                     uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
 
                     testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcher, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                    
+                    message.Acknowledge();
+                    
+                    testPeer.WaitForAllMatchersToComplete(3000);
+                }
+                
+                testPeer.ExpectClose();
+                connection.Close();
+                
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public void TestModifyUndeliverableIndividualMessagesAsync()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                int msgCount = 6;
+
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                IQueue queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(
+                    message: CreateMessageWithNullContent(),
+                    count: msgCount,
+                    drain: false,
+                    nextIncomingId: 1,
+                    addMessageNumberProperty: true,
+                    sendDrainFlowResponse: false,
+                    sendSettled: false,
+                    creditMatcher: credit => Assert.Greater(credit, msgCount));
+
+                IMessageConsumer consumer = session.CreateConsumer(queue);
+                
+                CountdownEvent latch = new CountdownEvent(msgCount);
+                List<ITextMessage> messages = new List<ITextMessage>();
+                consumer.Listener += message =>
+                {
+                    messages.Add((ITextMessage) message);
+                    latch.Signal();
+                };
+                
+                Assert.True(latch.Wait(TimeSpan.FromMilliseconds(1000)), $"Should receive: {msgCount}, but received: {messages.Count}");
+                
+                Action<DeliveryState> dispositionMatcher = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code); };
+                Action<DeliveryState> dispositionMatcherFailed = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.MODIFIED_FAILED_INSTANCE.Descriptor.Code); };
+                
+                // Acknowledge the messages in a random order and verify the individual dispositions have expected delivery state.
+                Random random = new Random();
+                for (int i = 0; i < msgCount; i++)
+                {
+                    var message = messages[random.Next(msgCount - i)];
+                    messages.Remove(message);
+
+                    uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
+
+                    if (deliveryNumber == 0)
+                    {
+                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                        ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.MODIFIED_FAILED_UNDELIVERABLE;
+                    }
+                    else
+                    {
+                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcher, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                    }
+                    
+                    message.Acknowledge();
+                    
+                    testPeer.WaitForAllMatchersToComplete(3000);
+                }
+                
+                testPeer.ExpectClose();
+                connection.Close();
+                
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public void TestRejectIndividualMessagesAsync()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                int msgCount = 6;
+
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                IQueue queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(
+                    message: CreateMessageWithNullContent(),
+                    count: msgCount,
+                    drain: false,
+                    nextIncomingId: 1,
+                    addMessageNumberProperty: true,
+                    sendDrainFlowResponse: false,
+                    sendSettled: false,
+                    creditMatcher: credit => Assert.Greater(credit, msgCount));
+
+                IMessageConsumer consumer = session.CreateConsumer(queue);
+                
+                CountdownEvent latch = new CountdownEvent(msgCount);
+                List<ITextMessage> messages = new List<ITextMessage>();
+                consumer.Listener += message =>
+                {
+                    messages.Add((ITextMessage) message);
+                    latch.Signal();
+                };
+                
+                Assert.True(latch.Wait(TimeSpan.FromMilliseconds(1000)), $"Should receive: {msgCount}, but received: {messages.Count}");
+                
+                Action<DeliveryState> dispositionMatcher = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code); };
+                Action<DeliveryState> dispositionMatcherFailed = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.REJECTED_INSTANCE.Descriptor.Code); };
+                
+                // Acknowledge the messages in a random order and verify the individual dispositions have expected delivery state.
+                Random random = new Random();
+                for (int i = 0; i < msgCount; i++)
+                {
+                    var message = messages[random.Next(msgCount - i)];
+                    messages.Remove(message);
+
+                    uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
+
+                    if (deliveryNumber == 0)
+                    {
+                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                        ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.REJECTED;
+                    }
+                    else
+                    {
+                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcher, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                    }
+                    
+                    message.Acknowledge();
+                    
+                    testPeer.WaitForAllMatchersToComplete(3000);
+                }
+                
+                testPeer.ExpectClose();
+                connection.Close();
+                
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public void TestModifyIndividualMessagesAsync()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                int msgCount = 6;
+
+                IConnection connection = EstablishConnection(testPeer);
+                connection.Start();
+
+                testPeer.ExpectBegin();
+                ISession session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                IQueue queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(
+                    message: CreateMessageWithNullContent(),
+                    count: msgCount,
+                    drain: false,
+                    nextIncomingId: 1,
+                    addMessageNumberProperty: true,
+                    sendDrainFlowResponse: false,
+                    sendSettled: false,
+                    creditMatcher: credit => Assert.Greater(credit, msgCount));
+
+                IMessageConsumer consumer = session.CreateConsumer(queue);
+                
+                CountdownEvent latch = new CountdownEvent(msgCount);
+                List<ITextMessage> messages = new List<ITextMessage>();
+                consumer.Listener += message =>
+                {
+                    messages.Add((ITextMessage) message);
+                    latch.Signal();
+                };
+                
+                Assert.True(latch.Wait(TimeSpan.FromMilliseconds(1000)), $"Should receive: {msgCount}, but received: {messages.Count}");
+                
+                Action<DeliveryState> dispositionMatcher = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code); };
+                Action<DeliveryState> dispositionMatcherFailed = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.MODIFIED_INSTANCE.Descriptor.Code); };
+                
+                // Acknowledge the messages in a random order and verify the individual dispositions have expected delivery state.
+                Random random = new Random();
+                for (int i = 0; i < msgCount; i++)
+                {
+                    var message = messages[random.Next(msgCount - i)];
+                    messages.Remove(message);
+
+                    uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
+
+                    if (deliveryNumber == 0)
+                    {
+                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                        ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.MODIFIED_FAILED;
+                    }
+                    else
+                    {
+                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcher, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                    }
                     
                     message.Acknowledge();
                     
