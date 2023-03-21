@@ -323,16 +323,9 @@ namespace NMS.AMQP.Test.Integration
                     messages.Remove(message);
 
                     uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
-
-                    if (deliveryNumber == 0)
-                    {
-                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                        ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.MODIFIED_FAILED_UNDELIVERABLE;
-                    }
-                    else
-                    {
-                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcher, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                    }
+                    
+                    testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                    ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.MODIFIED_FAILED_UNDELIVERABLE;
                     
                     message.Acknowledge();
                     
@@ -394,17 +387,10 @@ namespace NMS.AMQP.Test.Integration
                     messages.Remove(message);
 
                     uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
-
-                    if (deliveryNumber == 0)
-                    {
-                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                        ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.REJECTED;
-                    }
-                    else
-                    {
-                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcher, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                    }
                     
+                    testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                    ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.REJECTED;
+
                     message.Acknowledge();
                     
                     testPeer.WaitForAllMatchersToComplete(3000);
@@ -454,7 +440,6 @@ namespace NMS.AMQP.Test.Integration
                 
                 Assert.True(latch.Wait(TimeSpan.FromMilliseconds(1000)), $"Should receive: {msgCount}, but received: {messages.Count}");
                 
-                Action<DeliveryState> dispositionMatcher = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code); };
                 Action<DeliveryState> dispositionMatcherFailed = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.MODIFIED_INSTANCE.Descriptor.Code); };
                 
                 // Acknowledge the messages in a random order and verify the individual dispositions have expected delivery state.
@@ -465,17 +450,10 @@ namespace NMS.AMQP.Test.Integration
                     messages.Remove(message);
 
                     uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
-
-                    if (deliveryNumber == 0)
-                    {
-                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                        ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.MODIFIED_FAILED;
-                    }
-                    else
-                    {
-                        testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcher, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                    }
                     
+                    testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
+                    ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.MODIFIED_FAILED;
+                        
                     message.Acknowledge();
                     
                     testPeer.WaitForAllMatchersToComplete(3000);
