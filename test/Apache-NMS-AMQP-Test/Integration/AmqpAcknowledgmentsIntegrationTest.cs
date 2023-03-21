@@ -312,7 +312,6 @@ namespace NMS.AMQP.Test.Integration
                 
                 Assert.True(latch.Wait(TimeSpan.FromMilliseconds(1000)), $"Should receive: {msgCount}, but received: {messages.Count}");
                 
-                Action<DeliveryState> dispositionMatcher = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code); };
                 Action<DeliveryState> dispositionMatcherFailed = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.MODIFIED_FAILED_INSTANCE.Descriptor.Code); };
                 
                 // Acknowledge the messages in a random order and verify the individual dispositions have expected delivery state.
@@ -376,7 +375,6 @@ namespace NMS.AMQP.Test.Integration
                 
                 Assert.True(latch.Wait(TimeSpan.FromMilliseconds(1000)), $"Should receive: {msgCount}, but received: {messages.Count}");
                 
-                Action<DeliveryState> dispositionMatcher = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code); };
                 Action<DeliveryState> dispositionMatcherFailed = state => { Assert.AreEqual(state.Descriptor.Code, MessageSupport.REJECTED_INSTANCE.Descriptor.Code); };
                 
                 // Acknowledge the messages in a random order and verify the individual dispositions have expected delivery state.
