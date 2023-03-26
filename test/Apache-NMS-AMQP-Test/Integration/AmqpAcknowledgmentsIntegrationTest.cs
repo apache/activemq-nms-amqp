@@ -324,8 +324,8 @@ namespace NMS.AMQP.Test.Integration
                     uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
                     
                     testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                    ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.MODIFIED_FAILED_UNDELIVERABLE;
-                    
+                    message.Properties["NMS_AMQP_ACK_TYPE"] = AckType.MODIFIED_FAILED_UNDELIVERABLE;
+
                     message.Acknowledge();
                     
                     testPeer.WaitForAllMatchersToComplete(3000);
@@ -387,7 +387,7 @@ namespace NMS.AMQP.Test.Integration
                     uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
                     
                     testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                    ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.REJECTED;
+                    message.Properties["NMS_AMQP_ACK_TYPE"] = AckType.REJECTED;
 
                     message.Acknowledge();
                     
@@ -450,7 +450,7 @@ namespace NMS.AMQP.Test.Integration
                     uint deliveryNumber = (uint) message.Properties.GetInt(TestAmqpPeer.MESSAGE_NUMBER) + 1;
                     
                     testPeer.ExpectDisposition(settled: true, stateMatcher: dispositionMatcherFailed, firstDeliveryId: deliveryNumber, lastDeliveryId: deliveryNumber);
-                    ((NmsMessage) message).NmsAcknowledgeCallback.AcknowledgementType = AckType.MODIFIED_FAILED;
+                    message.Properties["NMS_AMQP_ACK_TYPE"] = AckType.MODIFIED_FAILED;
                         
                     message.Acknowledge();
                     

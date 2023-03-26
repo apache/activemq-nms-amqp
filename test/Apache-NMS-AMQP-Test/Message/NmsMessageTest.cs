@@ -349,7 +349,7 @@ namespace NMS.AMQP.Test.Message
         {
             NmsMessage msg = factory.CreateMessage();
 
-            Assert.Throws<ArgumentNullException>(() => msg.Properties.SetString(null, "asd"));
+            Assert.Throws<ArgumentException>(() => msg.Properties.SetString("", "asd"));
         }
 
         [Test]
