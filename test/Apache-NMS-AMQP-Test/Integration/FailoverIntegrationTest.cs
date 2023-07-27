@@ -447,7 +447,7 @@ namespace NMS.AMQP.Test.Integration
             DoFailoverPassthroughOfFailingSyncSendTestImpl(new Released());
         }
 
-        [Test, Timeout(20_000), Ignore("TODO: It should be fixed.")]
+        [Test, Timeout(20_000)]
         public void TestFailoverPassthroughOfModifiedFailedSyncSend()
         {
             var modified = new Modified()
