@@ -49,7 +49,7 @@ namespace Apache.NMS.AMQP
             try
             {
                 isOnDispatcherFlow.Value = true;
-                await messageDeliveryTask.DeliverNextPending().Await();
+                await messageDeliveryTask.DeliverNextPending(cts.Token).Await();
             }
             finally
             {

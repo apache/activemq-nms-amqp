@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
@@ -110,6 +111,26 @@ namespace Apache.NMS.AMQP
         public ConsumerTransformerDelegate ConsumerTransformer { get; set; }
 
         public string MessageSelector => Info.Selector;
+        
+        event AsyncMessageListener IMessageConsumer.AsyncListener 
+        {
+            add
+            {
+                CheckClosed();
+                using(syncRoot.Lock())
+                {
+                    AsyncListener += value;
+                    DrainMessageQueueToListener();
+                }
+            }
+            remove
+            {
+                using (syncRoot.LockAsync())
+                {
+                    AsyncListener -= value;
+                }
+            }
+        }
 
         event MessageListener IMessageConsumer.Listener
         {
@@ -284,6 +305,8 @@ namespace Apache.NMS.AMQP
 
         private event MessageListener Listener;
 
+        private event AsyncMessageListener AsyncListener;
+
         public async Task Init()
         {
             await Session.Connection.CreateResource(Info).Await();
@@ -310,7 +333,7 @@ namespace Apache.NMS.AMQP
             else
                 messageQueue.Enqueue(envelope);
 
-            if (Session.IsStarted && Listener != null)
+            if (Session.IsStarted && HasMessageListener())
             {
                 using (syncRoot.Exclude()) // Exclude lock for a time of dispatching, so it does not pass along to actionblock
                 {
@@ -319,27 +342,27 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        private async Task DeliverNextPendingAsync()
+        private async Task DeliverNextPendingAsync(CancellationToken cancellationToken)
         {
             if (Tracer.IsDebugEnabled)
             {
                 Tracer.Debug($"{Info.Id} is about to deliver next pending message.");
             }
             
-            if (Session.IsStarted && started && Listener != null)
+            if (Session.IsStarted && this.started && HasMessageListener())
             {
                 using(await syncRoot.LockAsync().Await())
                 {
                     try
                     {
-                        if (started && Listener != null)
+                        if (this.started && HasMessageListener())
                         {
                             var envelope = messageQueue.DequeueNoWait();
                             if (envelope == null)
                             {
                                 if (Tracer.IsDebugEnabled)
                                 {
-                                    Tracer.Debug($"No message available for delivery.");
+                                    Tracer.Debug("No message available for delivery.");
                                 }
 
                                 return;
@@ -376,7 +399,11 @@ namespace Apache.NMS.AMQP
 
                                 try
                                 {
-                                    Listener.Invoke(envelope.Message.Copy());
+                                    Listener?.Invoke(envelope.Message.Copy());
+                                    if (AsyncListener != null)
+                                    {
+                                        await AsyncListener.Invoke(envelope.Message.Copy(), cancellationToken).Await();
+                                    }
                                 }
                                 catch (Exception)
                                 {
@@ -592,7 +619,7 @@ namespace Apache.NMS.AMQP
 
         public bool HasMessageListener()
         {
-            return Listener != null;
+            return Listener != null || AsyncListener != null;
         }
 
         public void Shutdown(Exception exception)
@@ -628,7 +655,7 @@ namespace Apache.NMS.AMQP
 
         private void DrainMessageQueueToListener()
         {
-            if (Listener != null && Session.IsStarted)
+            if (HasMessageListener() && Session.IsStarted)
             {
                 int size = messageQueue.Count;
                 for (int i = 0; i < size; i++)
@@ -715,9 +742,9 @@ namespace Apache.NMS.AMQP
                 this.consumer = consumer;
             }
 
-            public Task DeliverNextPending()
+            public Task DeliverNextPending(CancellationToken cancellationToken)
             {
-                return consumer.DeliverNextPendingAsync();
+                return consumer.DeliverNextPendingAsync(cancellationToken);
             }
         }
     }
