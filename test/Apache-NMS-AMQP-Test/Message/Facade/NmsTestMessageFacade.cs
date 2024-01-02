@@ -54,6 +54,7 @@ namespace NMS.AMQP.Test.Message.Facade
         public IPrimitiveMap Properties { get; } = new PrimitiveMap();
         public string NMSCorrelationID { get; set; }
         public IDestination NMSDestination { get; set; }
+        public IDestination NMSConsumerDestination { get; set; }
         public TimeSpan NMSTimeToLive { get; set; }
         public MsgPriority NMSPriority { get; set; }
         public bool NMSRedelivered { get; set; }

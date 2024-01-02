@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 using System;
 
 namespace Apache.NMS.AMQP.Message.Facade
@@ -29,6 +30,7 @@ namespace Apache.NMS.AMQP.Message.Facade
         IPrimitiveMap Properties { get; }
         string NMSCorrelationID { get; set; }
         IDestination NMSDestination { get; set; }
+        IDestination NMSConsumerDestination { get; set; }
         TimeSpan NMSTimeToLive { get; set; }
         MsgPriority NMSPriority { get; set; }
         bool NMSRedelivered { get; set; }
@@ -40,7 +42,7 @@ namespace Apache.NMS.AMQP.Message.Facade
         uint GroupSequence { get; set; }
         DateTime? Expiration { get; set; }
         sbyte? JmsMsgType { get; }
-        
+
         /// <summary>
         /// True if this message is tagged as being persistent
         /// </summary>

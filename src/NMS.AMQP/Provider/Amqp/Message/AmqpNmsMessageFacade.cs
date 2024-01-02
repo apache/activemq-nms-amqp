@@ -35,7 +35,6 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         private TimeSpan? amqpTimeToLiveOverride;
         private IDestination destination;
         private IDestination replyTo;
-        private IDestination consumerDestination;
         private IAmqpConnection connection;
         private DateTime? syntheticExpiration;
         private DateTime syntheticDeliveryTime;
@@ -133,7 +132,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
 
         public IDestination NMSDestination
         {
-            get => destination ?? (destination = AmqpDestinationHelper.GetDestination(this, connection, consumerDestination));
+            get => destination ?? (destination = AmqpDestinationHelper.GetDestination(this, connection, NMSConsumerDestination));
             set
             {
                 destination = value;
@@ -149,10 +148,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
                 }
             }
         }
+        
+        public IDestination NMSConsumerDestination { get; set; }
 
         public IDestination NMSReplyTo
         {
-            get => replyTo ?? (replyTo = AmqpDestinationHelper.GetReplyTo(this, connection, consumerDestination));
+            get => replyTo ?? (replyTo = AmqpDestinationHelper.GetReplyTo(this, connection, NMSConsumerDestination));
             set
             {
                 replyTo = value;
@@ -410,7 +411,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         /// </summary>
         public virtual void Initialize(IAmqpConsumer consumer, global::Amqp.Message message)
         {
-            this.consumerDestination = consumer.Destination;
+            this.NMSConsumerDestination = consumer.Destination;
             this.connection = consumer.Connection;
             Message = message;
 
@@ -487,7 +488,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         protected void CopyInto(AmqpNmsMessageFacade target)
         {
             target.connection = connection;
-            target.consumerDestination = consumerDestination;
+            target.NMSConsumerDestination = NMSConsumerDestination;
             target.syntheticExpiration = syntheticExpiration;
             target.syntheticDeliveryTime = syntheticDeliveryTime;
             target.amqpTimeToLiveOverride = amqpTimeToLiveOverride;
