@@ -40,12 +40,11 @@ with the License.  You may obtain a copy of the License at
         <Description>Apache ActiveMQ NMS.AMQP provides a NMS based client that uses the AMQP v1.0 protocol.</Description>
         <Copyright>Copyright (C) 2005-2023 Apache Software Foundation</Copyright>
         <PackageProjectUrl>https://activemq.apache.org/components/nms/</PackageProjectUrl>
-        <PackageLicense>https://github.com/apache/activemq-nms-amqp/blob/master/NOTICE.txt</PackageLicense>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
         <PackageIconUrl>https://activemq.apache.org/assets/img/activemq_logo_icon.png</PackageIconUrl>
         <RepositoryUrl>https://github.com/apache/activemq-nms-amqp</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageTags>apache;activemq;nms;amqp;net;messaging</PackageTags>
-        <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     </PropertyGroup>
 
     <!-- SourceLink Start -->
