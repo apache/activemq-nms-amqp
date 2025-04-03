@@ -169,6 +169,13 @@ namespace Apache.NMS.AMQP
         public string ClientId { get; set; }
 
         /// <summary>
+        /// Sets and gets the name of the host to which we are connecting.
+        /// By default this value is derived from the URI.
+        /// Can be used to determine the correct service if connecting to an AMQP proxy.
+        /// </summary>
+        public string HostName { get; set; }
+
+        /// <summary>
         /// Sets and gets the prefetch values for consumers
         /// </summary>
         public PrefetchPolicyInfo PrefetchPolicy { get; set; } = NmsConnectionInfo.DEFAULT_PREFETCH_POLICY.Clone();
@@ -340,6 +347,7 @@ namespace Apache.NMS.AMQP
             {
                 UserName = userName,
                 Password = password,
+                HostName = HostName,
                 ConfiguredUri = BrokerUri,
                 RequestTimeout = RequestTimeout,
                 SendTimeout = SendTimeout,

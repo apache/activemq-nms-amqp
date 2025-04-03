@@ -114,7 +114,7 @@ namespace Apache.NMS.AMQP.Provider.Amqp
             open.ContainerId = Info.ClientId;
             open.ChannelMax = Info.ChannelMax;
             open.MaxFrameSize = (uint) Info.MaxFrameSize;
-            open.HostName = remoteUri.Host;
+            open.HostName = String.IsNullOrEmpty(Info.HostName) ? remoteUri.Host : Info.HostName;
             open.IdleTimeOut = (uint) Info.IdleTimeOut;
             open.DesiredCapabilities = new[]
             {

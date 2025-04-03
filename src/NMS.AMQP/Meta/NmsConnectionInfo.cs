@@ -60,6 +60,7 @@ namespace Apache.NMS.AMQP.Meta
         public NmsConnectionId Id { get; }
         public bool IsExplicitClientId { get; private set; }
         public string ClientId { get; private set; }
+        public string HostName { get; set; }
         public string UserName { get; set; }
         public string Password { get; set; }
         public Uri ConfiguredUri { get; set; }
