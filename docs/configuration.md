@@ -18,6 +18,7 @@ The options apply to the behavior of the NMS objects such as Connection, Session
 - **nms.username** User name value used to authenticate the connection.
 - **nms.password** The password value used to authenticate the connection.
 - **nms.clientId** The ClientId value that is applied to the connection.
+- **nms.hostname** Optional, the name of the host to which we are connecting. By default this value is derived from the URI. Can be used to determine the correct service if connecting to an AMQP proxy.
 - **nms.localMessageExpiry** Controls whether MessageConsumer instances will locally filter expired Messages or deliver them. By default this value is set to true and expired messages will be filtered.
 - **nms.sendTimeout** Timeout value that controls how long the client waits on completion of a synchronous message send before returning an error. By default the client will wait indefinitely for a send to complete.
 - **nms.requestTimeout** Timeout value that controls how long the client waits on completion of various synchronous interactions, such as opening a producer or consumer, before returning an error. Does not affect synchronous message sends. By default the client will wait indefinitely for a request to complete.
