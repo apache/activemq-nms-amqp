@@ -169,11 +169,11 @@ namespace Apache.NMS.AMQP
         public string ClientId { get; set; }
 
         /// <summary>
-        /// Sets and gets the name of the host to which we are connecting.
+        /// Sets and gets the name of the virtual host to which we are connecting.
         /// By default this value is derived from the URI.
         /// Can be used to determine the correct service if connecting to an AMQP proxy.
         /// </summary>
-        public string HostName { get; set; }
+        public string VHost { get; set; }
 
         /// <summary>
         /// Sets and gets the prefetch values for consumers
@@ -347,7 +347,7 @@ namespace Apache.NMS.AMQP
             {
                 UserName = userName,
                 Password = password,
-                HostName = HostName,
+                VHost = VHost,
                 ConfiguredUri = BrokerUri,
                 RequestTimeout = RequestTimeout,
                 SendTimeout = SendTimeout,
@@ -375,6 +375,9 @@ namespace Apache.NMS.AMQP
         {
             StringDictionary nmsOptions = PropertyUtil.FilterProperties(options, "nms.");
             PropertyUtil.SetProperties(this, nmsOptions);
+
+            StringDictionary amqpOptions = PropertyUtil.FilterProperties(options, "amqp.");
+            PropertyUtil.SetProperties(this, amqpOptions);
             // TODO: Check if there are any unused options, if so throw argument exception
         }
 
