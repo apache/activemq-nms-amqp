@@ -93,8 +93,7 @@ namespace NMS.AMQP.Test
                                 "&nms.requestTimeout=1000" +
                                 "&nms.sendTimeout=1000" +
                                 "&nms.localMessageExpiry=false" +
-                                "&nms.maxNewConnectionRatePerSec=4" +
-                                "&amqp.vhost=test-vhost";
+                                "&nms.maxNewConnectionRatePerSec=4";
 
             NmsConnectionFactory factory = new NmsConnectionFactory(configuredUri);
 
@@ -106,7 +105,6 @@ namespace NMS.AMQP.Test
             Assert.AreEqual(1000, factory.RequestTimeout);
             Assert.AreEqual(1000, factory.SendTimeout);
             Assert.AreEqual(4, factory.MaxNewConnectionRatePerSec);
-            Assert.AreEqual("test-vhost", factory.VHost);
             Assert.IsFalse(factory.LocalMessageExpiry);
         }
         
@@ -124,8 +122,7 @@ namespace NMS.AMQP.Test
                                 "&nms.sendTimeout=1000" +
                                 "&nms.closeTimeout=2000" +
                                 "&nms.localMessageExpiry=false" +
-                                "&nms.prefetchPolicy.all=55" +
-                                "&amqp.vhost=test-vhost";
+                                "&nms.prefetchPolicy.all=55";
 
             NmsConnectionFactory factory = new NmsConnectionFactory(new Uri(configuredUri));
 
@@ -141,7 +138,6 @@ namespace NMS.AMQP.Test
             Assert.AreEqual(55, factory.PrefetchPolicy.TopicPrefetch);
             Assert.AreEqual(55, factory.PrefetchPolicy.DurableTopicPrefetch);
             Assert.AreEqual(55, factory.PrefetchPolicy.QueueBrowserPrefetch);
-            Assert.AreEqual("test-vhost", factory.VHost);
             Assert.IsFalse(factory.LocalMessageExpiry);
         }
         
