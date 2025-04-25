@@ -25,7 +25,7 @@ namespace Apache.NMS.AMQP.Message
 {
     public class NmsMessage : IMessage
     {
-        private MessagePropertyIntercepter properties;
+        private NmsMessagePropertiesInterceptor properties;
         private bool readOnlyProperties;
 
         public NmsMessage(INmsMessageFacade facade)
@@ -35,9 +35,7 @@ namespace Apache.NMS.AMQP.Message
 
         public INmsMessageFacade Facade { get; }
 
-        public IPrimitiveMap Properties => properties ??
-                                           (properties = new MessagePropertyIntercepter(this, Facade.Properties,
-                                               IsReadOnlyProperties));
+        public IPrimitiveMap Properties => properties ?? (properties = new NmsMessagePropertiesInterceptor(this, IsReadOnlyProperties));
 
         public string NMSCorrelationID
         {

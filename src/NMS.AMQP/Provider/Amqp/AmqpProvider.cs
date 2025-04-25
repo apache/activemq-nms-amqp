@@ -33,6 +33,14 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         private readonly ITransportContext transport;
         private NmsConnectionInfo connectionInfo;
         private AmqpConnection connection;
+
+        /// <summary>
+        /// Sets and gets the name of the virtual host to which we are connecting.
+        /// By default this value is derived from the URI.
+        /// Can be used to determine the correct service if connecting to an AMQP proxy.
+        /// </summary>
+        public string VHost { get; set; }
+
         public AmqpProvider(Uri remoteUri, ITransportContext transport)
         {
             RemoteUri = remoteUri;

@@ -26,7 +26,9 @@ namespace NMS.AMQP.Test.Provider.Amqp
     [TestFixture]
     public class AmqpProviderFactoryTest
     {
-        private uint customMaxHandle = 2048;
+        private const uint customMaxHandle = 2048;
+
+        private const string customVHost = "test-vhost";
 
         [Test]
         public void TestCreateAmqpProvider()
@@ -50,13 +52,15 @@ namespace NMS.AMQP.Test.Provider.Amqp
         {
             Uri uri = new Uri("amqp://localhost:5672" +
                               "?amqp.maxHandle=" + customMaxHandle +
-                              "&amqp.traceFrames=true");
+                              "&amqp.traceFrames=true" +
+                              "&amqp.vhost=" + customVHost);
 
             AmqpProvider provider = ProviderFactory.Create(uri) as AmqpProvider;
 
             Assert.IsNotNull(provider);
             Assert.AreEqual(customMaxHandle, provider.MaxHandle);
             Assert.IsTrue(provider.TraceFrames);
+            Assert.AreEqual(customVHost, provider.VHost);
         }
 
         [TearDown]

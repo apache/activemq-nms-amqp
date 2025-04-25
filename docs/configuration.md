@@ -30,6 +30,10 @@ The options apply to the behavior of the NMS objects such as Connection, Session
 - **nms.prefetchPolicy.queueBrowserPrefetch** Link credit value that will be assigned to new queue browser. The default value is 1000..
 - **nms.prefetchPolicy.durableTopicPrefetch** Link credit value that will be assigned to new consumers of durable topic. The default value is 1000..
 
+### AMQP Configuration options
+
+- **amqp.vhost** Optional, the name of the virtual host to which we are connecting. By default this value is derived from the URI. Can be used to determine the correct service if connecting to an AMQP proxy.
+
 ### TCP Transport Configuration options
 When connected to a remote using plain TCP these options configure the behaviour of the underlying socket. These options are appended to the connection URI along with the other configuration options, for example:
 

@@ -332,6 +332,10 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                         receiverLink.Modify(message, true, true);
                         RemoveMessage(envelope);
                         break;
+                    case AckType.MODIFIED_FAILED:
+                        receiverLink.Modify(message, true, false);
+                        RemoveMessage(envelope);
+                        break;
                     case AckType.REJECTED:
                         receiverLink.Reject(message);
                         RemoveMessage(envelope);

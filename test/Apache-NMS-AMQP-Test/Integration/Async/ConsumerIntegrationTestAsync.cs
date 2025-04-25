@@ -254,7 +254,7 @@ namespace NMS.AMQP.Test.Integration.Async
                 IQueue queue = await session.GetQueueAsync("myQueue");
                 IMessageConsumer consumer = await session.CreateConsumerAsync(queue);
 
-                consumer.Listener += message => { };
+                consumer.AsyncListener += (message, ct) => Task.CompletedTask;
 
                 // Verify the consumer gets marked closed
                 testPeer.WaitForAllMatchersToComplete(1000);
@@ -313,9 +313,9 @@ namespace NMS.AMQP.Test.Integration.Async
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = null } }, count: 1);
                 testPeer.ExpectDispositionThatIsReleasedAndSettled();
-
+                
                 IMessageConsumer consumer = await session.CreateConsumerAsync(queue);
-                consumer.Listener += message => throw new Exception();
+                consumer.AsyncListener += (message, ct) => throw new Exception();
 
                 testPeer.WaitForAllMatchersToComplete(2000);
 
@@ -606,14 +606,14 @@ namespace NMS.AMQP.Test.Integration.Async
                 testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
 
                 testPeer.ExpectDispositionThatIsAcceptedAndSettled();
-
+                
                 IMessageConsumer consumer = await session.CreateConsumerAsync(destination);
 
-                consumer.Listener += message =>
+                consumer.AsyncListener += async (message, ct) =>
                 {
-                    IMessageProducer producer = session.CreateProducer(outbound);
-                    producer.Send(message);
-                    producer.Close();
+                    IMessageProducer producer = await session.CreateProducerAsync(outbound);
+                    await producer.SendAsync(message);
+                    await producer.CloseAsync();
                 };
 
                 testPeer.WaitForAllMatchersToComplete(10_000);
@@ -648,11 +648,11 @@ namespace NMS.AMQP.Test.Integration.Async
 
                 ManualResetEvent latch = new ManualResetEvent(false);
                 Exception exception = null;
-                consumer.Listener += message =>
+                consumer.AsyncListener += async (message, ct) =>
                 {
                     try
                     {
-                        connection.Close();
+                        await connection.CloseAsync();
                     }
                     catch (Exception e)
                     {
@@ -701,11 +701,11 @@ namespace NMS.AMQP.Test.Integration.Async
 
                 ManualResetEvent latch = new ManualResetEvent(false);
                 Exception exception = null;
-                consumer.Listener += message =>
+                consumer.AsyncListener += async (message, ct) =>
                 {
                     try
                     {
-                        connection.Stop();
+                        await connection.StopAsync();
                     }
                     catch (Exception e)
                     {
@@ -754,11 +754,11 @@ namespace NMS.AMQP.Test.Integration.Async
 
                 ManualResetEvent latch = new ManualResetEvent(false);
                 Exception exception = null;
-                consumer.Listener += message =>
+                consumer.AsyncListener += async (message, ct) =>
                 {
                     try
                     {
-                        session.Close();
+                        await session.CloseAsync();
                     }
                     catch (Exception e)
                     {
@@ -813,11 +813,11 @@ namespace NMS.AMQP.Test.Integration.Async
                 testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
 
                 Exception exception = null;
-                consumer.Listener += message =>
+                consumer.AsyncListener += async (message, ct) =>
                 {
                     try
                     {
-                        consumer.Close();
+                        await consumer.CloseAsync();
                         latch.Set();
                     }
                     catch (Exception e)
@@ -878,7 +878,7 @@ namespace NMS.AMQP.Test.Integration.Async
                 bool complete = false;
                 int messageSeen = 0;
                 int expectedIndex = 0;
-                consumer.Listener += message =>
+                consumer.AsyncListener += async(message, ct) =>
                 {
                     if (complete)
                     {
@@ -893,7 +893,7 @@ namespace NMS.AMQP.Test.Integration.Async
                         // don't ack the message until we receive it X times
                         if (messageSeen < recoverCount)
                         {
-                            session.Recover();
+                            await session.RecoverAsync();
                             messageSeen++;
                         }
                         else
@@ -906,7 +906,7 @@ namespace NMS.AMQP.Test.Integration.Async
                                 stateMatcher: state => Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code
                                 ));
 
-                            message.Acknowledge();
+                            await message.AcknowledgeAsync();
 
                             if (expectedIndex == messageCount)
                             {
@@ -958,10 +958,10 @@ namespace NMS.AMQP.Test.Integration.Async
 
                 testPeer.ExpectDispositionThatIsAcceptedAndSettled();
 
-                consumer.Listener += _ =>
+                consumer.AsyncListener += async (msg, ct) =>
                 {
                     latch.Set();
-                    Task.Delay(TimeSpan.FromMilliseconds(100)).GetAwaiter().GetResult();
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), ct);
                 };
 
                 Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(3000)), "Messages not received within given timeout.");
@@ -1001,10 +1001,10 @@ namespace NMS.AMQP.Test.Integration.Async
 
                 testPeer.ExpectDispositionThatIsAcceptedAndSettled();
 
-                consumer.Listener += _ =>
+                consumer.AsyncListener += async (msg, _) =>
                 {
                     latch.Set();
-                    Task.Delay(TimeSpan.FromMilliseconds(100)).GetAwaiter().GetResult();
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), CancellationToken.None);
                 };
 
                 Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(3000)), "Messages not received within given timeout.");
@@ -1044,10 +1044,10 @@ namespace NMS.AMQP.Test.Integration.Async
 
                 testPeer.ExpectDispositionThatIsAcceptedAndSettled();
 
-                consumer.Listener += _ =>
+                consumer.AsyncListener += async (msg, _) =>
                 {
                     latch.Set();
-                    Task.Delay(TimeSpan.FromMilliseconds(100)).GetAwaiter().GetResult();
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), CancellationToken.None);
                 };
 
                 Assert.True(latch.WaitOne(TimeSpan.FromMilliseconds(3000)), "Messages not received within given timeout.");
