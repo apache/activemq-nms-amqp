@@ -23,6 +23,7 @@ using Amqp.Framing;
 using Apache.NMS;
 using Apache.NMS.AMQP;
 using Apache.NMS.AMQP.Message;
+using Apache.NMS.AMQP.Policies;
 using Apache.NMS.AMQP.Util;
 using Moq;
 using NMS.AMQP.Test.TestAmqp;
@@ -1095,6 +1096,278 @@ namespace NMS.AMQP.Test.Integration
                 connection.Close();
 
                 testPeer.WaitForAllMatchersToComplete(2000);
+            }
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestMessageNackedWhenRedeliveryCountExceeded()
+        {
+            using (var testPeer = new TestAmqpPeer())
+            {
+                var connection = EstablishConnection(testPeer);
+                connection.RedeliveryPolicy = new DefaultRedeliveryPolicy { MaximumRedeliveries = 1 };
+                connection.Start();
+
+                testPeer.ExpectBegin();
+
+                var session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                var queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message { BodySection = new AmqpValue { Value = "hello" } });
+                testPeer.ExpectDispositionThatIsModifiedFailedAndSettled();
+
+                IMessageConsumer consumer = session.CreateConsumer(queue);
+
+                IMessage m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                // Verify the message is no longer there. Will drain to be sure there are no messages.
+                Assert.IsNull(consumer.Receive(TimeSpan.Zero), "Message should not have been received");
+
+                testPeer.ExpectClose();
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestMessageAcceptedWhenRedeliveryCountExceeded()
+        {
+            using (var testPeer = new TestAmqpPeer())
+            {
+                var connection = EstablishConnection(testPeer);
+                connection.RedeliveryPolicy = new CustomRedeliveryPolicy { MaximumRedeliveries = 1, Outcome = 0 };
+                connection.Start();
+
+                testPeer.ExpectBegin();
+
+                var session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                var queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message { BodySection = new AmqpValue { Value = "hello" } });
+                testPeer.ExpectDisposition(settled: true, state =>
+                {
+                    Assert.AreEqual(state.Descriptor.Code, MessageSupport.ACCEPTED_INSTANCE.Descriptor.Code);
+                });
+
+                var consumer = session.CreateConsumer(queue);
+
+                var m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                // Verify the message is no longer there. Will drain to be sure there are no messages.
+                Assert.IsNull(consumer.Receive(TimeSpan.Zero), "Message should not have been received");
+
+                testPeer.ExpectClose();
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public void TestMessageRejectedWhenRedeliveryCountExceeded()
+        {
+            using (var testPeer = new TestAmqpPeer())
+            {
+                var connection = EstablishConnection(testPeer);
+                connection.RedeliveryPolicy = new CustomRedeliveryPolicy { MaximumRedeliveries = 1, Outcome = 1 };
+                connection.Start();
+
+                testPeer.ExpectBegin();
+
+                var session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                var queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message { BodySection = new AmqpValue { Value = "hello" } });
+                testPeer.ExpectDisposition(settled: true, state =>
+                {
+                    Assert.AreEqual(state.Descriptor.Code, MessageSupport.REJECTED_INSTANCE.Descriptor.Code);
+                });
+
+                var consumer = session.CreateConsumer(queue);
+
+                var m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                // Verify the message is no longer there. Will drain to be sure there are no messages.
+                Assert.IsNull(consumer.Receive(TimeSpan.Zero), "Message should not have been received");
+
+                testPeer.ExpectClose();
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public void TestMessageReleasedWhenRedeliveryCountExceeded()
+        {
+            using (var testPeer = new TestAmqpPeer())
+            {
+                var connection = EstablishConnection(testPeer);
+                connection.RedeliveryPolicy = new CustomRedeliveryPolicy { MaximumRedeliveries = 1, Outcome = 2 };
+                connection.Start();
+
+                testPeer.ExpectBegin();
+
+                var session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                var queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message { BodySection = new AmqpValue { Value = "hello" } });
+                testPeer.ExpectDisposition(settled: true, state =>
+                {
+                    Assert.AreEqual(state.Descriptor.Code, MessageSupport.RELEASED_INSTANCE.Descriptor.Code);
+                });
+
+                var consumer = session.CreateConsumer(queue);
+
+                var m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                // Verify the message is no longer there. Will drain to be sure there are no messages.
+                Assert.IsNull(consumer.Receive(TimeSpan.Zero), "Message should not have been received");
+
+                testPeer.ExpectClose();
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public void TestMessageModifiedFailedWhenRedeliveryCountExceeded()
+        {
+            using (var testPeer = new TestAmqpPeer())
+            {
+                var connection = EstablishConnection(testPeer);
+                connection.RedeliveryPolicy = new CustomRedeliveryPolicy { MaximumRedeliveries = 1, Outcome = 3 };
+                connection.Start();
+
+                testPeer.ExpectBegin();
+
+                var session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                var queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message { BodySection = new AmqpValue { Value = "hello" } });
+                testPeer.ExpectDisposition(settled: true, state =>
+                {
+                    Assert.AreEqual(state.Descriptor.Code, MessageSupport.MODIFIED_INSTANCE.Descriptor.Code);
+                });
+
+                var consumer = session.CreateConsumer(queue);
+
+                var m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                // Verify the message is no longer there. Will drain to be sure there are no messages.
+                Assert.IsNull(consumer.Receive(TimeSpan.Zero), "Message should not have been received");
+
+                testPeer.ExpectClose();
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+        
+        [Test, Timeout(20_000)]
+        public void TestMessageModifiedFailedUndeliverableWhenRedeliveryCountExceeded()
+        {
+            using (var testPeer = new TestAmqpPeer())
+            {
+                var connection = EstablishConnection(testPeer);
+                connection.RedeliveryPolicy = new CustomRedeliveryPolicy { MaximumRedeliveries = 1, Outcome = 4 };
+                connection.Start();
+
+                testPeer.ExpectBegin();
+
+                var session = connection.CreateSession(AcknowledgementMode.IndividualAcknowledge);
+                var queue = session.GetQueue("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message { BodySection = new AmqpValue { Value = "hello" } });
+                testPeer.ExpectDisposition(settled: true, state =>
+                {
+                    Assert.AreEqual(state.Descriptor.Code, MessageSupport.MODIFIED_INSTANCE.Descriptor.Code);
+                    Assert.IsTrue(state is Modified modified && modified.DeliveryFailed && modified.UndeliverableHere);
+                });
+
+                var consumer = session.CreateConsumer(queue);
+
+                var m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                m = consumer.Receive(TimeSpan.FromMilliseconds(3000));
+
+                Assert.NotNull(m, "Message should have been received");
+                Assert.IsInstanceOf<ITextMessage>(m);
+                session.Recover();
+
+                // Verify the message is no longer there. Will drain to be sure there are no messages.
+                Assert.IsNull(consumer.Receive(TimeSpan.Zero), "Message should not have been received");
+
+                testPeer.ExpectClose();
+                connection.Close();
+
+                testPeer.WaitForAllMatchersToComplete(3000);
+            }
+        }
+
+        private class CustomRedeliveryPolicy : Apache.NMS.Policies.RedeliveryPolicy
+        {
+            public int Outcome { get; set; }
+            
+            public override int GetOutcome(IDestination destination)
+            {
+                return Outcome;
             }
         }
     }
