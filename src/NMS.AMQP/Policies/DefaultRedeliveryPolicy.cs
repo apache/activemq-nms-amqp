@@ -14,15 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Apache.NMS.AMQP.Policies
 {
-    class RedeliveryPolicy
+    public class DefaultRedeliveryPolicy : Apache.NMS.Policies.RedeliveryPolicy
     {
+        public override int GetOutcome(IDestination destination)
+        {
+            return 4; // MODIFIED_FAILED_UNDELIVERABLE
+        }
     }
 }
