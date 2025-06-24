@@ -60,7 +60,6 @@ namespace NMS.AMQP.Test
             Assert.IsNull(messageConsumer.Receive(TimeSpan.FromSeconds(1)));
             
             messageConsumer.Close();
-            
         }
         
         [Test, Timeout(60_000)]
@@ -435,6 +434,33 @@ namespace NMS.AMQP.Test
                 _ = objectMessage.Body;
             });
         }
+        
+        // https://codewhitesec.blogspot.com/2022/06/bypassing-dotnet-serialization-binders.html
+        [Test, Timeout(20_000)]
+        public void TestShouldNotDeserializeMaliciousType()
+        {
+            Connection = CreateAmqpConnection(configureConnectionFactory: factory =>
+            {
+                factory.DeserializationPolicy = new CustomDeserializationPolicy();
+            });
+
+            Connection.Start();
+            var session = Connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
+            var queue = session.GetQueue(Guid.NewGuid().ToString());
+            var consumer = session.CreateConsumer(queue);
+            var producer = session.CreateProducer(queue);
+            
+            var message = producer.CreateObjectMessage(new MaliciousSerializable());
+            producer.Send(message);
+
+            var receivedMessage = consumer.Receive();
+            var objectMessage = receivedMessage as IObjectMessage;
+            Assert.NotNull(objectMessage);
+            Assert.Throws<SerializationException>(() =>
+            {
+                _ = objectMessage.Body;
+            });
+        }        
     }
 
     [Serializable]
@@ -442,6 +468,39 @@ namespace NMS.AMQP.Test
     {
         public string Prop1 { get; set; }
     }
+    
+    [Serializable]
+    public class TrustedType
+    {
+        // ReSharper disable once UnusedMember.Global
+        public string Prop1 { get; set; }
+    }
+    
+    [Serializable]
+    public class MaliciousSerializable : ISerializable
+    {
+        private readonly string _payloadData = "Injected Payload";
+
+        public MaliciousSerializable() { }
+
+        protected MaliciousSerializable(SerializationInfo info, StreamingContext context)
+        {
+            _payloadData = info.GetString("InjectedValue");
+        }
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            Type type = typeof(TrustedType);
+
+            // Manipulate serialization info to trick deserialization
+            info.SetType(type);
+            info.FullTypeName = type.AssemblyQualifiedName; // This should result in null
+            info.AssemblyName = "mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089";
+
+            // Inject a fake property
+            info.AddValue("InjectedValue", _payloadData);
+        }
+    }     
     
     public class CustomDeserializationPolicy : INmsDeserializationPolicy
     {

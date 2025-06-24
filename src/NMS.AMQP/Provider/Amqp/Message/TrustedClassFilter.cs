@@ -38,12 +38,17 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
             var name = new AssemblyName(assemblyName);
             var assembly = Assembly.Load(name);
             var type = FormatterServices.GetTypeFromAssembly(assembly, typeName);
+            if (type == null)
+            {
+                throw new SerializationException($"Type {typeName} not found in assembly {assemblyName}");
+            }
+            
             if (deserializationPolicy.IsTrustedType(destination, type))
             {
                 return type;
             }
 
-            var message = $"Forbidden {type.FullName}! " +
+            var message = $"Forbidden {type.FullName ?? typeName}! " +
                           "This type is not trusted to be deserialized under the current configuration. " +
                           "Please refer to the documentation for more information on how to configure trusted types.";
             throw new SerializationException(message);
