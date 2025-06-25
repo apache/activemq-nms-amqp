@@ -17,12 +17,10 @@ with the License.  You may obtain a copy of the License at
   -->
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
         <OutputType>Library</OutputType>
-        <TargetFrameworks>netstandard2.0</TargetFrameworks>
+        <TargetFramework>netstandard2.0</TargetFramework>
         <RootNamespace>Apache.NMS.AMQP</RootNamespace>
         <AssemblyName>Apache.NMS.AMQP</AssemblyName>
-        <LangVersion>7.3</LangVersion>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)'=='Release'">
