@@ -253,7 +253,7 @@ namespace NMS.AMQP.Test.Provider
                 "&failover.maxReconnectDelay=3200" +
                 "&failover.reconnectDelay=100" +
                 "&failover.useReconnectBackOff=true"+
-                "&failover.reconnectDelayRandomFactor=0.9");
+                $"&failover.reconnectDelayRandomFactor={0.9d.ToString()}");
 
             IConnection connection = null;
             try

@@ -557,7 +557,7 @@ namespace NMS.AMQP.Test.Message
             AssertGetStreamEntryEquals<long>(streamMessage, true, long.MaxValue);
 
             streamMessage.ClearBody();
-            string fpValue = Convert.ToString(float.MaxValue, CultureInfo.InvariantCulture);
+            string fpValue = Convert.ToString(float.MaxValue);
             streamMessage.WriteString(fpValue);
             streamMessage.Reset();
 
