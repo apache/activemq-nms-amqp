@@ -31,7 +31,7 @@ namespace NMS.AMQP.Test.Policies
             var destination = new NmsQueue("test-queue");
             var policy = new NmsDefaultDeserializationPolicy();
             
-            Assert.True(policy.IsTrustedType(destination, null));
+            Assert.False(policy.IsTrustedType(destination, null));
             Assert.True(policy.IsTrustedType(destination, typeof(Guid)));
             Assert.True(policy.IsTrustedType(destination, typeof(string)));
             Assert.True(policy.IsTrustedType(destination, typeof(bool)));
@@ -40,7 +40,7 @@ namespace NMS.AMQP.Test.Policies
             
             // Only types in System
             policy.AllowList = "System";
-            Assert.True(policy.IsTrustedType(destination, null));
+            Assert.False(policy.IsTrustedType(destination, null));
             Assert.True(policy.IsTrustedType(destination, typeof(Guid)));
             Assert.True(policy.IsTrustedType(destination, typeof(string)));
             Assert.True(policy.IsTrustedType(destination, typeof(bool)));
@@ -50,7 +50,7 @@ namespace NMS.AMQP.Test.Policies
             
             // Entry must be complete namespace name prefix to match
             // i.e. while "System.C" is a prefix of "System.Collections", this
-            // wont match the Queue class below.
+            // won't match the Queue class below.
             policy.AllowList = "System.C";
             Assert.False(policy.IsTrustedType(destination, typeof(Guid)));
             Assert.False(policy.IsTrustedType(destination, typeof(string)));

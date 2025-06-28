@@ -43,15 +43,15 @@ namespace Apache.NMS.AMQP.Policies
         /// </summary>
         public const string CATCH_ALL_WILDCARD = "*";
         
-        private IReadOnlyList<string> denyList = Array.Empty<string>();
-        private IReadOnlyList<string> allowList = new[] { CATCH_ALL_WILDCARD };
+        private IReadOnlyList<string> denyList = [];
+        private IReadOnlyList<string> allowList = [CATCH_ALL_WILDCARD];
         
         public bool IsTrustedType(IDestination destination, Type type)
         {
             var typeName = type?.FullName;
             if (typeName == null)
             {
-                return true;
+                return false;
             }
 
             foreach (var denyListEntry in denyList)
