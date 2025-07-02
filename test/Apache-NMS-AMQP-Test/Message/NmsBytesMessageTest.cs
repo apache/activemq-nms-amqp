@@ -534,5 +534,43 @@ namespace NMS.AMQP.Test.Message
             NmsBytesMessage copy = message.Copy() as NmsBytesMessage;
             Assert.IsNotNull(copy);
         }
+
+        [Test]
+        public void TestMessageContentCanBeObtainedMultipleTimesWithoutReset()
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes("myBytes");
+            NmsBytesMessage message = factory.CreateBytesMessage();
+            message.Content = bytes;
+            message.Reset();
+            
+            CollectionAssert.AreEqual(bytes, message.Content);
+            CollectionAssert.AreEqual(bytes, message.Content);
+        }
+
+        [Test]
+        public void TestConsecutiveReadBytes()
+        {
+            byte[] bytes = CreateBytesArrayOfSize(24);
+            NmsBytesMessage message = factory.CreateBytesMessage(bytes);
+            message.Reset();
+
+            CollectionAssert.AreEqual(bytes.Take(8), ReadBytes(message, 8));
+            CollectionAssert.AreEqual(bytes.Skip(8).Take(8), ReadBytes(message, 8));
+            CollectionAssert.AreEqual(bytes.Skip(16).Take(8), ReadBytes(message, 8));
+            CollectionAssert.AreEqual(new byte[8], ReadBytes(message, 8));
+        }
+
+        private static byte[] CreateBytesArrayOfSize(int size)
+        {
+            var random = new Random();
+            return Enumerable.Range(0, size).Select(x => (byte) random.Next(byte.MaxValue)).ToArray();
+        }
+
+        private static byte[] ReadBytes(IBytesMessage message, int count)
+        {
+            byte[] bytes = new byte[count];
+            message.ReadBytes(bytes);
+            return bytes;
+        }
     }
 }
