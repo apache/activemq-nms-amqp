@@ -261,3 +261,4 @@ ModelManifest.xml
 .fake/
 .idea/
 package/
+.DS_Store

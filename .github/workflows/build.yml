@@ -1,0 +1,33 @@
+name: .NET Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NMS_AMQP_TEST_CU: "artemis"
+      NMS_AMQP_TEST_CPWD: "artemis"
+      NMS_AMQP_TEST_URI: "amqp://localhost:5672"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run ActiveMQ Artemis
+        run: docker compose up -V -d
+        working-directory: ./test
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Restore dependencies
+        run: dotnet restore apache-nms-amqp.sln
+
+      - name: Build
+        run: dotnet build apache-nms-amqp.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test apache-nms-amqp.sln --configuration Release --no-build --verbosity normal

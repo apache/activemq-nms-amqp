@@ -1,7 +1,0 @@
-language: csharp
-solution: apache-nms-amqp.sln
-mono: none
-dotnet: 2.1
-script:
- - dotnet build -p:AppTargetFramework=netcoreapp2.1 -c Release
- - dotnet test ./test/Apache-NMS-AMQP-Test/Apache-NMS-AMQP-Test.csproj -f netcoreapp2.1 -c Release --filter Category!=Windows

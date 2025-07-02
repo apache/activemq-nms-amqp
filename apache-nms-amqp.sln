@@ -23,6 +23,17 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "benchmark", "benchmark", "{
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PingPong", "src\PingPong\PingPong.csproj", "{CA6094FA-B615-47E6-A5D5-224BE62CDF70}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{54150DEF-1084-4756-A637-A07E080BB87F}"
+	ProjectSection(SolutionItems) = preProject
+		Directory.Build.props = Directory.Build.props
+		NOTICE.txt = NOTICE.txt
+		package.ps1 = package.ps1
+		README.md = README.md
+		LICENSE.txt = LICENSE.txt
+		test\docker-compose.yml = test\docker-compose.yml
+		.github\workflows\build.yml = .github\workflows\build.yml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

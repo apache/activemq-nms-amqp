@@ -16,11 +16,9 @@ under the License.
 -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net462;netcoreapp2.1</TargetFrameworks>
-    <TargetFramework Condition="'$(AppTargetFramework)' != ''">$(AppTargetFramework)</TargetFramework>
     <RootNamespace>NMS.AMQP.Test</RootNamespace>
     <AssemblyName>NMS.AMQP.Interop.Test</AssemblyName>
-    <LangVersion>7.3</LangVersion>
+    <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
   
   <ItemGroup>
@@ -29,6 +27,7 @@ under the License.
     <PackageReference Include="NUnit" Version="3.12.0" />
     <PackageReference Include="NUnit.Console" Version="3.10.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.13.0" />
+    <PackageReference Include="System.Runtime.Serialization.Formatters" Version="9.0.6" />
   </ItemGroup>
   
   <ItemGroup>
