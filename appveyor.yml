@@ -1,2 +1,0 @@
-# This AppVeyor configuration is now disabled. Use GitHub Actions for CI.
-build: off
