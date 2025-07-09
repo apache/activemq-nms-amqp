@@ -37,11 +37,14 @@ namespace Apache.NMS.AMQP.Message
         {
             get
             {
-                byte[] buffer = new byte [BodyLength];
-                ReadBytes(buffer);
-                return buffer;
+                CheckWriteOnlyBody();
+                return this.facade.Content;
             }
-            set => WriteBytes(value);
+            set
+            {
+                CheckReadOnlyBody();
+                this.facade.Content = value;
+            }
         }
 
         public byte ReadByte()
@@ -292,7 +295,11 @@ namespace Apache.NMS.AMQP.Message
         public int ReadBytes(byte[] value, int length)
         {
             InitializeReading();
+            return ReadBytes(dataIn, value, length);
+        }
 
+        private int ReadBytes(BinaryReader binaryReader, byte[] value, int length)
+        {
             if (length < 0 || value.Length < length)
             {
                 throw new IndexOutOfRangeException("length must not be negative or larger than the size of the provided array");
@@ -300,7 +307,7 @@ namespace Apache.NMS.AMQP.Message
 
             try
             {
-                return dataIn.Read(value, 0, length);
+                return binaryReader.Read(value, 0, length);
             }
             catch (EndOfStreamException e)
             {

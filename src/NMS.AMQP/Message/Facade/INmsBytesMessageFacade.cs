@@ -24,5 +24,6 @@ namespace Apache.NMS.AMQP.Message.Facade
         BinaryWriter GetDataWriter();
         void Reset();
         long BodyLength { get; }
+        byte[] Content { get; set; }
     }
 }
