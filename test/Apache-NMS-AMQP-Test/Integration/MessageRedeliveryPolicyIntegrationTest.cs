@@ -19,6 +19,7 @@ using System;
 using System.Threading;
 using Amqp.Framing;
 using Apache.NMS;
+using Apache.NMS.AMQP.Policies;
 using Apache.NMS.Policies;
 using NMS.AMQP.Test.TestAmqp;
 using NUnit.Framework;
@@ -36,7 +37,7 @@ namespace NMS.AMQP.Test.Integration
                 IConnection connection = EstablishConnection(testPeer);
                 int initialRedeliveryDelay = 1000;
                 int clockResolution = 15;
-                connection.RedeliveryPolicy = new RedeliveryPolicy() { MaximumRedeliveries = 1, InitialRedeliveryDelay = initialRedeliveryDelay};
+                connection.RedeliveryPolicy = new DefaultRedeliveryPolicy { MaximumRedeliveries = 1, InitialRedeliveryDelay = initialRedeliveryDelay};
                 connection.Start();
 
                 testPeer.ExpectBegin();
@@ -80,7 +81,7 @@ namespace NMS.AMQP.Test.Integration
             {
                 IConnection connection = EstablishConnection(testPeer);
                 int initialRedeliveryDelay = 1000;
-                connection.RedeliveryPolicy = new RedeliveryPolicy() { MaximumRedeliveries = 1, InitialRedeliveryDelay = initialRedeliveryDelay};
+                connection.RedeliveryPolicy = new DefaultRedeliveryPolicy { MaximumRedeliveries = 1, InitialRedeliveryDelay = initialRedeliveryDelay};
                 connection.Start();
 
                 testPeer.ExpectBegin();

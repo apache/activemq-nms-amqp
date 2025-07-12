@@ -23,6 +23,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Apache.NMS.AMQP.Message;
 using Apache.NMS.AMQP.Meta;
+using Apache.NMS.AMQP.Policies;
 using Apache.NMS.AMQP.Provider;
 using Apache.NMS.AMQP.Util;
 using Apache.NMS.AMQP.Util.Synchronization;
@@ -249,7 +250,7 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        public IRedeliveryPolicy RedeliveryPolicy { get; set; }
+        public IRedeliveryPolicy RedeliveryPolicy { get; set; } = new DefaultRedeliveryPolicy();
         public IConnectionMetaData MetaData { get; } = ConnectionMetaData.Version;
         public event ExceptionListener ExceptionListener;
         public event ConnectionInterruptedListener ConnectionInterruptedListener;
