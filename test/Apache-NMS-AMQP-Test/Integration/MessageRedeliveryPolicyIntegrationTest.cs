@@ -47,7 +47,7 @@ namespace NMS.AMQP.Test.Integration
 
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = "hello" } });
-                testPeer.ExpectDispositionThatIsRejectedAndSettled();
+                testPeer.ExpectDispositionThatIsModifiedFailedAndSettled();
 
                 IMessageConsumer consumer = session.CreateConsumer(queue);
 
@@ -92,7 +92,7 @@ namespace NMS.AMQP.Test.Integration
                 
                 testPeer.ExpectReceiverAttach();
                 testPeer.ExpectLinkFlowRespondWithTransfer(message: new Amqp.Message() { BodySection = new AmqpValue() { Value = "hello" } });
-                testPeer.ExpectDispositionThatIsRejectedAndSettled();
+                testPeer.ExpectDispositionThatIsModifiedFailedAndSettled();
 
                 IMessageConsumer consumer = session.CreateConsumer(queue);
 
