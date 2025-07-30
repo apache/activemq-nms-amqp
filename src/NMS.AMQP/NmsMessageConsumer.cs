@@ -384,8 +384,7 @@ namespace Apache.NMS.AMQP
                                     Tracer.Debug($"{Info.Id} filtered message with excessive redelivery count: {envelope.RedeliveryCount.ToString()}");
                                 }
 
-                                // TODO: Apply redelivery policy
-                                await DoAckExpiredAsync(envelope).Await();
+                                await ApplyRedeliveryPolicyOutcome(envelope).Await();
                             }
                             else
                             {
@@ -396,7 +395,9 @@ namespace Apache.NMS.AMQP
                                     await DoAckDeliveredAsync(envelope).Await();
                                 else
                                     await AckFromReceiveAsync(envelope).Await();
-
+                                
+                                await ApplyRedeliveryPolicy(envelope).Await();
+                                
                                 try
                                 {
                                     Listener?.Invoke(envelope.Message.Copy());
@@ -455,6 +456,17 @@ namespace Apache.NMS.AMQP
             }
 
             return false;
+        }
+        
+        private int GetRedeliveryDelay(InboundMessageDispatch envelope)
+        {
+            var redeliveryPolicy = Session.Connection.RedeliveryPolicy;
+            
+            if (redeliveryPolicy == null || envelope.RedeliveryCount <= 0) 
+                return 0;
+            
+            var redeliveryDelay = redeliveryPolicy.RedeliveryDelay(envelope.RedeliveryCount);
+            return redeliveryDelay;
         }
 
         private Task DoAckReleasedAsync(InboundMessageDispatch envelope)
@@ -544,7 +556,7 @@ namespace Apache.NMS.AMQP
                             Tracer.Debug($"{Info.Id} filtered message with excessive redelivery count: {envelope.RedeliveryCount.ToString()}");
                         }
 
-                        await DoAckExpiredAsync(envelope).Await();
+                        await ApplyRedeliveryPolicyOutcome(envelope).Await();
                     }
                     else
                     {
@@ -552,6 +564,8 @@ namespace Apache.NMS.AMQP
                         {
                             Tracer.Debug($"{Info.Id} received message {envelope.Message.NMSMessageId}.");
                         }
+
+                        await ApplyRedeliveryPolicy(envelope).Await();
 
                         return await func.Invoke(envelope);
                     }
@@ -566,7 +580,17 @@ namespace Apache.NMS.AMQP
                 throw ExceptionSupport.Wrap(ex, "Receive failed");
             }
         }
-        
+
+        private async Task ApplyRedeliveryPolicy(InboundMessageDispatch envelope)
+        {
+            int redeliveryDelay = GetRedeliveryDelay(envelope);
+
+            if (redeliveryDelay > 0)
+            {
+                Tracer.DebugFormat("Envelope has been redelivered, apply redelivery policy wait {0} milliseconds", redeliveryDelay);
+                await Task.Delay(TimeSpan.FromMilliseconds(redeliveryDelay)).Await();
+            }
+        }
 
         private static long GetDeadline(int timeout)
         {
@@ -601,16 +625,7 @@ namespace Apache.NMS.AMQP
 
         private Task DoAckExpiredAsync(InboundMessageDispatch envelope)
         {
-            if (Session.Connection.RedeliveryPolicy != null)
-            {
-                var dispositionType = Session.Connection.RedeliveryPolicy.GetOutcome(envelope.Message.NMSDestination);
-                var ackType = LookupAckTypeForDisposition(dispositionType);
-                return Session.AcknowledgeAsync(ackType, envelope);
-            }
-            else
-            {
-                return Session.AcknowledgeAsync(AckType.MODIFIED_FAILED_UNDELIVERABLE, envelope);
-            }
+            return Session.AcknowledgeAsync(AckType.MODIFIED_FAILED_UNDELIVERABLE, envelope);
         }
 
         private static AckType LookupAckTypeForDisposition(int dispositionType)
@@ -628,6 +643,26 @@ namespace Apache.NMS.AMQP
                 default:
                     throw new ArgumentOutOfRangeException(nameof(dispositionType), "Unknown disposition type");
             }
+        }
+
+        private Task ApplyRedeliveryPolicyOutcome(InboundMessageDispatch envelope)
+        {
+            if (Tracer.IsDebugEnabled)
+            {
+                Tracer.DebugFormat("{0} filtered message with excessive redelivery count: {1}", Info.Id, envelope.RedeliveryCount);
+            }
+
+            AckType ackType;
+            if (Session.Connection.RedeliveryPolicy is { } redeliveryPolicy)
+            {
+                var dispositionType = redeliveryPolicy.GetOutcome(envelope.Message.NMSDestination);
+                ackType = LookupAckTypeForDisposition(dispositionType);
+            }
+            else
+            {
+                ackType = AckType.MODIFIED_FAILED_UNDELIVERABLE;
+            }
+            return Session.AcknowledgeAsync(ackType, envelope);
         }
 
         private void SetAcknowledgeCallback(InboundMessageDispatch envelope)
