@@ -250,7 +250,7 @@ namespace Apache.NMS.AMQP
             }
         }
 
-        public IRedeliveryPolicy RedeliveryPolicy { get; set; } = new DefaultRedeliveryPolicy();
+        public IRedeliveryPolicy RedeliveryPolicy { get; set; }
         public IConnectionMetaData MetaData { get; } = ConnectionMetaData.Version;
         public event ExceptionListener ExceptionListener;
         public event ConnectionInterruptedListener ConnectionInterruptedListener;

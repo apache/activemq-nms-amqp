@@ -651,8 +651,17 @@ namespace Apache.NMS.AMQP
             {
                 Tracer.DebugFormat("{0} filtered message with excessive redelivery count: {1}", Info.Id, envelope.RedeliveryCount);
             }
-            var dispositionType = Session.Connection.RedeliveryPolicy.GetOutcome(envelope.Message.NMSDestination);
-            var ackType = LookupAckTypeForDisposition(dispositionType);
+
+            AckType ackType;
+            if (Session.Connection.RedeliveryPolicy is { } redeliveryPolicy)
+            {
+                var dispositionType = redeliveryPolicy.GetOutcome(envelope.Message.NMSDestination);
+                ackType = LookupAckTypeForDisposition(dispositionType);
+            }
+            else
+            {
+                ackType = AckType.MODIFIED_FAILED_UNDELIVERABLE;
+            }
             return Session.AcknowledgeAsync(ackType, envelope);
         }
 
