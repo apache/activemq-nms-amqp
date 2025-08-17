@@ -14,7 +14,7 @@
 # limitations under the License.
 
 $pkgname = "Apache.NMS.AMQP"
-$pkgver = "2.3.0"
+$pkgver = "2.4.0"
 $frameworks = "netstandard2.0"
 
 write-progress "Creating package directory." "Initializing..."
