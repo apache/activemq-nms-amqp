@@ -19,10 +19,10 @@ jobs:
       - name: Run ActiveMQ Artemis
         run: docker compose up -V -d
         working-directory: ./test
-      - name: Setup .NET 9
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '8.0.x'
       - name: Restore dependencies
         run: dotnet restore apache-nms-amqp.sln
 
