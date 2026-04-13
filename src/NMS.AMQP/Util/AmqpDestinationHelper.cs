@@ -206,7 +206,7 @@ namespace Apache.NMS.AMQP.Util
 
         private static void SetAnnotationFromDestination(Symbol key, IDestination destination, MessageAnnotations annotations)
         {
-            byte? typeValue = ToTypeAnnotation(destination);
+            var typeValue = ToTypeAnnotation(destination);
 
             if (typeValue == null)
                 annotations.Map.Remove(key);
@@ -214,24 +214,26 @@ namespace Apache.NMS.AMQP.Util
                 annotations.Map[key] = typeValue;
         }
 
-        private static byte? ToTypeAnnotation(IDestination destination)
+        private static sbyte? ToTypeAnnotation(IDestination destination)
         {
+            //in dotnet byte is by default an unsigned type, but in the amqp 1.0 spec byte is defined as signed type (see 1.6.7 in the amqp 1.0 spec)
+
             if (destination == null)
                 return null;
 
             if (destination.IsQueue)
             {
                 if (destination.IsTemporary)
-                    return MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE;
+                    return (sbyte)MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE;
                 else
-                    return MessageSupport.JMS_DEST_TYPE_QUEUE;
+                    return (sbyte)MessageSupport.JMS_DEST_TYPE_QUEUE;
             }
             else if (destination.IsTopic)
             {
                 if (destination.IsTemporary)
-                    return MessageSupport.JMS_DEST_TYPE_TEMP_TOPIC;
+                    return (sbyte)MessageSupport.JMS_DEST_TYPE_TEMP_TOPIC;
                 else
-                    return MessageSupport.JMS_DEST_TYPE_TOPIC;
+                    return (sbyte)MessageSupport.JMS_DEST_TYPE_TOPIC;
             }
 
             return null;
