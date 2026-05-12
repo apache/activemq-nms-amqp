@@ -125,7 +125,7 @@ namespace Apache.NMS.AMQP
             }
             remove
             {
-                using (syncRoot.LockAsync())
+                using (syncRoot.Lock())
                 {
                     AsyncListener -= value;
                 }
