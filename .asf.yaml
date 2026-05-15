@@ -36,6 +36,20 @@ github:
     projects: false
     discussions: true
 
+  rulesets:
+    - name: "Default Branch Protection"
+      type: branch
+      branches:
+        includes:
+          - "~DEFAULT_BRANCH"
+          - "release/*"
+          - "rel/*"
+        excludes: []
+      bypass_teams:
+        - root
+      restrict_deletion: true
+      restrict_force_push: true
+
 notifications:
   commits: commits@activemq.apache.org
   issues: gitbox@activemq.apache.org
