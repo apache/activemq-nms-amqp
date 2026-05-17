@@ -1094,5 +1094,50 @@ namespace NMS.AMQP.Test.Integration.Async
                 testPeer.WaitForAllMatchersToComplete(2000);
             }
         }
+
+        [Test, Timeout(20_000)]
+        public async Task TestAsyncListenerAddAfterRemoveReceivesMessages()
+        {
+            using (TestAmqpPeer testPeer = new TestAmqpPeer())
+            {
+                IConnection connection = await EstablishConnectionAsync(testPeer);
+                await connection.StartAsync();
+
+                testPeer.ExpectBegin();
+                ISession session = await connection.CreateSessionAsync(AcknowledgementMode.AutoAcknowledge);
+                IQueue destination = await session.GetQueueAsync("myQueue");
+
+                testPeer.ExpectReceiverAttach();
+                testPeer.ExpectLinkFlowRespondWithTransfer(message: CreateMessageWithContent(), count: 1);
+                testPeer.ExpectDispositionThatIsAcceptedAndSettled();
+
+                IMessageConsumer consumer = await session.CreateConsumerAsync(destination);
+
+                // Remove a handler that was never added — this is the sequence that triggered the bug.
+                // With the buggy LockAsync() call, the semaphore was acquired but never released,
+                // causing the subsequent add to deadlock.
+                AsyncMessageListener handler = (_, _) => Task.CompletedTask;
+                consumer.AsyncListener -= handler;
+
+                ManualResetEvent messageReceived = new ManualResetEvent(false);
+                consumer.AsyncListener += async (message, ct) =>
+                {
+                    await Task.CompletedTask;
+                    messageReceived.Set();
+                };
+
+                Assert.True(messageReceived.WaitOne(4000), "Message was not received after adding AsyncListener following a remove.");
+
+                testPeer.WaitForAllMatchersToComplete(2000);
+
+                testPeer.ExpectDetach(expectClosed: true, sendResponse: true, replyClosed: true);
+                await consumer.CloseAsync();
+
+                testPeer.ExpectClose();
+                await connection.CloseAsync();
+
+                testPeer.WaitForAllMatchersToComplete(2000);
+            }
+        }
     }
 }
