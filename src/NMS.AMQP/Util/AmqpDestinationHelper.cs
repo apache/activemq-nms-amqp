@@ -73,7 +73,7 @@ namespace Apache.NMS.AMQP.Util
             object typeAnnotation = message.GetMessageAnnotation(SymbolUtil.JMSX_OPT_DEST);
             if (typeAnnotation != null)
             {
-                byte type = Convert.ToByte(typeAnnotation);
+                sbyte type = Convert.ToSByte(typeAnnotation);
                 string name = StripPrefixIfNecessary(to, connection, type);
                 return CreateDestination(name, type);
             }
@@ -91,7 +91,7 @@ namespace Apache.NMS.AMQP.Util
             object typeAnnotation = message.GetMessageAnnotation(SymbolUtil.JMSX_OPT_REPLY_TO);
             if (typeAnnotation != null)
             {
-                byte type = Convert.ToByte(typeAnnotation);
+                sbyte type = Convert.ToSByte(typeAnnotation);
                 string name = StripPrefixIfNecessary(replyTo, connection, type);
                 return CreateDestination(name, type);
             }
@@ -102,7 +102,7 @@ namespace Apache.NMS.AMQP.Util
             }
         }
 
-        private static string StripPrefixIfNecessary(string address, IAmqpConnection connection, byte type)
+        private static string StripPrefixIfNecessary(string address, IAmqpConnection connection, sbyte type)
         {
             if (address == null)
                 return null;
@@ -147,7 +147,7 @@ namespace Apache.NMS.AMQP.Util
             return address;
         }
 
-        private static IDestination CreateDestination(string address, byte typeByte)
+        private static IDestination CreateDestination(string address, sbyte typeByte)
         {
             if (address == null)
                 return null;
@@ -224,16 +224,16 @@ namespace Apache.NMS.AMQP.Util
             if (destination.IsQueue)
             {
                 if (destination.IsTemporary)
-                    return (sbyte)MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE;
+                    return MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE;
                 else
-                    return (sbyte)MessageSupport.JMS_DEST_TYPE_QUEUE;
+                    return MessageSupport.JMS_DEST_TYPE_QUEUE;
             }
             else if (destination.IsTopic)
             {
                 if (destination.IsTemporary)
-                    return (sbyte)MessageSupport.JMS_DEST_TYPE_TEMP_TOPIC;
+                    return MessageSupport.JMS_DEST_TYPE_TEMP_TOPIC;
                 else
-                    return (sbyte)MessageSupport.JMS_DEST_TYPE_TOPIC;
+                    return MessageSupport.JMS_DEST_TYPE_TOPIC;
             }
 
             return null;

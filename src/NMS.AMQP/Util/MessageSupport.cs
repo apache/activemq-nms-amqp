@@ -42,10 +42,10 @@ namespace Apache.NMS.AMQP.Util
         public const sbyte JMS_TYPE_TXT = 0x05;
 
         // "x-opt-jms-dest" and "x-opt-jms-reply-to" values
-        public const byte JMS_DEST_TYPE_QUEUE = 0x00;
-        public const byte JMS_DEST_TYPE_TOPIC = 0x01;
-        public const byte JMS_DEST_TYPE_TEMP_QUEUE = 0x02;
-        public const byte JMS_DEST_TYPE_TEMP_TOPIC = 0x03;
+        public const sbyte JMS_DEST_TYPE_QUEUE = 0x00;
+        public const sbyte JMS_DEST_TYPE_TOPIC = 0x01;
+        public const sbyte JMS_DEST_TYPE_TEMP_QUEUE = 0x02;
+        public const sbyte JMS_DEST_TYPE_TEMP_TOPIC = 0x03;
 
         // Message Content-type values
         public const string OCTET_STREAM_CONTENT_TYPE = "application/octet-stream";

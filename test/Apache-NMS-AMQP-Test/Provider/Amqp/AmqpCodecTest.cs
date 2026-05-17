@@ -460,7 +460,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             DoTestNMSMessageEncodingAddsProperMessageAnnotations(MessageSupport.JMS_TYPE_STRM, MessageSupport.JMS_DEST_TYPE_QUEUE, MessageSupport.JMS_DEST_TYPE_TEMP_QUEUE);
         }
 
-        private void DoTestNMSMessageEncodingAddsProperMessageAnnotations(sbyte msgType, byte? toType, byte? replyToType)
+        private void DoTestNMSMessageEncodingAddsProperMessageAnnotations(sbyte msgType, sbyte? toType, sbyte? replyToType)
         {
             AmqpNmsMessageFacade messageFacade = CreateMessageFacadeFromTypeId(msgType);
             IDestination to = CreateDestinationFromTypeId(toType);
@@ -564,7 +564,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             return message;
         }
 
-        private IDestination CreateDestinationFromTypeId(byte? destinationType)
+        private IDestination CreateDestinationFromTypeId(sbyte? destinationType)
         {
             switch (destinationType)
             {
