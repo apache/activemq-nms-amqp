@@ -41,7 +41,7 @@ So in general most of the top level classes that implement the Apache.NMS interf
 ## Getting started
 - [Configuration](docs/configuration.md) contains various uri options that can be set when defining a ConnectionFactory.
 - [Interested in the code?](docs/working_with_code.md) Clone and build the projects.
-- Want to contribute? Github pull requests are one way to contribute, but our real issue tracker is [JIRA](https://issues.apache.org/jira/issues/?jql=project%20%3D%20AMQNET%20AND%20component%20%3D%20AMQP).
+- Want to contribute? GitHub pull requests are welcome! Use [GitHub Issues](https://github.com/apache/activemq-nms-amqp/issues) to report bugs or request features, and [GitHub Discussions](https://github.com/apache/activemq-nms-amqp/discussions) for questions and general conversation.
 
 ## Amqp Provider NMS Feature Support
 
