@@ -7,8 +7,11 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        framework: ['net8.0', 'net10.0']
     env:
       NMS_AMQP_TEST_CU: "artemis"
       NMS_AMQP_TEST_CPWD: "artemis"
@@ -19,15 +22,15 @@ jobs:
       - name: Run ActiveMQ Artemis
         run: docker compose up -V -d
         working-directory: ./test
-      - name: Setup .NET 8
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: Restore dependencies
         run: dotnet restore apache-nms-amqp.sln
-
       - name: Build
         run: dotnet build apache-nms-amqp.sln --configuration Release --no-restore
-
       - name: Test
-        run: dotnet test apache-nms-amqp.sln --configuration Release --no-build --verbosity normal
+        run: dotnet test apache-nms-amqp.sln --configuration Release --no-build --framework ${{ matrix.framework }} --verbosity normal

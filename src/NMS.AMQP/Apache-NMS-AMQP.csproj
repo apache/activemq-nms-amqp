@@ -18,7 +18,7 @@ with the License.  You may obtain a copy of the License at
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Library</OutputType>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFrameworks>netstandard2.0</TargetFrameworks>
         <RootNamespace>Apache.NMS.AMQP</RootNamespace>
         <AssemblyName>Apache.NMS.AMQP</AssemblyName>
     </PropertyGroup>
