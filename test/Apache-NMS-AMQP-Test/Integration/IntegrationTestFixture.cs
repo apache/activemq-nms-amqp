@@ -82,7 +82,7 @@ namespace NMS.AMQP.Test.Integration
             return context;
         }
         
-        private static string BuildUri(TestAmqpPeer testPeer, string optionsString)
+        protected static string BuildUri(TestAmqpPeer testPeer, string optionsString = null)
         {
             string baseUri = "amqp://127.0.0.1:" + testPeer.ServerPort.ToString();
 

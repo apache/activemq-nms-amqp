@@ -158,9 +158,9 @@ namespace NMS.AMQP.Test.TestAmqp
             AddMatcher(saslInitMatcher);
         }
 
-        public void ExpectOpen(Fields serverProperties = null)
+        public void ExpectOpen(Fields serverProperties = null, Action<Open> openAssertion = null)
         {
-            ExpectOpen(desiredCapabilities: DEFAULT_DESIRED_CAPABILITIES, serverCapabilities: new[] { SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER }, serverProperties: serverProperties);
+            ExpectOpen(desiredCapabilities: DEFAULT_DESIRED_CAPABILITIES, serverCapabilities: new[] { SymbolUtil.OPEN_CAPABILITY_SOLE_CONNECTION_FOR_CONTAINER }, serverProperties: serverProperties, openAssertion: openAssertion);
         }
 
         public void ExpectOpen(Symbol[] serverCapabilities, Fields serverProperties)
@@ -168,7 +168,8 @@ namespace NMS.AMQP.Test.TestAmqp
             ExpectOpen(desiredCapabilities: DEFAULT_DESIRED_CAPABILITIES, serverCapabilities: serverCapabilities, serverProperties: serverProperties);
         }
 
-        private void ExpectOpen(Symbol[] desiredCapabilities, Symbol[] serverCapabilities, Fields serverProperties)
+        private void ExpectOpen(Symbol[] desiredCapabilities, Symbol[] serverCapabilities, Fields serverProperties,
+            Action<Open> openAssertion = null)
         {
             var openMatcher = new FrameMatcher<Open>();
 
@@ -176,6 +177,9 @@ namespace NMS.AMQP.Test.TestAmqp
                 openMatcher.WithAssertion(open => CollectionAssert.AreEquivalent(desiredCapabilities, open.DesiredCapabilities));
             else
                 openMatcher.WithAssertion(open => Assert.IsNull(open.DesiredCapabilities));
+
+            if (openAssertion != null)
+                openMatcher.WithAssertion(openAssertion);
 
             openMatcher.WithOnComplete(context =>
             {

@@ -18,6 +18,7 @@
 using System;
 using System.Threading;
 using Apache.NMS;
+using Apache.NMS.AMQP.Provider.Amqp;
 using Apache.NMS.AMQP;
 using NMS.AMQP.Test.TestAmqp;
 using NMS.AMQP.Test.TestAmqp.BasicTypes;
@@ -248,6 +249,69 @@ namespace NMS.AMQP.Test.Integration
                 
                 testPeer.WaitForAllMatchersToComplete(2000);
             }
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestIdleTimeoutIsSetByDefault()
+        {
+            using TestAmqpPeer testPeer = new TestAmqpPeer();
+            testPeer.ExpectSaslPlain("guest", "guest");
+            testPeer.ExpectOpen(openAssertion: open =>
+            {
+                Assert.AreEqual((uint)AmqpProvider.DEFAULT_IDLE_TIMEOUT, open.IdleTimeOut);
+            });
+            testPeer.ExpectBegin();
+
+            IConnection connection = new NmsConnectionFactory(BuildUri(testPeer)).CreateConnection("guest", "guest");
+            connection.ClientId = "ClientName";
+
+            testPeer.ExpectClose();
+            connection.Close();
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestIdleTimeoutIsNotSetOnOpenFrameWhenConfiguredToZero()
+        {
+            using TestAmqpPeer testPeer = new TestAmqpPeer();
+            testPeer.ExpectSaslPlain("guest", "guest");
+            testPeer.ExpectOpen(openAssertion: open => Assert.AreEqual(int.MaxValue, open.IdleTimeOut));
+            testPeer.ExpectBegin();
+
+            IConnection connection = new NmsConnectionFactory(BuildUri(testPeer, "amqp.idleTimeout=0")).CreateConnection("guest", "guest");
+            connection.ClientId = "ClientName";
+
+            testPeer.ExpectClose();
+            connection.Close();
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestIdleTimeoutIsSetOnOpenFrameWhenConfiguredGreaterThanZero()
+        {
+            using TestAmqpPeer testPeer = new TestAmqpPeer();
+            testPeer.ExpectSaslPlain("guest", "guest");
+            testPeer.ExpectOpen(openAssertion: open => Assert.AreEqual(30000u, open.IdleTimeOut));
+            testPeer.ExpectBegin();
+
+            IConnection connection = new NmsConnectionFactory(BuildUri(testPeer, "amqp.idleTimeout=30000")).CreateConnection("guest", "guest");
+            connection.ClientId = "ClientName";
+
+            testPeer.ExpectClose();
+            connection.Close();
+        }
+
+        [Test, Timeout(20_000)]
+        public void TestIdleTimeoutIsNotSetOnOpenFrameWhenConfiguredNegative()
+        {
+            using TestAmqpPeer testPeer = new TestAmqpPeer();
+            testPeer.ExpectSaslPlain("guest", "guest");
+            testPeer.ExpectOpen(openAssertion: open => Assert.AreEqual(int.MaxValue, open.IdleTimeOut));
+            testPeer.ExpectBegin();
+
+            IConnection connection = new NmsConnectionFactory(BuildUri(testPeer, "amqp.idleTimeout=-1")).CreateConnection("guest", "guest");
+            connection.ClientId = "ClientName";
+
+            testPeer.ExpectClose();
+            connection.Close();
         }
     }
 }

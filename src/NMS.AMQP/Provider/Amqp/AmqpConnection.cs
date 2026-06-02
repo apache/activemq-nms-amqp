@@ -112,12 +112,12 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         internal void OnLocalOpen(Open open)
         {
             open.ContainerId = Info.ClientId;
-            open.ChannelMax = Info.ChannelMax;
-            open.MaxFrameSize = (uint) Info.MaxFrameSize;
+            open.ChannelMax = Provider.ChannelMax;
+            open.MaxFrameSize = (uint) Provider.MaxFrameSize;
             open.HostName = String.IsNullOrWhiteSpace(this.Provider.VHost) ? remoteUri.Host : this.Provider.VHost;
-            if (Info.IdleTimeOut > 0)
+            if (Provider.IdleTimeout > 0)
             {
-                open.IdleTimeOut = (uint)Info.IdleTimeOut;
+                open.IdleTimeOut = (uint)Provider.IdleTimeout;
             }
             open.DesiredCapabilities = new[]
             {
