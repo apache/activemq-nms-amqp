@@ -30,25 +30,17 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public static readonly uint DEFAULT_MAX_HANDLE = 1024;
         private static readonly uint DEFAULT_SESSION_OUTGOING_WINDOW = 2048; // AmqpNetLite default
 
-        private readonly ITransportContext transport;
-        private NmsConnectionInfo connectionInfo;
-        private AmqpConnection connection;
-
-        /// <summary>
-        /// Sets and gets the name of the virtual host to which we are connecting.
-        /// By default this value is derived from the URI.
-        /// Can be used to determine the correct service if connecting to an AMQP proxy.
-        /// </summary>
-        public string VHost { get; set; }
-
-        public AmqpProvider(Uri remoteUri, ITransportContext transport)
-        {
-            RemoteUri = remoteUri;
-            this.transport = transport;
-        }
+        public static readonly ushort DEFAULT_CHANNEL_MAX;
+        public static readonly int DEFAULT_MAX_FRAME_SIZE;
+        public static readonly int DEFAULT_IDLE_TIMEOUT;
 
         static AmqpProvider()
         {
+            AmqpSettings defaultAmqpSettings = new global::Amqp.ConnectionFactory().AMQP;
+            DEFAULT_CHANNEL_MAX = defaultAmqpSettings.MaxSessionsPerConnection;
+            DEFAULT_MAX_FRAME_SIZE = defaultAmqpSettings.MaxFrameSize;
+            DEFAULT_IDLE_TIMEOUT = defaultAmqpSettings.IdleTimeout;
+
             // Set up tracing in AMQP. We capture all AMQP traces in the TraceListener below
             // and map to NMS 'Tracer' logs as follows:
             //    AMQP          Tracer
@@ -87,6 +79,23 @@ namespace Apache.NMS.AMQP.Provider.Amqp
                 }
             };
         }
+
+        private readonly ITransportContext transport;
+        private NmsConnectionInfo connectionInfo;
+        private AmqpConnection connection;
+
+        /// <summary>
+        /// Sets and gets the name of the virtual host to which we are connecting.
+        /// By default this value is derived from the URI.
+        /// Can be used to determine the correct service if connecting to an AMQP proxy.
+        /// </summary>
+        public string VHost { get; set; }
+
+        public AmqpProvider(Uri remoteUri, ITransportContext transport)
+        {
+            RemoteUri = remoteUri;
+            this.transport = transport;
+        }
         
         /// <summary>
         /// Enables AmqpNetLite's Frame logging level.
@@ -112,6 +121,9 @@ namespace Apache.NMS.AMQP.Provider.Amqp
         public long RequestTimeout => connectionInfo?.RequestTimeout ?? NmsConnectionInfo.DEFAULT_REQUEST_TIMEOUT;
         public uint SessionOutgoingWindow { get; set; } = DEFAULT_SESSION_OUTGOING_WINDOW;
         public uint MaxHandle { get; set; } = DEFAULT_MAX_HANDLE;
+        public ushort ChannelMax { get; set; } = DEFAULT_CHANNEL_MAX;
+        public int MaxFrameSize { get; set; } = DEFAULT_MAX_FRAME_SIZE;
+        public int IdleTimeout { get; set; } = DEFAULT_IDLE_TIMEOUT;
         
         public Uri RemoteUri { get; }
         public IProviderListener Listener { get; private set; }

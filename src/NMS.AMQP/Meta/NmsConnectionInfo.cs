@@ -32,9 +32,6 @@ namespace Apache.NMS.AMQP.Meta
         public static readonly long DEFAULT_CLOSE_TIMEOUT = 60000;
         public static readonly long DEFAULT_SEND_TIMEOUT = INFINITE;
         public static readonly long DEFAULT_REQUEST_TIMEOUT = INFINITE;
-        public static readonly int DEFAULT_IDLE_TIMEOUT;
-        public static readonly ushort DEFAULT_CHANNEL_MAX;
-        public static readonly int DEFAULT_MAX_FRAME_SIZE;
         public static readonly PrefetchPolicyInfo DEFAULT_PREFETCH_POLICY = new PrefetchPolicyInfo()
         {
             QueuePrefetch = 1000,
@@ -43,14 +40,6 @@ namespace Apache.NMS.AMQP.Meta
             QueueBrowserPrefetch = 1000
         };
         public static double DEFAULT_MAX_NEW_CONNECTION_RATE_PER_SEC = -1;
-
-        static NmsConnectionInfo()
-        {
-            AmqpSettings defaultAmqpSettings = new Amqp.ConnectionFactory().AMQP;
-            DEFAULT_CHANNEL_MAX = defaultAmqpSettings.MaxSessionsPerConnection;
-            DEFAULT_MAX_FRAME_SIZE = defaultAmqpSettings.MaxFrameSize;
-            DEFAULT_IDLE_TIMEOUT = defaultAmqpSettings.IdleTimeout;
-        }
 
         public NmsConnectionInfo(NmsConnectionId connectionId)
         {
@@ -69,9 +58,6 @@ namespace Apache.NMS.AMQP.Meta
         public bool LocalMessageExpiry { get; set; }
         public string QueuePrefix { get; set; }
         public string TopicPrefix { get; set; }
-        public ushort ChannelMax { get; set; } = DEFAULT_CHANNEL_MAX;
-        public int MaxFrameSize { get; set; } = DEFAULT_MAX_FRAME_SIZE;
-        public int IdleTimeOut { get; set; } = DEFAULT_IDLE_TIMEOUT;
         
         public bool AnonymousRelaySupported { get; set; }
         

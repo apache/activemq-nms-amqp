@@ -27,7 +27,9 @@ namespace NMS.AMQP.Test.Provider.Amqp
     public class AmqpProviderFactoryTest
     {
         private const uint customMaxHandle = 2048;
-
+        private const ushort customChannelMax = 32;
+        private const int customMaxFrameSize = 1048576;
+        private const int customIdleTimeout = 30000;
         private const string customVHost = "test-vhost";
 
         [Test]
@@ -45,6 +47,7 @@ namespace NMS.AMQP.Test.Provider.Amqp
             Assert.IsNotNull(provider);
             Assert.AreEqual(AmqpProvider.DEFAULT_MAX_HANDLE, provider.MaxHandle);
             Assert.IsFalse(provider.TraceFrames);
+            Assert.Greater(provider.IdleTimeout, 0);
         }
 
         [Test]
@@ -53,7 +56,10 @@ namespace NMS.AMQP.Test.Provider.Amqp
             Uri uri = new Uri("amqp://localhost:5672" +
                               "?amqp.maxHandle=" + customMaxHandle +
                               "&amqp.traceFrames=true" +
-                              "&amqp.vhost=" + customVHost);
+                              "&amqp.vhost=" + customVHost +
+                              "&amqp.channelMax=" + customChannelMax +
+                              "&amqp.maxFrameSize=" + customMaxFrameSize +
+                              "&amqp.idleTimeout=" + customIdleTimeout);
 
             AmqpProvider provider = ProviderFactory.Create(uri) as AmqpProvider;
 
@@ -61,6 +67,9 @@ namespace NMS.AMQP.Test.Provider.Amqp
             Assert.AreEqual(customMaxHandle, provider.MaxHandle);
             Assert.IsTrue(provider.TraceFrames);
             Assert.AreEqual(customVHost, provider.VHost);
+            Assert.AreEqual(customChannelMax, provider.ChannelMax);
+            Assert.AreEqual(customMaxFrameSize, provider.MaxFrameSize);
+            Assert.AreEqual(customIdleTimeout, provider.IdleTimeout);
         }
 
         [TearDown]
