@@ -31,10 +31,11 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
         private EndianBinaryReader byteIn = null;
         private EndianBinaryWriter byteOut = null;
 
-        private static readonly Data EMPTY_DATA = new Data { Binary = new byte[0] };
+        private static readonly byte[] EMPTY_BINARY = new byte[0];
+        private static readonly Data EMPTY_DATA = new Data { Binary = EMPTY_BINARY };
 
         public override sbyte? JmsMsgType => MessageSupport.JMS_TYPE_BYTE;
-        public long BodyLength => GetBinaryFromBody().Binary.LongLength;
+        public long BodyLength => Content.Length;
 
         public BinaryReader GetDataReader()
         {
@@ -45,58 +46,60 @@ namespace Apache.NMS.AMQP.Provider.Amqp.Message
 
             if (byteIn == null)
             {
-                Data body = GetBinaryFromBody();
-                Stream dataStream = new MemoryStream(body.Binary, false);
+                byte[] body = Content;
+                Stream dataStream = new MemoryStream(body, false);
                 byteIn = new EndianBinaryReader(dataStream);
             }
 
             return byteIn;
         }
 
-        private Data GetBinaryFromBody()
+        public byte[] Content
         {
-            RestrictedDescribed body = Message.BodySection;
-            Data result = EMPTY_DATA;
-            if (body == null)
+            get
             {
-                return result;
-            }
-            else if (body is Data)
-            {
-                byte[] binary = (body as Data).Binary;
-                if (binary != null && binary.Length != 0)
-                {
-                    return body as Data;
-                }
-            }
-            else if (body is AmqpValue)
-            {
-                object value = (body as AmqpValue).Value;
-                if (value == null)
+                RestrictedDescribed body = Message.BodySection;
+                byte[] result = EMPTY_BINARY;
+                if (body == null)
                 {
                     return result;
                 }
-
-                if (value is byte[])
+                else if (body is Data)
                 {
-                    byte[] dataValue = value as byte[];
-                    if (dataValue.Length > 0)
+                    byte[] binary = (body as Data).Binary;
+                    if (binary != null && binary.Length != 0)
                     {
-                        result = new Data();
-                        result.Binary = dataValue;
+                        return binary;
+                    }
+                }
+                else if (body is AmqpValue)
+                {
+                    object value = (body as AmqpValue).Value;
+                    if (value == null)
+                    {
+                        return result;
+                    }
+                    if (value is byte[])
+                    {
+                        byte[] dataValue = value as byte[];
+                        if (dataValue.Length > 0)
+                        {
+                            return dataValue;
+                        }
+                    }
+                    else
+                    {
+                        throw new IllegalStateException("Unexpected Amqp value content-type: " + value.GetType().FullName);
                     }
                 }
                 else
                 {
-                    throw new IllegalStateException("Unexpected Amqp value content-type: " + value.GetType().FullName);
+                    throw new IllegalStateException("Unexpected body content-type: " + body.GetType().FullName);
                 }
-            }
-            else
-            {
-                throw new IllegalStateException("Unexpected body content-type: " + body.GetType().FullName);
-            }
 
-            return result;
+                return result;
+            }
+            set => Message.BodySection = new Data { Binary = value };
         }
 
         public BinaryWriter GetDataWriter()
